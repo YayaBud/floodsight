@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FloodSight — dam-break flood simulator</title>
+  <meta name="description" content="FloodSight: dam-break flood simulator for landslide dams and unmapped impoundments. Validated 2D shallow-water solver. SIH26161." />
+
+  <link href="maplibre-gl.css" rel="stylesheet" />
+  <script src="maplibre-gl.js"></script>
+  <script src="plotly-2.32.0.min.js"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:ital,wght@0,400;0,500;0,600;1,400&family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+
+  <link rel="stylesheet" href="styles.css" />
+</head>
+
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════ DASHBOARD -->
+<main id="app-main">
+
+  <!-- Full-bleed map, always a sibling of the chrome overlay, never a grid track. -->
+  <section id="stage" aria-label="Flood map">
+    <div id="map"></div>
+    <div id="map-vignette" aria-hidden="true"></div>
+
+    <div class="map-tools">
+      <div id="basemap-switcher" role="group" aria-label="Basemap">
+        <button class="seg is-active" data-mode="streets"   onclick="switchBasemap('streets')">Streets</button>
+        <button class="seg" data-mode="satellite" onclick="switchBasemap('satellite')">Satellite</button>
+        <button class="seg" data-mode="topo"      onclick="switchBasemap('topo')">Terrain</button>
+        <button class="seg" data-mode="dark"      onclick="switchBasemap('dark')">Dark</button>
+      </div>
+
+      <button class="btn btn-quiet is-active" type="button" id="btn-toggle-markings"
+              onclick="toggleMapMarkings()" title="Toggle map markings (Dam, Villages, Wavefront, Cuts)" aria-pressed="true">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="8" cy="8" r="6"/>
+          <circle cx="8" cy="8" r="2" fill="currentColor"/>
+        </svg>
+        <span>Markings</span>
+      </button>
+
+      <button class="btn btn-quiet" type="button" id="btn-toggle-sar"
+              onclick="toggleGeeSarLayer()" title="Toggle Google Earth Engine Sentinel-1 SAR Radar Flood Trace" aria-pressed="false">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/>
+          <path d="M4 8a4 4 0 0 1 8 0" stroke-linecap="round"/>
+        </svg>
+        <span>SAR (GEE)</span>
+      </button>
+
+      <button class="btn btn-quiet is-active" type="button" id="btn-toggle-shelters"
+              onclick="toggleShelters()" title="Toggle High-Ground Safe Shelters & Evacuation Havens" aria-pressed="true">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M8 2l5 2.5v4c0 3-2.5 5.5-5 6.5-2.5-1-5-3.5-5-6.5v-4L8 2z" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Shelters</span>
+      </button>
+
+      <div class="menu-wrap">
+        <button class="btn btn-quiet" type="button" id="btn-download"
+                onclick="toggleDownloads()" aria-expanded="false" aria-controls="download-menu" disabled>
+          <svg viewBox="0 0 14 14" width="13" height="13" aria-hidden="true">
+            <path d="M7 2v7m0 0 3-3m-3 3-3-3M2.5 11.5h9" fill="none" stroke="currentColor"
+                  stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          Download
+        </button>
+        <div id="download-menu" class="menu" hidden>
+          <button id="btn-shp" onclick="downloadExport('shp')" disabled>Shapefile <em>.shp</em></button>
+          <button id="btn-kml" onclick="downloadExport('kml')" disabled>Google Earth <em>.kml</em></button>
+          <button id="btn-tif" onclick="downloadExport('tif')" disabled>Max Depth GeoTIFF <em>.tif</em></button>
+          <button id="btn-cap" onclick="downloadExport('cap')" disabled>Alert file <em>CAP JSON</em></button>
+          <p class="menu-note">CAP is formatted for SACHET. Nothing is transmitted.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Transparent overlay grid. Four regions in four named cells; the centre
+       cell is never occupied, so it is always clear map — that, not manual
+       fixed-position math, is what keeps these four from ever colliding. -->
+  <div id="workspace">
+
+    <!-- ══════════════════════════════════════════════════════════════ HEADER -->
+    <header id="app-header">
+      <div class="brand">
+        <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+          <circle cx="16" cy="16" r="15" fill="none" stroke="currentColor" stroke-width="1.4" opacity=".28"/>
+          <path d="M6 19q4-5 8 0t8 0" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"/>
+          <path d="M7 24q3.6-4 7.5 0t7.5 0" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" opacity=".5"/>
+          <path d="M16 5v7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-dasharray="2 3" opacity=".65"/>
+          <circle cx="16" cy="4.5" r="2.4" fill="currentColor"/>
+        </svg>
+        <div class="brand-text">
+          <div class="brand-title-row">
+            <h1>FloodSight</h1>
+            <span class="live-pill"><span class="live-dot"></span>SIMULATOR</span>
+          </div>
+          <p>Dam-break flood simulator</p>
+        </div>
+      </div>
+
+      <nav class="tabs" aria-label="Sections">
+        <button class="tab is-active" id="tab-dashboard" onclick="switchTab('dashboard')">Map</button>
+        <button class="tab" id="tab-compare"  onclick="switchTab('compare')">Solvers</button>
+        <button class="tab" id="tab-alerts"   onclick="switchTab('alerts')">Alerts</button>
+        <button class="tab" id="tab-about"    onclick="switchTab('about')">About</button>
+      </nav>
+
+      <div class="header-end">
+        <span class="grid-badge" id="header-cell-size" title="Simulation grid cell size" hidden></span>
+        <button class="icon-btn" id="zen-toggle" type="button" onclick="toggleZenMode()" title="Zen Mode: Hide all panels to view full map (Press Z)" aria-label="Toggle zen mode">
+          <svg viewBox="0 0 20 20" aria-hidden="true" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6">
+            <path d="M3 7V4a1 1 0 0 1 1-1h3m10 4V4a1 1 0 0 0-1-1h-3M3 13v3a1 1 0 0 0 1 1h3m10-4v3a1 1 0 0 1-1 1h-3" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <button class="icon-btn" id="theme-toggle" type="button" aria-label="Switch light or dark">
+          <svg viewBox="0 0 20 20" aria-hidden="true" width="15" height="15">
+            <path d="M15.5 12.4A6.6 6.6 0 0 1 7.6 4.5a6.6 6.6 0 1 0 7.9 7.9Z"
+                  fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- ─────────────────────────────────────────────── LEFT: run controls -->
+    <aside id="left-panel" aria-label="Set up and run a simulation">
+      <div class="window-header">
+        <div class="window-title-row">
+          <span class="window-dot dot-cyan"></span>
+          <span class="window-title">Simulation Control</span>
+        </div>
+        <div class="window-actions">
+          <span class="window-badge">2D SWE</span>
+          <button class="win-btn" type="button" onclick="togglePanel('left')" title="Collapse Panel (Alt+L)" aria-label="Collapse panel">
+            <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M10 3L5 8l5 5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="sheet-body">
+        <h2>Set up a run</h2>
+
+        <div class="field">
+          <label for="scenario-select">Which impoundment</label>
+          <select id="scenario-select" onchange="window.updateScenarioDefaults()">
+            <option value="rishiganga" selected>Rishi Ganga natural lake — Uttarakhand, 2021</option>
+            <option value="phutkal">Phutkal landslide dam — Ladakh, 2015</option>
+            <option value="south_lhonak">South Lhonak GLOF & Chungthang dam — Sikkim, 2023</option>
+            <option value="derna">Derna dams — Libya, 2023 (Copernicus EMSR696 observed)</option>
+            <option value="ivanovo">Ivanovo dam collapse — Bulgaria, 2012 (GFD satellite observed)</option>
+            <option value="malpasset">Malpasset arch dam — France, 1959 (Dry-bed field benchmark)</option>
+            <option value="annamayya">Annamayya dam breach — Andhra Pradesh, 2021 (Cheyyeru flash flood)</option>
+          </select>
+        </div>
+
+        <!-- Tactical Dam & Breach Origin HUD Card -->
+        <div id="dam-origin-card" class="dam-setup-card">
+          <div class="dam-card-kicker">
+            <span class="dam-card-pulse"></span>
+            <span class="dam-card-kicker-text">BREACH ORIGIN &amp; STRUCTURE</span>
+          </div>
+          <div class="dam-card-title" id="dam-card-title">Rishi Ganga Natural Lake</div>
+          <div class="dam-card-desc" id="dam-card-desc">Rock-ice avalanche barrier failure in narrow Himalayan gorge.</div>
+          
+          <div class="dam-card-telemetry">
+            <div class="telemetry-item">
+              <span class="t-lbl">Coords</span>
+              <span class="t-val" id="dam-card-coords">30.4780°N, 79.7260°E</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-lbl">Height / Crest</span>
+              <span class="t-val" id="dam-card-height">70 m · WSE 3,650 m</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-lbl">Storage</span>
+              <span class="t-val" id="dam-card-vol">15.0 MCM</span>
+            </div>
+            <div class="telemetry-item">
+              <span class="t-lbl">Break Type</span>
+              <span class="t-val" id="dam-card-failure">Avalanche Outburst</span>
+            </div>
+          </div>
+
+          <button type="button" class="btn-focus-dam" onclick="focusDamBreachPoint()" title="Fly 3D camera to exact dam crest and breach point">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="8" cy="8" r="6"/><circle cx="8" cy="8" r="2"/>
+              <line x1="8" y1="0" x2="8" y2="4"/><line x1="8" y1="12" x2="8" y2="16"/>
+              <line x1="0" y1="8" x2="4" y2="8"/><line x1="12" y1="8" x2="16" y2="8"/>
+            </svg>
+            Locate Dam &amp; Breach Point (3D)
+          </button>
+        </div>
+
+        <div class="field">
+          <label for="dam-name-input">Name</label>
+          <input id="dam-name-input" type="text" value="Rishi Ganga Natural Lake (Feb 2021)" />
+        </div>
+
+        <div class="field-row">
+          <div class="field">
+            <label for="wse-input">Water level <span class="hint">m</span></label>
+            <input id="wse-input" type="number" value="3650" min="0" step="0.5" />
+          </div>
+          <div class="field">
+            <label for="failure-mode">How it fails</label>
+            <select id="failure-mode">
+              <option value="overtopping" selected>Overtopping</option>
+              <option value="piping">Piping</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="resolution-select">Detail <span class="hint">finer cells cost time</span></label>
+          <select id="resolution-select">
+            <option value="6">Rough — 170 m cells, about 30 s</option>
+            <option value="4" selected>Balanced — 113 m cells, about a minute</option>
+            <option value="2">Fine — 57 m cells, about 12 minutes</option>
+            <option value="1">Full — 28 m cells, very slow</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label for="reservoir-fraction">How full <span class="hint" id="res-frac-val">90%</span></label>
+          <input id="reservoir-fraction" class="range" type="range"
+                 min="0.1" max="1.0" step="0.05" value="0.9"
+                 oninput="document.getElementById('res-frac-val').textContent = (+this.value*100).toFixed(0)+'%'" />
+          <div class="range-ends"><span>empty</span><span>full</span></div>
+        </div>
+
+        <button class="btn btn-primary btn-block btn-lg" id="btn-run" onclick="runSimulation()">Run it</button>
+
+        <p id="run-status" class="run-status" role="status" aria-live="polite">Ready when you are.</p>
+
+        <div id="run-progress" class="run-progress hidden" role="progressbar"
+             aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="rp-track"><div class="rp-fill" id="rp-fill"></div></div>
+          <div class="rp-meta"><span id="rp-label">—</span><span id="rp-pct">0%</span></div>
+          <p class="rp-detail" id="rp-detail"></p>
+        </div>
+
+        <ol class="progress-steps" id="progress-steps" aria-label="Stages">
+          <li class="progress-step step-pending" id="step-0"><span class="step-dot"></span>Estimating the breach</li>
+          <li class="progress-step step-pending" id="step-1"><span class="step-dot"></span>Routing the water</li>
+          <li class="progress-step step-pending" id="step-2"><span class="step-dot"></span>Finding who is hit</li>
+          <li class="progress-step step-pending" id="step-3"><span class="step-dot"></span>Packaging the files</li>
+        </ol>
+
+        <details class="disclose">
+          <summary>How this was worked out</summary>
+          <div class="disclose-body">
+            <p>Three breach estimates run as an ensemble. The middle one drives the map;
+               the outer two set the flooded-area envelope.</p>
+            <div class="arm" id="breach-pess">
+              <span class="arm-name">Bigger, faster breach</span>
+              <span class="arm-stat" id="bp-qp">—</span><span class="arm-stat" id="bp-tf">—</span>
+            </div>
+            <div class="arm arm-mid" id="breach-cent">
+              <span class="arm-name">Middle <em>Froehlich 2008</em></span>
+              <span class="arm-stat" id="bc-qp">—</span><span class="arm-stat" id="bc-tf">—</span>
+            </div>
+            <div class="arm" id="breach-opti">
+              <span class="arm-name">Smaller, slower breach</span>
+              <span class="arm-stat" id="bo-qp">—</span><span class="arm-stat" id="bo-tf">—</span>
+            </div>
+            <p class="disclose-note">
+              Water is routed with a well-balanced 2D finite-volume shallow-water solver,
+              checked against the Ritter analytical dam break. Terrain is Copernicus GLO-30,
+              population GHS-POP, roads and buildings OpenStreetMap.
+            </p>
+          </div>
+        </details>
+      </div>
+    </aside>
+
+    <!-- ─────────────────────────────────────────── RIGHT: everything computed -->
+    <aside id="right-panel" aria-label="Results">
+      <div class="window-header">
+        <div class="window-title-row">
+          <span class="window-dot dot-blue"></span>
+          <span class="window-title">Telemetry & Impact</span>
+        </div>
+        <div class="window-actions">
+          <span class="window-badge">Real-Time</span>
+          <button class="win-btn" type="button" onclick="togglePanel('right')" title="Collapse Panel (Alt+R)" aria-label="Collapse panel">
+            <svg viewBox="0 0 16 16" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M6 3l5 5-5 5" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <div id="answer-card" class="card" data-state="empty">
+        <div class="card-empty">
+          <div class="ac-empty-header">
+            <svg class="ac-radar-icon" viewBox="0 0 24 24" aria-hidden="true" width="20" height="20">
+              <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".3"/>
+              <circle cx="12" cy="12" r="5" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/>
+              <circle cx="12" cy="12" r="2" fill="currentColor"/>
+              <path d="M12 12l6-6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+            </svg>
+            <p class="ac-empty-title">Simulation Standby</p>
+          </div>
+          <p class="ac-empty-body">Select an impoundment and execute the 2D solver to simulate flood propagation, road cuts, and village exposure.</p>
+          <button class="btn btn-primary btn-block" type="button" onclick="document.getElementById('scenario-select').focus()">Configure Scenario</button>
+        </div>
+
+        <div class="card-full">
+          <div class="ac-lead">
+            <svg class="ac-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="9" cy="7.5" r="2.6" fill="none" stroke="currentColor" stroke-width="1.7"/>
+              <circle cx="16.5" cy="8.5" r="2.1" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".6"/>
+              <path d="M4 18.5c0-2.8 2.2-5 5-5s5 2.2 5 5" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+              <path d="M15.2 13.7c2.5.2 4.4 2.3 4.4 4.8" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" opacity=".6"/>
+            </svg>
+            <div>
+              <span class="ac-num" id="val-par">—</span>
+              <span class="ac-unit">People in the flood path</span>
+            </div>
+          </div>
+          <p class="ac-scope">Whole event · <span id="val-buildings">—</span> buildings flooded</p>
+
+          <!-- Below the rule everything is read at the playhead. Only these two
+               are genuinely time-varying in the run output. -->
+          <p class="ac-at">At <span class="ac-at-t">T+<b id="ac-t-val">0</b> min</span></p>
+          <dl class="ac-rows">
+            <div class="ac-row">
+              <dt>Roads cut</dt>
+              <dd><span id="val-roads">—</span><span class="ac-of" id="val-roads-of"></span></dd>
+            </div>
+            <div class="ac-row ac-row-alert">
+              <dt>Villages cut off</dt>
+              <dd><span id="val-isolated">—</span></dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <div id="evac-card" class="card" hidden>
+        <div class="card-head">
+          <h2>Evacuate first</h2>
+          <p class="card-note">By isolation time, people, exits</p>
+        </div>
+        <div id="priority-list" class="priority-list" role="list"></div>
+        <button class="card-foot-btn" type="button" id="btn-all-villages" onclick="toggleAllVillages()">
+          View all locations
+        </button>
+      </div>
+
+      <div class="card" id="event-details">
+        <div class="card-head"><h2>Event</h2></div>
+        <div class="card-body">
+          <p id="event-desc">Rishi Ganga natural lake — Uttarakhand, 7 February 2021</p>
+        </div>
+      </div>
+
+      <div id="hadr-export-card" class="card">
+        <div class="card-head">
+          <h2>HADR Deliverables</h2>
+          <p class="card-note">Standard Open Geospatial Formats</p>
+        </div>
+        <div class="card-body export-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:10px;">
+          <button class="btn btn-sm btn-quiet" id="btn-shp-card" onclick="downloadExport('shp')" disabled title="GIS Inundation Extent (.shp)">
+            <strong>.SHP</strong> Shapefile
+          </button>
+          <button class="btn btn-sm btn-quiet" id="btn-kml-card" onclick="downloadExport('kml')" disabled title="Google Earth Overlay (.kml)">
+            <strong>.KML</strong> Google Earth
+          </button>
+          <button class="btn btn-sm btn-quiet" id="btn-tif-card" onclick="downloadExport('tif')" disabled title="Max Flood Depth GeoTIFF (.tif)">
+            <strong>.TIF</strong> GeoTIFF
+          </button>
+          <button class="btn btn-sm btn-quiet" id="btn-cap-card" onclick="downloadExport('cap')" disabled title="Common Alerting Protocol (CAP 1.2)">
+            <strong>CAP</strong> SACHET Alert
+          </button>
+        </div>
+      </div>
+
+      <div id="validation-panel" class="card" hidden></div>
+
+      <div id="map-legend" class="card">
+        <button class="card-head card-head-btn" type="button" onclick="toggleLegend()"
+                aria-expanded="true" aria-controls="legend-body">
+          <h2>Legend</h2>
+          <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+            <path d="M2 7.5 6 3.5 10 7.5" fill="none" stroke="currentColor"
+                  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </button>
+        <div id="legend-body" class="card-body">
+          <p class="legend-label">Water depth <em>m</em></p>
+          <div class="legend-ramp"></div>
+          <div class="legend-ramp-scale"><span>0</span><span>0.3</span><span>1</span><span>2</span><span>3+</span></div>
+          <p class="legend-label">Roads</p>
+          <ul class="legend-keys">
+            <li><i class="k-line k-open"></i>Open</li>
+            <li><i class="k-line k-risk"></i>Cut soon</li>
+            <li><i class="k-line k-cut"></i>Impassable now</li>
+            <li><i class="k-line k-bridge"></i>Bridge lost</li>
+          </ul>
+          <p class="legend-label" style="margin-top:8px;">Satellite Ground Truth</p>
+          <ul class="legend-keys">
+            <li><i class="k-line" style="background:#06b6d4;height:3px;"></i>Observed extent</li>
+            <li><i class="k-line" style="background:#818cf8;border:1px dashed #6366f1;height:3px;"></i>Sentinel-1 SAR (GEE)</li>
+          </ul>
+          <p class="legend-label" style="margin-top:8px;">Safe Havens &amp; Shelters</p>
+          <ul class="legend-keys">
+            <li><i class="k-line" style="background:#10b981;height:3px;"></i>Safe Evacuation Haven</li>
+          </ul>
+        </div>
+      </div>
+    </aside>
+
+    <!-- event detail popover, anchored to a timeline pin -->
+    <div id="event-pop" class="card" role="dialog" aria-label="Event detail" hidden>
+      <div class="pop-head">
+        <p class="pop-kicker" id="pop-kicker">Event</p>
+        <button class="pop-close" type="button" onclick="closeEventPop()" aria-label="Close">
+          <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true">
+            <path d="M3 3l6 6M9 3l-6 6" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </div>
+      <h3 id="callout-village" dir="auto">—</h3>
+      <dl class="pop-rows">
+        <div><dt>Water arrives</dt><dd id="callout-arr">—</dd></div>
+        <div><dt>Last road closes</dt><dd id="callout-iso">—</dd></div>
+        <div><dt>People</dt><dd id="callout-pop">—</dd></div>
+        <div><dt>Evacuate to</dt><dd id="callout-shelter" style="color:#10b981;font-weight:600;">Safe High Ground</dd></div>
+      </dl>
+      <p class="pop-window" id="callout-window-line"><span id="callout-window">—</span></p>
+    </div>
+
+  <!-- ─────────────────────────────────────────────────────────── THE SPINE -->
+  <section id="spine" class="is-compact" aria-label="Timeline" data-state="empty">
+    <div class="spine-lanes-wrap">
+      <div class="spine-gutter">
+        <div class="lane-name"><span>Flow depth</span></div>
+        <div class="lane-name"><span>Events</span></div>
+        <div class="lane-name"><span>Roads</span><em id="roads-count"></em></div>
+      </div>
+
+      <div class="spine-body">
+        <div id="spine-empty" class="spine-empty">
+          <div class="spine-empty-inner">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" opacity=".7">
+              <path d="M3 17l4-5 4 4 5-8 5 4" stroke-linecap="round" stroke-linejoin="round"/>
+            </svg>
+            <span>Simulation timeline & hydrograph initialize upon execution</span>
+          </div>
+        </div>
+
+        <div id="spine-lanes" class="spine-lanes" hidden>
+          <svg id="lane-flow" class="lane" viewBox="0 0 1000 60" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="flow-grad" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%"   stop-color="var(--water)" stop-opacity=".38"/>
+                <stop offset="100%" stop-color="var(--water)" stop-opacity=".04"/>
+              </linearGradient>
+            </defs>
+            <path id="flow-area" d="" />
+            <path id="flow-line" d="" />
+          </svg>
+
+          <div id="lane-events" class="lane lane-events">
+            <div class="axis"></div>
+            <div id="event-pins"></div>
+          </div>
+
+          <svg id="lane-roads" class="lane" viewBox="0 0 1000 26" preserveAspectRatio="none" aria-hidden="true">
+            <path id="roads-open-area" d="" />
+            <path id="roads-risk-area" d="" />
+            <path id="roads-cut-area"  d="" />
+          </svg>
+
+          <div id="playhead" aria-hidden="true"><b id="playhead-tag">T+0</b><i></i></div>
+        </div>
+
+        <!-- Native range: gives keyboard, screen readers and drag for free. -->
+        <input type="range" id="time-slider" min="0" max="100" value="0" step="1"
+               aria-label="Simulation time" oninput="onTimeSlider(+this.value)" />
+      </div>
+    </div>
+
+    <div class="spine-foot">
+      <button id="btn-play" class="btn btn-primary" onclick="togglePlay()"
+              aria-label="Play the flood animation" hidden>
+        <svg viewBox="0 0 12 12" width="11" height="11" aria-hidden="true"><path d="M3 2l7 4-7 4z" fill="currentColor"/></svg>
+        <span>Play</span>
+      </button>
+      <button id="btn-rewind" class="icon-btn" onclick="rewindToStart()" aria-label="Back to T+0" hidden>
+        <svg viewBox="0 0 14 14" width="12" height="12" aria-hidden="true">
+          <path d="M4 3v8M11 3.5l-5.5 3.5L11 10.5z" fill="none" stroke="currentColor"
+                stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+      </button>
+
+      <div class="readout">
+        <span class="readout-t">T +</span>
+        <span class="readout-v" id="scrubber-time-val">0 min</span>
+      </div>
+
+      <div class="spine-ends">
+        <span>T+0</span>
+        <span class="spine-ends-track" aria-hidden="true"><i id="ends-fill"></i></span>
+        <span id="scrubber-max"></span>
+      </div>
+      <span id="scrubber-mid" hidden></span>
+      <button class="win-btn spine-toggle-btn" id="btn-toggle-spine" type="button" onclick="toggleSpine()" title="Minimize / Expand Timeline" aria-label="Toggle timeline height">
+        <svg viewBox="0 0 14 14" width="11" height="11" fill="none" stroke="currentColor" stroke-width="2">
+          <path id="spine-chevron-path" d="M3 8l4-4 4 4" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </button>
+    </div>
+  </section>
+
+  <!-- Floating Collapsed Window Handles -->
+  <button class="floating-handle handle-left" id="handle-left" type="button" onclick="togglePanel('left')" aria-label="Open Simulation Control">
+    <span class="window-dot dot-cyan"></span>
+    <span class="handle-text">Parameters</span>
+    <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M5 3l4 4-4 4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+  </button>
+
+  <button class="floating-handle handle-right" id="handle-right" type="button" onclick="togglePanel('right')" aria-label="Open Telemetry & Impact">
+    <svg viewBox="0 0 14 14" width="10" height="10" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M9 3L5 7l4 4" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <span class="window-dot dot-blue"></span>
+    <span class="handle-text">Telemetry</span>
+  </button>
+
+  <!-- Zen Mode Exit Banner -->
+  <button id="zen-banner" type="button" onclick="toggleZenMode()" aria-label="Exit zen mode">
+    <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+      <path d="M3 3l10 10M13 3L3 13" stroke-linecap="round"/>
+    </svg>
+    <span>Full Map View Active · Click to restore panels (Z)</span>
+  </button>
+  </div>
+</main>
+
+<!-- ══════════════════════════════════════════════════════════ SOLVERS TAB -->
+<div id="tab-compare-panel" class="page hidden">
+  <div class="page-head">
+    <h2>Solvers</h2>
+    <p>FloodSight runs a well-balanced 2D finite-volume shallow-water solver, checked against
+       five benchmarks. Two other arms exist in the repository; their real wiring status is below.</p>
+  </div>
+  <div class="page-grid">
+    <article class="card page-card">
+      <p class="card-kicker">Runs on every simulation</p>
+      <h3>FloodSight 2D SWE</h3>
+      <p>Audusse hydrostatic reconstruction, MUSCL with minmod, SSP-RK2,
+         Kurganov&ndash;Petrova desingularisation. Checked on lake-at-rest, mass closure,
+         Ritter RMSE, wave speed and front location.</p>
+      <dl class="spec">
+        <div><dt>Type</dt><dd>2D SWE, finite volume, structured</dd></div>
+        <div><dt>Ritter RMSE</dt><dd>0.043 m</dd></div>
+        <div><dt>Cell size</dt><dd id="solver-cellsize">—</dd></div>
+      </dl>
+      <div id="ritter-anuga-chart" class="mini-chart"></div>
+    </article>
+
+    <article class="card page-card">
+      <p class="card-kicker card-kicker-off">In the repo, not called</p>
+      <h3>SWE-SPH, 1D</h3>
+      <p>Depth-averaged smoothed-particle hydrodynamics, self-contained in
+         <code>sph_swe.py</code> with no PySPH dependency. Intended to run the Ritter
+         benchmark so its output is comparable to the finite-volume result.</p>
+      <dl class="spec">
+        <div><dt>Type</dt><dd>SWE-SPH, 1D</dd></div>
+        <div><dt>Status</dt><dd>Not yet wired</dd></div>
+      </dl>
+      <div id="ritter-sph-chart" class="mini-chart"></div>
+    </article>
+
+    <article class="card page-card">
+      <p class="card-kicker card-kicker-off">Precomputed benchmark</p>
+      <h3>Delft3D-FLOW</h3>
+      <p>Structured finite-difference solver, Deltares, GPLv3. A pre-built benchmark case
+         only &mdash; running Delft3D live inside a 36-hour build is a known way to fail.</p>
+      <dl class="spec">
+        <div><dt>Ritter RMSE</dt><dd>0.14 m, precomputed</dd></div>
+        <div><dt>Domain</dt><dd>Test channel only</dd></div>
+      </dl>
+    </article>
+  </div>
+
+  <section class="page-section">
+    <h3>Ritter analytical check</h3>
+    <p>The exact 1892 dam-break solution on a flat frictionless bed. Matching it proves the
+       numerics before any real terrain run.</p>
+    <div id="ritter-combined-chart" class="big-chart"></div>
+  </section>
+
+  <section class="page-section" style="margin-top: 24px;">
+    <p class="card-kicker" style="color: var(--water); font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px;">Canonical Field Benchmark (Zero Rain)</p>
+    <h3>Malpasset 1959 Dam Break Benchmark</h3>
+    <p>The textbook real-world dam break validation case (Reyran Valley, France). Catastrophic arch dam failure (66.5 m, 50 Mm³ reservoir) into a dry rocky canyon. Zero rainfall contamination. FloodSight 2D SWE simulated wave arrival times and peak elevations are compared against recorded electrical transformer destruction and police survey marks.</p>
+
+    <div class="page-grid" style="margin-top: 14px;">
+      <article class="card page-card">
+        <p class="card-kicker">Recorded Arrival Times</p>
+        <h4>Electric Transformers A, B, C</h4>
+        <dl class="spec">
+          <div><dt>Transformer A (1.4 km)</dt><dd>100 s recorded vs 105 s SWE (+5.0%)</dd></div>
+          <div><dt>Transformer B (5.5 km)</dt><dd>1204 s recorded vs 1180 s SWE (-2.0%)</dd></div>
+          <div><dt>Transformer C (6.9 km)</dt><dd>1420 s recorded vs 1395 s SWE (-1.8%)</dd></div>
+        </dl>
+      </article>
+      <article class="card page-card">
+        <p class="card-kicker">High-Water Marks</p>
+        <h4>Survey Gauges P1–P14</h4>
+        <div id="malpasset-hwm-chart" class="mini-chart" style="height: 200px;"></div>
+      </article>
+    </div>
+  </section>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════════ ALERTS TAB -->
+<div id="tab-alerts-panel" class="page hidden">
+  <div class="page-head">
+    <h2>Alerts</h2>
+    <p>Built from the simulation output and shown here only &mdash; nothing is transmitted.
+       Run a simulation to fill these in.</p>
+  </div>
+  <div class="page-grid">
+    <article class="card page-card">
+      <p class="card-kicker">CAP 1.2 &middot; ITU-T X.1303</p>
+      <h3>Alert file</h3>
+      <pre class="preview" id="cap-preview">Run a simulation to see the alert file.</pre>
+    </article>
+    <article class="card page-card">
+      <p class="card-kicker">For responders</p>
+      <h3>Brief</h3>
+      <pre class="preview" id="responder-brief">Run a simulation to see the brief.</pre>
+    </article>
+    <article class="card page-card">
+      <p class="card-kicker">160 characters</p>
+      <h3>Public SMS, English</h3>
+      <pre class="preview" id="sms-en">Run a simulation to see the SMS.</pre>
+    </article>
+    <article class="card page-card">
+      <p class="card-kicker">70 characters per segment</p>
+      <h3>Public SMS, Hindi</h3>
+      <pre class="preview" id="sms-hi">सिमुलेशन चलाएं।</pre>
+    </article>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ ABOUT TAB -->
+<div id="tab-about-panel" class="page hidden">
+  <div class="page-head">
+    <h2>About</h2>
+    <p class="pitch">NDSA has a plan for all 6,628 specified dams. Nobody has a plan for the dam
+       that formed last Tuesday. We build one in twenty minutes from open data.</p>
+  </div>
+  <div class="page-grid">
+    <article class="card page-card">
+      <h3>What is new here</h3>
+      <ul>
+        <li><strong>Impoundments nobody registered</strong> &mdash; landslide dams, moraine lakes,
+            river blockages. No DHARMA record, no emergency action plan, no gauge.</li>
+        <li><strong>Roads that close over time</strong> &mdash; the road graph is cut as a function
+            of simulation time, not once at the end.</li>
+        <li><strong>Three breach estimates, not one</strong> &mdash; Froehlich, Von Thun &amp;
+            Gillette and MacDonald carried as a range.</li>
+      </ul>
+    </article>
+    <article class="card page-card">
+      <h3>What already exists</h3>
+      <ul>
+        <li><strong>RBSD</strong> &mdash; dam-break population dashboard for 6,628 specified dams.</li>
+        <li><strong>C-FLOOD</strong> &mdash; 48-hour inundation forecast at village level.</li>
+        <li><strong>DHARMA</strong> &mdash; dam register and health monitoring.</li>
+        <li><strong>SACHET</strong> &mdash; the national CAP alert pipeline.</li>
+      </ul>
+    </article>
+    <article class="card page-card">
+      <h3>Where the data comes from</h3>
+      <ul>
+        <li>Terrain: <strong>Copernicus GLO-30</strong>, 27.9 m at this latitude</li>
+        <li>People: <strong>GHS-POP</strong> 3 arc-second, area-conserving resample</li>
+        <li>Buildings and roads: <strong>OpenStreetMap</strong></li>
+        <li>Settlements: OSM place nodes</li>
+      </ul>
+    </article>
+    <article class="card page-card">
+      <h3>Honest limits</h3>
+      <ul>
+        <li>Derna 2023 was a compound event. Rain drove part of the observed flood and
+            FloodSight routes only the dam break, so its score cannot reach 1.</li>
+        <li>Roughness is inferred from population density, not land cover.</li>
+        <li>Only the middle breach estimate is carried through to roads and people.</li>
+      </ul>
+    </article>
+  </div>
+</div>
+
+<script>
+  // Theme: follow the OS, remember an explicit choice. Storage throws outright
+  // in some privacy modes, so every access is wrapped.
+  (function () {
+    let saved = null;
+    try { saved = localStorage.getItem("floodsight-theme"); } catch (e) {}
+    if (saved) document.documentElement.setAttribute("data-theme", saved);
+    document.addEventListener("DOMContentLoaded", function () {
+      const btn = document.getElementById("theme-toggle");
+      if (!btn) return;
+      btn.addEventListener("click", function () {
+        const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+        const cur = document.documentElement.getAttribute("data-theme") || (dark ? "dark" : "light");
+        const next = cur === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        try { localStorage.setItem("floodsight-theme", next); } catch (e) {}
+        document.dispatchEvent(new CustomEvent("floodsight:themechange"));
+      });
+    });
+  })();
+</script>
+<script src="debug.js"></script>
+<script src="spine.js"></script>
+<script src="map.js"></script>
+<script src="charts.js"></script>
+<script src="ui.js"></script>
+</body>
+</html>

@@ -1,0 +1,110 @@
+{
+  "Togurupeta": {
+    "lat": 14.2539265,
+    "lon": 79.043258,
+    "display_name": "Togurupeta, Rajampet, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Mandapalli": {
+    "lat": 19.1266716,
+    "lon": 84.6717243,
+    "display_name": "Mandapalli, Ichchapuram, Srikakulam, Andhra Pradesh, 532312, India",
+    "in_bbox": false
+  },
+  "Pulapathuru": {
+    "lat": 14.2472661,
+    "lon": 79.0444644,
+    "display_name": "Pulapathuru, Rajampet, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Gundlur": {
+    "lat": 14.2521689,
+    "lon": 79.1139917,
+    "display_name": "Gundlur, Rajampet, YSR Kadapa, Andhra Pradesh, 516150, India",
+    "in_bbox": true
+  },
+  "Ramachandrapuram": {
+    "lat": 16.8185549,
+    "lon": 82.0641497,
+    "display_name": "Ramachandrapuram, Konaseema, Andhra Pradesh, India",
+    "in_bbox": false
+  },
+  "Paparajupalle": {
+    "lat": 13.9610207,
+    "lon": 79.327908,
+    "display_name": "Paparajupalle, Kodur, Tirupati, Andhra Pradesh, 516101, India",
+    "in_bbox": false
+  },
+  "Nandalur": {
+    "lat": 14.3329582,
+    "lon": 79.1961433,
+    "display_name": "Nandalur, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Akepadu": {
+    "lat": 14.180761,
+    "lon": 79.0587653,
+    "display_name": "Akepadu Distributory, Rajampet, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Paturu": {
+    "lat": 14.5147189,
+    "lon": 79.9422313,
+    "display_name": "Paturu, Kovur, Sri Potti Sriramulu Nellore, Andhra Pradesh, 524152, India",
+    "in_bbox": false
+  },
+  "Lebaka": {
+    "lat": 14.2919061,
+    "lon": 79.1924824,
+    "display_name": "Lebaka, Nandalur, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Narayana Nellore": {
+    "lat": 14.2660778,
+    "lon": 79.1965254,
+    "display_name": "Narayana Nellore, Penagalur, Tirupati, Andhra Pradesh, India",
+    "in_bbox": true
+  },
+  "Mandaram": {
+    "lat": 15.7674903,
+    "lon": 78.0597739,
+    "display_name": "\u0c2f\u0c47\u0c38\u0c41 \u0c15\u0c4d\u0c30\u0c40\u0c38\u0c4d\u0c24\u0c41 \u0c2a\u0c4d\u0c30\u0c24\u0c4d\u0c2f\u0c15\u0c4d\u0c37\u0c24 \u0c2e\u0c02\u0c26\u0c3f\u0c30\u0c02 (YESU KRISTU PRATYAKSHATHA MANDIRAM), Kurnool - Ongole Main Road, Kurnool Urban, Bandi Tandrapadu, Kurnool, Andhra Pradesh, 518008, India",
+    "in_bbox": false
+  },
+  "Tanguturu": {
+    "lat": 14.2952889,
+    "lon": 79.2220696,
+    "display_name": "Tanguturu, Nandalur, YSR Kadapa, Andhra Pradesh, 516127, India",
+    "in_bbox": true
+  },
+  "Kummarapalle": {
+    "lat": 13.6575095,
+    "lon": 79.5589359,
+    "display_name": "Kummarapalle, Renigunta, Tirupati, Andhra Pradesh, India",
+    "in_bbox": false
+  },
+  "Penagaluru": {
+    "lat": 14.3045278,
+    "lon": 79.2633321,
+    "display_name": "Penagaluru, Penagalur, Tirupati, Andhra Pradesh, 516127, India",
+    "in_bbox": true
+  },
+  "Obili": {
+    "lat": 14.2836875,
+    "lon": 79.2239961,
+    "display_name": "Obili, Penagalur, Tirupati, Andhra Pradesh, 516127, India",
+    "in_bbox": true
+  },
+  "Jettivaripalle": {
+    "lat": 13.667615,
+    "lon": 78.2032536,
+    "display_name": "Jettivaripalle, Pothupeta, Pedda Thippasamudram, Annamayya, Andhra Pradesh, India",
+    "in_bbox": false
+  },
+  "Indluru": {
+    "lat": 14.2990778,
+    "lon": 79.2707692,
+    "display_name": "Indluru, Penagalur, Tirupati, Andhra Pradesh, 516127, India",
+    "in_bbox": true
+  }
+}

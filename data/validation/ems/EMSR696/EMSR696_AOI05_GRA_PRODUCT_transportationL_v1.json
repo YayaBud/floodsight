@@ -1,0 +1,10 @@
+{
+"type": "FeatureCollection",
+"name": "EMSR696_AOI05_GRA_PRODUCT_transportationL_v1",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "obj_type": "211-Highways, Streets and Roads", "name": "Unknown", "info": "21122-Local Road", "simplified": "Local roads", "damage_gra": "Possibly damaged", "det_method": "Photo-interpretation", "notation": "Not Applicable", "or_src_id": 994, "dmg_src_id": 2, "cd_value": "Not Applicable" }, "geometry": { "type": "LineString", "coordinates": [ [ 21.904651500000057, 32.79567140000006 ], [ 21.904926400000022, 32.795306100000062 ], [ 21.905044500000031, 32.795174200000076 ], [ 21.905103500000052, 32.795089700000062 ], [ 21.905182600000046, 32.794943100000069 ], [ 21.905318100000045, 32.794664600000033 ], [ 21.905335301000036, 32.794633704000034 ] ] } },
+{ "type": "Feature", "properties": { "obj_type": "211-Highways, Streets and Roads", "name": "Unknown", "info": "21121-Secondary Road", "simplified": "Main roads", "damage_gra": "Possibly damaged", "det_method": "Photo-interpretation", "notation": "Not Applicable", "or_src_id": 994, "dmg_src_id": 2, "cd_value": "Not Applicable" }, "geometry": { "type": "LineString", "coordinates": [ [ 21.910941445000049, 32.796458078000057 ], [ 21.910488, 32.796471800000063 ], [ 21.910021300000039, 32.796467300000074 ], [ 21.90909860000005, 32.796417700000063 ], [ 21.908763219000036, 32.79639387900005 ] ] } },
+{ "type": "Feature", "properties": { "obj_type": "211-Highways, Streets and Roads", "name": "Unknown", "info": "21122-Local Road", "simplified": "Local roads", "damage_gra": "Damaged", "det_method": "Photo-interpretation", "notation": "Not Applicable", "or_src_id": 994, "dmg_src_id": 2, "cd_value": "Not Applicable" }, "geometry": { "type": "LineString", "coordinates": [ [ 21.857375914000045, 32.778356320000057 ], [ 21.857440600000075, 32.778236400000026 ], [ 21.857584100000054, 32.778013200000032 ] ] } }
+]
+}

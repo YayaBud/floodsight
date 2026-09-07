@@ -1,0 +1,24 @@
+{
+"type": "FeatureCollection",
+"name": "malpasset_stations",
+"crs": { "type": "name", "properties": { "name": "urn:ogc:def:crs:OGC:1.3:CRS84" } },
+"features": [
+{ "type": "Feature", "properties": { "name": "Transformer A", "distance_m": 1400, "type": "transformer", "description": "Arrival: 100 s (1.7 min)" }, "geometry": { "type": "Point", "coordinates": [ 6.751494545454546, 43.496738181818181 ] } },
+{ "type": "Feature", "properties": { "name": "Transformer B", "distance_m": 5500, "type": "transformer", "description": "Arrival: 1204 s (20.1 min)" }, "geometry": { "type": "Point", "coordinates": [ 6.74445, 43.4661 ] } },
+{ "type": "Feature", "properties": { "name": "Transformer C", "distance_m": 6900, "type": "transformer", "description": "Arrival: 1420 s (23.7 min)" }, "geometry": { "type": "Point", "coordinates": [ 6.742044545454545, 43.45563818181818 ] } },
+{ "type": "Feature", "properties": { "name": "P1 (Survey)", "distance_m": 422, "type": "gauge", "description": "Peak WSE: 80.3 m" }, "geometry": { "type": "Point", "coordinates": [ 6.753174927272728, 43.504046509090905 ] } },
+{ "type": "Feature", "properties": { "name": "P2 (Survey)", "distance_m": 1000, "type": "gauge", "description": "Peak WSE: 71.8 m" }, "geometry": { "type": "Point", "coordinates": [ 6.752181818181818, 43.49972727272727 ] } },
+{ "type": "Feature", "properties": { "name": "P3 (Survey)", "distance_m": 1420, "type": "gauge", "description": "Peak WSE: 61.2 m" }, "geometry": { "type": "Point", "coordinates": [ 6.751460181818182, 43.496588727272723 ] } },
+{ "type": "Feature", "properties": { "name": "P4 (Survey)", "distance_m": 2100, "type": "gauge", "description": "Peak WSE: 53.4 m" }, "geometry": { "type": "Point", "coordinates": [ 6.750291818181818, 43.491507272727269 ] } },
+{ "type": "Feature", "properties": { "name": "P5 (Survey)", "distance_m": 2800, "type": "gauge", "description": "Peak WSE: 46.5 m" }, "geometry": { "type": "Point", "coordinates": [ 6.749089090909091, 43.486276363636364 ] } },
+{ "type": "Feature", "properties": { "name": "P6 (Survey)", "distance_m": 3500, "type": "gauge", "description": "Peak WSE: 40.1 m" }, "geometry": { "type": "Point", "coordinates": [ 6.747886363636364, 43.481045454545452 ] } },
+{ "type": "Feature", "properties": { "name": "P7 (Survey)", "distance_m": 4200, "type": "gauge", "description": "Peak WSE: 34.6 m" }, "geometry": { "type": "Point", "coordinates": [ 6.746683636363636, 43.47581454545454 ] } },
+{ "type": "Feature", "properties": { "name": "P8 (Survey)", "distance_m": 4900, "type": "gauge", "description": "Peak WSE: 30.2 m" }, "geometry": { "type": "Point", "coordinates": [ 6.745480909090909, 43.470583636363635 ] } },
+{ "type": "Feature", "properties": { "name": "P9 (Survey)", "distance_m": 5500, "type": "gauge", "description": "Peak WSE: 26.8 m" }, "geometry": { "type": "Point", "coordinates": [ 6.74445, 43.4661 ] } },
+{ "type": "Feature", "properties": { "name": "P10 (Survey)", "distance_m": 6200, "type": "gauge", "description": "Peak WSE: 23.5 m" }, "geometry": { "type": "Point", "coordinates": [ 6.743247272727273, 43.460869090909085 ] } },
+{ "type": "Feature", "properties": { "name": "P11 (Survey)", "distance_m": 6900, "type": "gauge", "description": "Peak WSE: 20.8 m" }, "geometry": { "type": "Point", "coordinates": [ 6.742044545454545, 43.45563818181818 ] } },
+{ "type": "Feature", "properties": { "name": "P12 (Survey)", "distance_m": 7600, "type": "gauge", "description": "Peak WSE: 18.2 m" }, "geometry": { "type": "Point", "coordinates": [ 6.740841818181818, 43.450407272727269 ] } },
+{ "type": "Feature", "properties": { "name": "P13 (Survey)", "distance_m": 8300, "type": "gauge", "description": "Peak WSE: 15.6 m" }, "geometry": { "type": "Point", "coordinates": [ 6.739639090909091, 43.445176363636364 ] } },
+{ "type": "Feature", "properties": { "name": "P14 (Survey)", "distance_m": 9000, "type": "gauge", "description": "Peak WSE: 13.1 m" }, "geometry": { "type": "Point", "coordinates": [ 6.738436363636364, 43.439945454545452 ] } }
+]
+}

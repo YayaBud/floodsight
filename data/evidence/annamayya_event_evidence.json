@@ -1,0 +1,170 @@
+{
+  "scenario_key": "annamayya",
+  "disaster_name": "Annamayya Dam Failure & Cheyyeru Flash Flood (19 November 2021)",
+  "region": "Rajampet and Nandalur Mandals, Annamayya District (formerly Kadapa), Andhra Pradesh, India",
+  "evidence_standards": {
+    "OBSERVED": "Direct sensor, gauge, or physical survey measurement",
+    "OFFICIAL_ESTIMATE": "Documented in government situation report or official committee memo",
+    "MODEL_RECONSTRUCTION": "Derived from validated hydrologic or hydraulic engineering formulations",
+    "ASSUMED": "Engineering scenario parameter bounded by uncertainty intervals"
+  },
+  "parameters": {
+    "catchment_rainfall_mm": {
+      "value": 180.0,
+      "range": [150.0, 240.0],
+      "units": "mm",
+      "classification": "OBSERVED",
+      "source": "IMD / APSDPS Daily Weather Bulletins (18-19 Nov 2021)",
+      "confidence": "High",
+      "usage": "Scenario boundary condition"
+    },
+    "pincha_storage_mcm": {
+      "value": 9.28,
+      "surcharge_max_mcm": 14.0,
+      "units": "MCM",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "AP Irrigation Dept Medium Irrigation Register / CWC",
+      "confidence": "High",
+      "usage": "Upstream feeder storage volume"
+    },
+    "pincha_failure_mechanism": {
+      "description": "Overtopping and washout of temporary ring bund",
+      "is_concrete_dam_collapse": false,
+      "classification": "OBSERVED",
+      "source": "AP Irrigation & CAD Department / CWC Technical Appraisal (2021)",
+      "confidence": "High"
+    },
+    "pincha_failure_time": {
+      "timestamp_ist": "2021-11-19T03:30:00+05:30",
+      "relative_min_to_annamayya_breach": -150.0,
+      "classification": "OBSERVED",
+      "source": "Local Irrigation Log / District Situation Report",
+      "confidence": "High",
+      "usage": "Temporal anchor T-150m"
+    },
+    "pincha_surge_peak_m3s": {
+      "value": 3964.4,
+      "value_cfs": 140000.0,
+      "range_cfs": [120000.0, 160000.0],
+      "units": "m3/s",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "AP Irrigation Official Flood Report (Nov 2021)",
+      "confidence": "High",
+      "usage": "1D channel routing inflow"
+    },
+    "pincha_to_annamayya_distance_km": {
+      "value": 34.0,
+      "units": "km",
+      "classification": "OBSERVED",
+      "source": "Survey of India GIS River Line / HydroRIVERS",
+      "confidence": "High"
+    },
+    "pincha_surge_travel_time_min": {
+      "value": 120.0,
+      "range": [105.0, 135.0],
+      "units": "min",
+      "classification": "MODEL_RECONSTRUCTION",
+      "source": "Muskingum 1D routing + eye-witness logs (wave speed ~4.5 m/s)",
+      "confidence": "High",
+      "usage": "Inflow lag at Annamayya"
+    },
+    "annamayya_frl_m": {
+      "value": 203.60,
+      "units": "m MSL",
+      "classification": "OBSERVED",
+      "source": "AP Irrigation Engineering Records / Original Drawings",
+      "confidence": "High"
+    },
+    "annamayya_bund_top_level_m": {
+      "value": 206.00,
+      "units": "m MSL",
+      "classification": "OBSERVED",
+      "source": "Technical Expert Committee Report (2021) / Restoration DPR (2022)",
+      "confidence": "High",
+      "usage": "Overtopping threshold"
+    },
+    "annamayya_deepest_bed_m": {
+      "value": 180.00,
+      "units": "m MSL",
+      "classification": "OBSERVED",
+      "source": "Dam Cross-Section Engineering Drawings",
+      "confidence": "High",
+      "usage": "Breach invert base"
+    },
+    "annamayya_gross_volume_mcm": {
+      "value": 63.43,
+      "value_tmc": 2.24,
+      "units": "MCM",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "National Register of Large Dams (CWC) / AP Irrigation",
+      "confidence": "High",
+      "usage": "Initial reservoir volume"
+    },
+    "spillway_operating_discharge_m3s": {
+      "value": 4135.8,
+      "value_cfs": 146056.0,
+      "operating_gates": 4,
+      "jammed_gates": [4],
+      "units": "m3/s",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "Ministry of Home Affairs (MHA) National Situation Report D692",
+      "confidence": "High",
+      "usage": "Spillway discharge before failure"
+    },
+    "spillway_design_capacity_m3s": {
+      "value": 8070.3,
+      "value_cfs": 285000.0,
+      "units": "m3/s",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "Original Dam Design Specification",
+      "confidence": "High"
+    },
+    "peak_total_inflow_annamayya_m3s": {
+      "mha_official_cfs": 226440.0,
+      "mha_official_m3s": 6412.0,
+      "cwc_appraisal_cfs": 320186.0,
+      "cwc_appraisal_m3s": 9065.0,
+      "iisc_reconstruction_cfs": 450000.0,
+      "iisc_reconstruction_m3s": 12740.0,
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "MHA Report D692 vs CWC Technical Appraisal (2021) vs IISc (2023)",
+      "confidence": "High (Range preserved)",
+      "usage": "Inflow hydrograph ensemble bounds"
+    },
+    "breach_time_ist": {
+      "initiation_overtopping": "2021-11-19T05:45:00+05:30",
+      "full_washout_collapse": "2021-11-19T06:15:00+05:30",
+      "mha_reported_failure": "2021-11-19T06:30:00+05:30",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "District Collectorate Records / MHA Report D692",
+      "confidence": "High",
+      "usage": "Simulation clock T=0"
+    },
+    "eroded_embankment_length_m": {
+      "value": 336.0,
+      "units": "m",
+      "classification": "OFFICIAL_ESTIMATE",
+      "source": "AP Irrigation Restoration DPR dt 30-10-2022 (EE Kadapa)",
+      "confidence": "High",
+      "usage": "Structural bound on breach erosion, NOT instantaneous width"
+    },
+    "hydraulic_breach_width_m": {
+      "central_froehlich_m": 128.5,
+      "central_range_m": [110.0, 150.0],
+      "optimistic_macdonald_m": 85.0,
+      "pessimistic_upper_m": 240.0,
+      "units": "m",
+      "classification": "MODEL_RECONSTRUCTION",
+      "source": "Empirical breach formulations (Froehlich 2008, MacDonald 1984)",
+      "confidence": "High",
+      "usage": "SWE-2D dynamic breach geometry"
+    },
+    "breach_centerline_wgs84": [
+      [79.0195, 14.2132],
+      [79.0182, 14.2128],
+      [79.0168, 14.2125]
+    ],
+    "breach_invert_elevation_m": 180.0,
+    "breach_side_slope_hv": 1.0
+  }
+}

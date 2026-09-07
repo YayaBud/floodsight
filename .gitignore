@@ -1,0 +1,47 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.pyd
+
+# C extensions / build artefacts
+.eggs/
+*.egg-info/
+dist/
+build/
+
+# Testing & Cache
+.pytest_cache/
+.coverage
+htmlcov/
+cache/
+**/_cache/
+data/**/_cache/
+
+# Environments & Local Config
+.env
+.env.*
+.venv/
+venv/
+ENV/
+env/
+
+# OS / IDE artefacts
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Geospatial raster & large binary data (fetch via python -m src.data_fetcher)
+*.tif
+*.tiff
+*.sww
+*.gpkg
+*.parquet
+
+# Simulation scenario run outputs
+data/scenarios/*/
+!data/scenarios/.gitkeep

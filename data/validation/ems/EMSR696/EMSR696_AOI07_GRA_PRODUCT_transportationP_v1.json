@@ -1,0 +1,8 @@
+{
+"type": "FeatureCollection",
+                                                                                
+"features": [
+{ "type": "Feature", "properties": { "obj_type": "214-Bridges, Elevated Highways, Tunnels and Subways", "name": "Unknown", "info": "2141-Bridges and elevated highways", "simplified": "Bridges and elevated highways", "damage_gra": "Destroyed", "det_method": "Photo-interpretation", "notation": "Not Applicable", "or_src_id": 1, "dmg_src_id": 2, "cd_value": "Not Applicable" }, "geometry": { "type": "Point", "coordinates": [ 21.915654431000064, 32.892785778000075 ] } }
+
+]
+}

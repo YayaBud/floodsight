@@ -1,0 +1,26 @@
+{
+  "Paparajupalle": {
+    "lat": 14.0644256,
+    "lon": 78.8721294,
+    "display_name": "Paparajupalle, T Sundupalle, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": false
+  },
+  "Paturu": {
+    "lat": 14.2585208,
+    "lon": 79.0761081,
+    "display_name": "Patur, Nandalur, YSR Kadapa, Andhra Pradesh, 516150, India",
+    "in_bbox": true
+  },
+  "Kummarapalle": {
+    "lat": 14.2430908,
+    "lon": 79.1123465,
+    "display_name": "Kummarapalle, Rajampet, YSR Kadapa, Andhra Pradesh, 516150, India",
+    "in_bbox": true
+  },
+  "Ramachandrapuram": {
+    "lat": 14.255951,
+    "lon": 79.0483653,
+    "display_name": "Ramachandrapuram, Rajampet, YSR Kadapa, Andhra Pradesh, India",
+    "in_bbox": true
+  }
+}

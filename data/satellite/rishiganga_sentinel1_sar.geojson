@@ -1,0 +1,46 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "platform": "Sentinel-1A SAR C-Band",
+        "polarization": "VH",
+        "backscatter_threshold_db": -16.0,
+        "observation_time": "2021-11-18T04:15:00Z",
+        "water_class": "SAR Flood Inundation"
+      },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [
+          [
+            [
+              79.6875,
+              30.429999999999996
+            ],
+            [
+              79.74,
+              30.439999999999998
+            ],
+            [
+              79.76249999999999,
+              30.49
+            ],
+            [
+              79.73625,
+              30.529999999999998
+            ],
+            [
+              79.7025,
+              30.509999999999998
+            ],
+            [
+              79.6875,
+              30.429999999999996
+            ]
+          ]
+        ]
+      }
+    }
+  ]
+}
