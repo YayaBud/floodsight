@@ -83,51 +83,51 @@ However, recent catastrophic disasters highlight an unaddressed vulnerability:
 
 ```mermaid
 flowchart TD
-    subgraph INGEST["1. Data Ingest & Terrain (M1 & M2)"]
-        A[User Parameters / Scenario Key / GEE Request] --> B[src/data_fetcher.py]
-        B1[(Copernicus GLO-30 DEM)] -->|AWS S3 COG| B
-        B2[(OpenStreetMap)] -->|OSMnx GraphML / GeoJSON| B
-        B3[(GHS-POP 100m)] -->|Zonal Population| B
-        B4[(Sentinel-1/2 SAR)] -->|GEE Backscatter| B
-        B --> C[M2 DEM Conditioning & Smoothing]
-        C --> D[M2 Seeded Flood Fill & V-h Stage-Storage]
-        D --> E{Stage B: Geometry Hard Gate}
-        E -->|Pool unconfined / Leaks| FAIL[Fail-Closed: ImpoundmentDoesNotHoldError]
-        E -->|Terrain Confined| F[Validated Impoundment & Barrier Geometry]
+    subgraph INGEST ["1. Data Ingest & Terrain (M1 & M2)"]
+        A["User Parameters & Scenario Config"] --> B["Data Fetcher (src/data_fetcher.py)"]
+        B1["Copernicus GLO-30 DEM"] --> B
+        B2["OpenStreetMap Road & River Vectors"] --> B
+        B3["GHS-POP 100m Population Grid"] --> B
+        B4["Sentinel-1/2 Satellite Data"] --> B
+        B --> C["DEM Conditioning & Flowline Smoothing"]
+        C --> D["Seeded Flood Fill & V(h) Stage-Storage"]
+        D --> E{"Geometry Hard Gate"}
+        E -->|Fail| FAIL["Fail-Closed: Abort Run"]
+        E -->|Pass| F["Validated Barrier & Pool Geometry"]
     end
 
-    subgraph BREACH["2. Breach Mechanics & Cascades (M3)"]
-        F --> G[M3 Empirical Ensemble: Froehlich / Von Thun / MacDonald]
-        G --> H[Unified DAMBRK Trapezoidal Kernel]
-        H --> I{Cascading Scenario?}
-        I -->|Yes| J[1D Muskingum + Level-Pool Reservoir Continuity]
-        I -->|No| K[Single-Structure Reservoir Depletion]
-        J & K --> L[Outflow Hydrographs Q-t with Confidence Bands]
+    subgraph BREACH ["2. Breach Mechanics & Cascades (M3)"]
+        F --> G["3-Arm Ensemble: Froehlich / Von Thun / MacDonald"]
+        G --> H["Unified DAMBRK Trapezoidal Kernel"]
+        H --> I{"Cascading Scenario?"}
+        I -->|Yes| J["1D Muskingum + Level-Pool Reservoir Routing"]
+        I -->|No| K["Single-Structure Reservoir Depletion"]
+        J --> L["Outflow Hydrographs Q(t) with Confidence Bands"]
+        K --> L
     end
 
-    subgraph SOLVER["3. 2D Hydrodynamic Solver (M4)"]
-        L --> M[2D Well-Balanced SWE Finite Volume Solver]
-        M --> M1[Audusse Hydrostatic Reconstruction]
-        M --> M2[MUSCL 2nd Order + Minmod Limiter]
-        M --> M3[SSP-RK2 Time Integration]
-        M --> M4[Rusanov Flux + Semi-Implicit Friction]
-        M --> M5[Active-Window Optimization: Bit-for-Bit Exact]
-        M --> N[Hydrodynamic Output: Depth Rasters, Snapshots, Arrival Grid]
+    subgraph SOLVER ["3. 2D Hydrodynamic Solver (M4)"]
+        L --> M["2D Well-Balanced SWE Solver (Audusse)"]
+        M --> M1["MUSCL 2nd-Order + SSP-RK2 Time Integration"]
+        M1 --> M2["Rusanov Flux + Semi-Implicit Manning Friction"]
+        M2 --> M3["Active-Window Optimization (Bit-for-Bit Exact)"]
+        M3 --> N["Hydrodynamic Rasters & Snapshot Frames"]
     end
 
-    subgraph CONSEQUENCE["4. Exposure, Isolation & Ranking (M5, M6, M7)"]
-        N --> O[M5 Exposure: GHS-POP Zonal Sum + JRC Depth-Damage]
-        N --> P[M6 Road Graph Isolation: Per-Timestep Edge Cuts]
-        P --> P1[Sample Edge Midpoints: Depth ≥ 0.3m Car / 0.5m Truck]
-        P1 --> P2[Dynamic Connected Components vs Safe Nodes]
-        P2 --> P3[Derive Isolation Time & Evacuation Window]
-        O & P3 --> Q[M7 Multi-Criteria Triage Ranking Engine]
+    subgraph CONSEQUENCE ["4. Exposure, Isolation & Ranking (M5, M6, M7)"]
+        N --> O["M5: Population & Structure Exposure (Zonal Sum + JRC)"]
+        N --> P["M6: Road Graph Network Cuts (h >= 0.3m Car / 0.5m Truck)"]
+        P --> P1["Graph Component Reachability vs Safe Nodes"]
+        P1 --> P2["Compute Isolation Time & Evacuation Window"]
+        O --> Q["M7: Multi-Criteria Emergency Ranking"]
+        P2 --> Q
     end
 
-    subgraph EXPORT["5. Dashboard & Interoperability (M8, M9, M10)"]
-        Q --> R[M8 Exporters: Shapefile + KML + CAP JSON + GeoTIFF]
-        N & Q --> S[M9 MapLibre GL WebGL Dashboard + 3-Lane Temporal Spine]
-        N --> T[M10 Validation: CSI / POD / FAR / Bias vs Observed EMS]
+    subgraph EXPORT ["5. Dashboard & Interoperability (M8, M9, M10)"]
+        Q --> R["M8: Multi-Format Exporters (.shp, .kml, CAP JSON, GeoTIFF)"]
+        Q --> S["M9: WebGL Command Dashboard (MapLibre GL + Temporal Spine)"]
+        N --> S
+        N --> T["M10: Empirical Skill Validation (CSI, POD, FAR, Bias)"]
     end
 ```
 
@@ -139,17 +139,17 @@ FloodSight models impoundment failures as continuous physical transitions, maint
 
 ```mermaid
 stateDiagram-v2
-    [*] --> InflowRise: Catchment Runoff / Upstream Surge
-    InflowRise --> PreBreachStorage: Level-Pool Reservoir Continuity dS/dt = I(t) - Q_spill(h)
-    PreBreachStorage --> TriggerEvaluation: Dynamic per-timestep check
-    TriggerEvaluation --> PreBreachStorage: z_wse < z_crest (Safe)
-    TriggerEvaluation --> ActiveBreach: z_wse >= z_crest (Overtopping Trigger)
-    ActiveBreach --> DamBreakExpansion: Linear breach widening B(t) & invert downcut z_b(t)
-    DamBreakExpansion --> Coupled2DInjection: Inflow with horizontal momentum hu = Q / width
-    Coupled2DInjection --> HydrodynamicPropagation: 2D SWE over conditioned DEM
-    HydrodynamicPropagation --> DynamicRoadCuts: Water depths submerge road links
-    DynamicRoadCuts --> SettlementIsolation: Last road to safe node severed
-    SettlementIsolation --> EvacuationWindowClosed: Flood arrival at village center
+    [*] --> InflowRise: Catchment Inflow Pulse
+    InflowRise --> PreBreachStorage: Reservoir Volume Rise
+    PreBreachStorage --> TriggerEvaluation: Dynamic Check Each Timestep
+    TriggerEvaluation --> PreBreachStorage: Water Level Below Crest
+    TriggerEvaluation --> ActiveBreach: Water Level Over Crest
+    ActiveBreach --> DamBreakExpansion: Trapezoidal Breach Growth
+    DamBreakExpansion --> Coupled2DInjection: Inflow with Momentum (hu = Q / width)
+    Coupled2DInjection --> HydrodynamicPropagation: 2D SWE Over Conditioned DEM
+    HydrodynamicPropagation --> DynamicRoadCuts: Submerged Roads (h >= 0.3m)
+    DynamicRoadCuts --> SettlementIsolation: Egress Cut from Safe Nodes
+    SettlementIsolation --> EvacuationWindowClosed: Flood Wave Arrival
     EvacuationWindowClosed --> [*]
 ```
 
@@ -167,12 +167,12 @@ sequenceDiagram
     participant Solver as 2D SWE Solver
     participant Village as Settlement
     
-    Solver->>RoadNet: Depth pulse reaches primary access road (Depth >= 0.30 m)
-    RoadNet--xRoadNet: Access road edge severed
-    Note over RoadNet,Village: T_iso: Settlement is ISOLATED (no dry path to Safe Nodes)
-    RoadNet->>Responders: ALERT: Egress cut at T_iso (e.g., T+25 min)
-    Solver->>Village: Water reaches village center at T_arr (e.g., T+65 min)
-    Note over Village,Responders: Evacuation Window ΔT_evac = 65 - 25 = 40 minutes!
+    Solver->>RoadNet: Water reaches access road (Depth >= 0.30 m)
+    RoadNet->>RoadNet: Road link cut: access severed
+    Note over RoadNet,Village: T_iso: Village ISOLATED (no path to safe nodes)
+    RoadNet->>Responders: ALERT: Egress cut at T_iso (e.g. T+25 min)
+    Solver->>Village: Water reaches village center at T_arr (e.g. T+65 min)
+    Note over Village,Responders: Evacuation Window = 65 - 25 = 40 minutes
 ```
 
 ---
