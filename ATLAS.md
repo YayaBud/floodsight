@@ -2,9 +2,9 @@
 
 **GENERATED FILE. Do not hand-edit — run `python scripts/gen_atlas.py`.**
 
-- generated: 2026-09-14 08:52
-- git HEAD: `d903da9`
-- newest source in tree: `scripts/observed_wse_extent.py` (2026-09-14 08:50)
+- generated: 2026-09-18 16:09
+- git HEAD: `dbb5d8f`
+- newest source in tree: `scripts/new_dam.py` (2026-09-18 16:08)
 
 If *newest source* is later than *generated*, this atlas is stale — regenerate
 before trusting it to navigate.
@@ -17,7 +17,7 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 
 ## `run_pipeline.py` — Orchestrator — the production call path, top to bottom
 
-- **`run_pipeline.py`** — 2369 lines — FloodSight
+- **`run_pipeline.py`** — 2392 lines — FloodSight
     - `def _depth_to_geojson` ~89 — Convert a depth snapshot to clean, continuous GeoJSON depth-class polygons using rasterio vector
     - `def _solve_envelope_arm` ~156 — Run one non-central breach arm and return ONLY its maximum-depth grid
     - `def gate_g1` ~200 — G1 -- volume provenance
@@ -28,34 +28,34 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
         - ~286 · M1/M2: terrain
         - ~364 · Geometry hard gate (Stage B)
         - ~394 · P2 (audit SS37, defect C3): put the barrier in the terrain the solver
-        - ~564 · The river as a hydraulic pathway
-        - ~588 · Give the domain an outlet
-        - ~630 · P2 Gate 1: DEM-confinement diagnostic, every scenario
-        - ~676 · P2 Gate 2 (Stage C): stage-storage reconciliation, cascade scenarios only
-        - ~728 · M3: breach hydrograph (cascade-aware)
-        - ~850 · standard single-structure breach (no upstream cascade)
-        - ~887 · M3: breach ensemble
-        - ~932 · M4: 2D shallow water
-        - ~1021 · Channel roughness, from the mapped river
-        - ~1047 · Stage F Part 1: real t=0 initial condition for the 2D solver
-        - ~1105 · Stage F Part 2: momentum for the injected inflow
-        - ~1185 · P3 (audit SS38, defects C2 + C1): cut the opening, delete the injection
-        - ~1440 · The MEASURED breach discharge, written beside the routed arms
-        - ~1485 · P4 (audit SS39): consequence is flood depth, not total water depth
-        - ~1527 · M4 SPH Scenario Comparison (SIH26161 deliverable i)
-        - ~1573 · Stage 1: Pre-Breach Lake Formation & Impoundment Rise
-        - ~1716 · M5: exposure
-        - ~1754 · M6: road isolation
-        - ~1764 · Road timeline (the differentiator made visible)
-        - ~1776 · Arrival-time raster
-        - ~1800 · M7: ranking
-        - ~1813 · Provenance stamping
-        - ~1834 · M8: exports
-        - ~1847 · M10: score against the observed outcome, when one exists
-        - ~1906 · Validation: the solver is actually run against Ritter
-        - ~1965 · Validity gate for the manifest system (P0-1)
-        - ~2043 · P1 gates G1-G3: three checks that can actually FAIL
-        - ~2191 · Flow-regime gate
+        - ~587 · The river as a hydraulic pathway
+        - ~611 · Give the domain an outlet
+        - ~653 · P2 Gate 1: DEM-confinement diagnostic, every scenario
+        - ~699 · P2 Gate 2 (Stage C): stage-storage reconciliation, cascade scenarios only
+        - ~751 · M3: breach hydrograph (cascade-aware)
+        - ~873 · standard single-structure breach (no upstream cascade)
+        - ~910 · M3: breach ensemble
+        - ~955 · M4: 2D shallow water
+        - ~1044 · Channel roughness, from the mapped river
+        - ~1070 · Stage F Part 1: real t=0 initial condition for the 2D solver
+        - ~1128 · Stage F Part 2: momentum for the injected inflow
+        - ~1208 · P3 (audit SS38, defects C2 + C1): cut the opening, delete the injection
+        - ~1463 · The MEASURED breach discharge, written beside the routed arms
+        - ~1508 · P4 (audit SS39): consequence is flood depth, not total water depth
+        - ~1550 · M4 SPH Scenario Comparison (SIH26161 deliverable i)
+        - ~1596 · Stage 1: Pre-Breach Lake Formation & Impoundment Rise
+        - ~1739 · M5: exposure
+        - ~1777 · M6: road isolation
+        - ~1787 · Road timeline (the differentiator made visible)
+        - ~1799 · Arrival-time raster
+        - ~1823 · M7: ranking
+        - ~1836 · Provenance stamping
+        - ~1857 · M8: exports
+        - ~1870 · M10: score against the observed outcome, when one exists
+        - ~1929 · Validation: the solver is actually run against Ritter
+        - ~1988 · Validity gate for the manifest system (P0-1)
+        - ~2066 · P1 gates G1-G3: three checks that can actually FAIL
+        - ~2214 · Flow-regime gate
 
 ## `src/m2_geometry` — Terrain, geometry gate, barrier emplacement, outlets
 
@@ -193,11 +193,11 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 ## `src/m8_outputs` — Raster/vector export
 
 - **`src/m8_outputs/__init__.py`** — 0 lines
-- **`src/m8_outputs/exporters.py`** — 287 lines — M8
+- **`src/m8_outputs/exporters.py`** — 321 lines — M8
     - `def _truncate_unique` ~29 — Truncate column names to the Shapefile limit without creating collisions
     - `def export_shp` ~66 — Export a GeoDataFrame to a Shapefile
-    - `def export_kml` ~116 — Export a GeoDataFrame to a KML file using simplekml
-    - `def export_cap_json` ~179 — Generate a CAP-conformant JSON payload
+    - `def export_kml` ~150 — Export a GeoDataFrame to a KML file using simplekml
+    - `def export_cap_json` ~213 — Generate a CAP-conformant JSON payload
 
 ## `src/m10_validation` — Observed-extent validation and skill metrics
 
@@ -270,20 +270,21 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 ## `src` — Shared: scenarios, provenance, manifests, raster helpers
 
 - **`src/__init__.py`** — 0 lines
-- **`src/data_fetcher.py`** — 1235 lines — FloodSight — Dataset Fetcher ============================ Fetches the real open datasets the pipeline runs on
-    - `def fetch_dem` ~591 — Fetch Copernicus GLO-30 for the scenario bbox and reproject to local UTM
-    - `def _bbox_stamp_ok` ~672 — Is this cached OSM layer the one the CURRENT scenario bbox asks for? These caches key on FILENAM
-    - `def _load_labelled` ~702 — Serve a cached OSM layer, LABELLED with whether it matches this bbox
-    - `def generate_synthetic_dem` ~765 — Analytic stand-in terrain, for running the demo with no network
-    - `def get_dem` ~802 — Real DEM, falling back to synthetic only when explicitly permitted
-    - `def fetch_population` ~867 — Clip GHS-POP to the scenario DEM grid, conserving population counts
-    - `def _osm_features` ~974 — Query OSM features; distinguish empty result from network failure
-    - `def download_osm_road_network` ~1030 — Download and cache the drivable road network
-    - `def build_villages` ~1059 — Build village polygons from real OSM ``place`` nodes
-    - `def build_rivers` ~1121 — River and stream centrelines from OSM
-    - `def build_facilities` ~1157 — Hospitals, clinics and schools from OSM
-    - `def build_buildings` ~1190 — OSM building footprints
-    - `def prepare_all` ~1213 — Fetch every layer for one scenario, or for all of them
+- **`src/data_fetcher.py`** — 1303 lines — FloodSight — Dataset Fetcher ============================ Fetches the real open datasets the pipeline runs on
+    - `def _load_external_scenarios` ~605 — Merge `data/scenarios_def/<key>.json` definitions into SCENARIOS
+    - `def fetch_dem` ~659 — Fetch Copernicus GLO-30 for the scenario bbox and reproject to local UTM
+    - `def _bbox_stamp_ok` ~740 — Is this cached OSM layer the one the CURRENT scenario bbox asks for? These caches key on FILENAM
+    - `def _load_labelled` ~770 — Serve a cached OSM layer, LABELLED with whether it matches this bbox
+    - `def generate_synthetic_dem` ~833 — Analytic stand-in terrain, for running the demo with no network
+    - `def get_dem` ~870 — Real DEM, falling back to synthetic only when explicitly permitted
+    - `def fetch_population` ~935 — Clip GHS-POP to the scenario DEM grid, conserving population counts
+    - `def _osm_features` ~1042 — Query OSM features; distinguish empty result from network failure
+    - `def download_osm_road_network` ~1098 — Download and cache the drivable road network
+    - `def build_villages` ~1127 — Build village polygons from real OSM ``place`` nodes
+    - `def build_rivers` ~1189 — River and stream centrelines from OSM
+    - `def build_facilities` ~1225 — Hospitals, clinics and schools from OSM
+    - `def build_buildings` ~1258 — OSM building footprints
+    - `def prepare_all` ~1281 — Fetch every layer for one scenario, or for all of them
 - **`src/gee_satellite.py`** — 161 lines — FloodSight
     - `class GEESatelliteAnalyzer` ~50 — Google Earth Engine Sentinel-1 SAR and Sentinel-2 Optical flood analysis engine
 - **`src/observation_manifest.py`** — 114 lines — Fail-closed validation for scenario-keyed observed products
@@ -347,6 +348,24 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def hillshade` ~30 — Standard Horn hillshade, 0-1
     - `def render` ~76
     - `def main` ~220
+- **`scripts/make_lake_formation.py`** — 580 lines — Build the pre-breach lake-formation animation for one scenario
+    - `def equal_volume_levels` ~89 — Levels whose impounded volumes are as equally spaced as the terrain allows
+    - `def _priority_flood` ~152 — Grow from `seed` in ascending elevation, stopping at `level` or `max_cells`
+    - `def hypsometric_frames` ~207
+    - `def dem_fill_frames` ~264
+    - `def phutkal_times` ~314 — Sourced duration, assumed constant inflow
+    - `def annamayya_routed_rise` ~338 — Pre-breach (t <= 0) reservoir elevation, routed from the Pincha surge
+    - `def annamayya_times` ~346 — Routed where a routing exists; level-indexed where none does
+    - `def write_run` ~383
+    - `def self_check` ~426 — The smallest set of assertions that fails if the frame logic breaks
+    - `def build` ~473
+    - `def main` ~548
+- **`scripts/new_dam.py`** — 221 lines — Register a new dam or river blockage as a scenario — the plug-in path
+    - `def write_definition` ~72
+    - `def fetch_inputs` ~101
+    - `def author_manifest` ~114
+    - `def revalidate` ~131 — Run the real gate against the conditioned DEM and report its verdict
+    - `def main` ~152
 - **`scripts/observed_wse_extent.py`** — 534 lines — Flood extent anchored to the REPORTED water depths, not to an arbitrary terrain stage
     - `def load_anchors` ~74 — The arrival records that carry BOTH a position and a reported depth
     - `def load_stem` ~91 — Downstream Cheyyeru main stem, oriented away from the dam, in `crs`
@@ -358,7 +377,7 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def polygonise` ~305
     - `def build` ~320
     - `def _check` ~461 — Analytic case: straight channel, constant side slope, known answer
-- **`scripts/route_annamayya.py`** — 1053 lines — Route the 19 Nov 2021 Annamayya flood down the Cheyyeru from a SOURCED hydrograph
+- **`scripts/route_annamayya.py`** — 1237 lines — Route the 19 Nov 2021 Annamayya flood down the Cheyyeru from a SOURCED hydrograph
     - `def catchment_runoff` ~128 — The catchment's own contribution, from the sourced Gaussian pulse
     - `def build_hydrograph` ~146 — Breach release + the catchment inflow still arriving behind it
     - `def build_grid` ~190 — The one grid both stages run on, so the handoff needs no reprojection
@@ -367,8 +386,12 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def _spinup` ~383 — Fill the channel with the sourced pre-event baseflow before the release
     - `def _condition_terrain` ~441 — Apply the two terrain steps run_pipeline does and this script never did
     - `def _roughness_field` ~500 — Uniform floodplain n, with the MAPPED channel dropped to n=0.035
-    - `def run_stage1` ~539 — Stage 1 -- route the sourced Pincha surge to the handoff section
-    - `def main` ~710
+    - `def village_exposure` ~539 — Per-village depth, arrival and population at risk, over each POLYGON
+    - `def write_exports` ~632 — Write the run's .shp / .kml / CAP exports and return their paths
+    - `def run_stage1` ~708 — Stage 1 -- route the sourced Pincha surge to the handoff section
+    - `def main` ~879
+        _1 sections:_
+        - ~1140 · M8 exports: .shp / .kml
 
 ## `tests` — Executable knowledge — what is pinned
 
@@ -599,11 +622,19 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_observed_roads_carry_damage_grades` ~191
     - `def test_describe_reports_source_and_licence` ~199
     - `def test_unwired_scenario_reports_absence_not_a_score` ~207
+- **`tests/test_village_exposure_polygon.py`** — 114 lines — A village is flooded when its POLYGON floods, not when its centroid cell does
+    - `def test_half_flooded_village_is_not_reported_dry` ~62 — The regression
+    - `def test_fully_dry_village_stays_dry` ~79
+    - `def test_population_is_apportioned_by_flooded_area_not_all_or_nothing` ~88 — Matches `compute_village_exposure`: pop_total * area_frac, PROXY
+    - `def test_arrival_is_the_earliest_wet_cell_in_the_polygon` ~101
+    - `def test_village_outside_the_grid_is_a_status_not_a_silent_zero` ~109
 - **`tests/test_village_layer_hand.py`** — 110 lines — Every settlement in the population layer must sit near its drainage
     - `def hand` ~69
     - `def test_every_settlement_sits_near_its_drainage` ~75
     - `def test_the_bad_geocode_would_fail_this` ~91 — Positive control: the check is only worth having if it rejects the error that got past us
     - `def test_nandalur_is_on_the_osm_village_node` ~103 — Pins the correction, so the in-channel point cannot quietly return
+- **`tests/test_village_status_node.py`** — 31 lines — Run the village-badge test under pytest so it cannot rot
+    - `def test_village_badge_never_calls_a_flooded_settlement_safe` ~23
 - **`tests/test_well_balanced.py`** — 198 lines — F-1 and F-3 — the instruments for the E-1/E-2 flux fix
     - `def test_f3_rhs_is_identically_zero_for_a_lake_at_rest` ~79 — The defining property of a well-balanced scheme, asserted on `_rhs`
     - `def test_f3_on_real_conditioned_terrain` ~103 — The same property on the array the solver actually integrates
@@ -614,13 +645,14 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 
 - **`frontend/charts.js`** — 542 lines
 - **`frontend/debug.js`** — 270 lines
-- **`frontend/map.js`** — 4059 lines
+- **`frontend/map.js`** — 4176 lines
 - **`frontend/maplibre-gl.js`** — 59 lines
 - **`frontend/plotly-2.32.0.min.js`** — 8 lines
 - **`frontend/spine.js`** — 546 lines
 - **`frontend/ui.js`** — 328 lines
-- **`frontend/index.html`** — 786 lines
+- **`frontend/village_status.js`** — 79 lines
+- **`frontend/index.html`** — 789 lines
 
 ---
 
-_99 files indexed._
+_104 files indexed._

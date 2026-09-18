@@ -545,6 +545,22 @@ floodsight/
 
 ## Known Limitations & Honest Gaps
 
+> The list below is the short version. The full record — every measurement, every
+> dead end, and the approaches that were tried and rejected — is in
+> `findings_results.md` and `floodsight/INVARIANTS.md`. Nothing here is softer
+> than those files; if it reads that way, those files are right.
+
+**The three that matter most:**
+
+- **No scenario currently produces a valid dam-break run.** Zero of seven. This is *not* a regression — the validity gates stopped being tautologies on 2026-09-12, and a scenario count going down after a gate change is the gate working. Each refusal is recorded per scenario with its measurement. The one complete Indian run, `annamayya_stage2_wide`, is a **forced-hydrograph inundation**: it prescribes the release rather than draining an impoundment, and says so in its own provenance block.
+- **The modelled flood front is ~3.3× too slow.** Against the five sourced arrival records for Annamayya: **depths 3/3 in range, arrivals 0/5, all late by 85–540 min.** The model puts the right amount of water in the right places and gets there too slowly. Flowline conditioning, open outlets and channel roughness together close only 17% of that gap; grid resolution is the remaining hypothesis (a 50–100 m channel is sub-grid at 152 m cells).
+- **The domain barely drains.** 51.84 MCM of sourced baseflow goes in over 18 h; **51.86 MCM is still standing and 0.33 MCM has left.** Every flood extent from these runs is therefore an **upper bound on ponding**, and a "flooded area" figure is a 24 h envelope, not a snapshot — the two differ by 1.75× (153.00 km² envelope against an 87.70 km² peak instantaneous).
+
+**Data and scope ceilings:**
+
+- **No satellite observed the Annamayya flood.** Sentinel-1's only footprint over the reach acquired 16 Nov and 28 Nov — the event sits in a 12-day gap — and Sentinel-2 passed 4 h after the breach into 98.7% cloud. No CSI or POD is quoted for it, and the map's purple layer is a **reported-depth-anchored reconstruction**, never served as an observation.
+- **Annamayya's dam is not in the DEM.** GLO-30 here is a DSM captured with the reservoir full: a flat 192.50 m water plane against a 206.0 m crest, 25.1 km of valley against a 366 m dam footprint. No coordinate or footprint edit fixes this, which is why the scenario is routed rather than breached.
+- **No debris or sediment physics exists anywhere.** Debris-flow scenarios (Rishi Ganga) fail the flow-regime gate rather than being modelled with clear-water equations and presented as results.
 - **Compound Meteorological Events:** Derna 2023 was a compound disaster where extreme rainfall (150–240 mm over 476 $km^2$) accompanied the dam breach. FloodSight models the breach volume (23.7 MCM) rather than the entire 39 MCM rainfall runoff. We state this ceiling honestly rather than inflating scores with synthetic rain.
 - **DEM Resolution in Extreme Gorges:** 30-meter DEMs (GLO-30) introduce $\approx 10-20\%$ volume uncertainty in steep canyons. The pipeline flags these bounds explicitly.
 - **Sparse Himalayan Road Networks:** In remote regions like Zanskar (Phutkal), mapped road networks are naturally sparse; isolation algorithms honestly report "No road egress found" rather than hallucinating roads.
@@ -554,14 +570,19 @@ floodsight/
 
 ## PS Deliverable Compliance
 
+> Status below is taken from [`floodsight/docs/PS_DELIVERABLE_SCOPE.md`](floodsight/docs/PS_DELIVERABLE_SCOPE.md),
+> which is the authoritative per-deliverable record. Where this table and that
+> document disagree, that document is right and this one is stale.
+
 | PS SIH26161 Deliverable | Implementation Module | Status |
 |---|---|---|
-| **(i) Hydrodynamic modeling + SPH verification** | `m4_solvers/swe_2d.py` (2D FV) & `m4_solvers/sph_swe.py` (1D SPH) | ✅ Fully Wired & Benchmarked |
-| **(i) Loss and damage consequence analysis** | `m5_exposure/exposure.py` + `m7_ranking/ranker.py` | ✅ Zonal PAR + JRC Damage Curves |
-| **(ii) Customizable open-source framework** | `src/data_fetcher.py` + `run_pipeline.py` | ✅ Fully Configurable (7 Scenarios) |
-| **(iii) Interactive dashboard + Shapefile + KML** | `frontend/` + `m8_outputs/exporters.py` | ✅ MapLibre Dashboard + Exporters |
-| **(iv) GEE Near-Real-Time satellite integration** | `src/gee_satellite.py` | ✅ Sentinel-1/2 SAR Analysis |
-| **(v) Demonstration on Indian river/dam events** | Phutkal, Rishi Ganga, South Lhonak, Annamayya | ✅ 4 Major Indian Events Calibrated |
+| **(i) SPH model** | `m4_solvers/sph_swe.py` (1D SWE-SPH) | ⚠️ **Partial.** Validated live against the Ritter analytical solution. The per-scenario thalweg comparison is **refused** and says why: after the injection was deleted the 2D arm has no forcing hydrograph, so the two solvers would not be given the same event, and 1D particles on a polyline against cell-averaged depth in a sub-cell gorge are different physical quantities. |
+| **(i) Delft3D model** | — | ❌ **Never run in this project.** The second arm is our own well-balanced 2D finite-volume SWE solver — same governing equations and numerical class, validated on the same benchmark. A "Ritter RMSE 0.14 m, precomputed" card was removed rather than relabelled: no code here produced that number. |
+| **(i) Loss and damage consequence analysis** | `m5_exposure/exposure.py` + `m7_ranking/ranker.py` | ✅ Zonal PAR + JRC damage curves. |
+| **(ii) Customizable open-source framework** | `data/scenarios_def/` + `scripts/new_dam.py` | ✅ A new dam is registered from a JSON definition with no code change; the geometry manifest is authored and gated automatically. |
+| **(iii) Interactive dashboard + Shapefile + KML** | `frontend/` + `m8_outputs/exporters.py` | ✅ MapLibre dashboard, ESRI Shapefile (with a `_fields.json` recording 10-character truncations), KML, and a CAP-conformant alert payload, each carrying a provenance block. |
+| **(iv) GEE near-real-time integration** | `src/gee_satellite.py` | ❌ **Framework present, NOT WIRED.** The module and its tests are real, but nothing in the pipeline calls it and there is no credentialed Earth Engine account. The frontend's "SAR (GEE)" toggle was **removed** because its map source was a permanently empty FeatureCollection. |
+| **(v) Demonstration on Indian river/dam events** | Annamayya (routed), Phutkal, Rishi Ganga, South Lhonak | ⚠️ **Partial.** One complete, artifact-backed, mass-conserving Indian run — `annamayya_stage2_wide` — and it is an explicitly labelled **forced-hydrograph inundation**, not a dam break: the release is prescribed from sourced figures, `impoundment_modelled: false`. **Four of the six events named in the problem statement have no scenario** (Kosi, Kashmir 2014, Assam 2014, and "Wapriyang", which resolves to no identifiable river or dam in any source). |
 
 ---
 
