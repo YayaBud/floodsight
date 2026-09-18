@@ -552,6 +552,29 @@ def execute_full_simulation(
         wse_m = thalweg_z + dam_height
         logger.info("M2: thalweg %.0f m + blockage %.0f m -> WSE %.0f m",
                     thalweg_z, dam_height, wse_m)
+        # The pool cannot stand above the structure holding it.
+        #
+        # `thalweg_z` is the DEM-SNAPPED bed, not the configured `thalweg_m`,
+        # and the snap moves with resolution. Every non-cascade scenario defines
+        # `wse_m == thalweg_m + dam_height_m` exactly, so substituting the
+        # snapped bed silently shifts the pool level: measured 2026-09-18, at
+        # coarsen 2 phutkal snaps to 3737.3 m against a configured 3736.11, and
+        # `thalweg_z + 69.0` lands at 3806.3 m -- 1.19 m ABOVE the sourced
+        # 3805.11 m crest. The fill then tops the barrier, reaches the domain
+        # edge, is correctly rejected as unconfined, and the run falls back to
+        # the typed volume labelled PROXY, which G1 then fails. Clamping it
+        # makes the fill confined and holds 27.1 MCM against a configured 30.0.
+        #
+        # This is the same species as the deleted `wse_m + 5.0`: a DERIVED level
+        # allowed to float above a SOURCED one. `crest_elev_m` is gated and
+        # carries its own source and classification, so the crest wins.
+        if barrier_crest_elev_m is not None and wse_m > barrier_crest_elev_m:
+            logger.warning(
+                "M2: derived WSE %.2f m exceeds the sourced barrier crest %.2f m "
+                "by %.2f m — clamped to the crest. A pool standing above its own "
+                "dam has already overtopped, so it was never impounded by it.",
+                wse_m, barrier_crest_elev_m, wse_m - barrier_crest_elev_m)
+            wse_m = float(barrier_crest_elev_m)
 
     # Stage B: the fill seed is the validated geometry manifest's own
     # upstream_seed_xy, not a river-vertex search — validate_geometry() has

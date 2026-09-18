@@ -576,6 +576,74 @@ SCENARIOS = {
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# External scenario definitions — the plug-in-a-new-dam path
+# ──────────────────────────────────────────────────────────────────────────────
+# `src/scenarios.py` already calls this dict "the legacy parameter table ...
+# during migration". Adding a dam by hand-editing a Python literal is what makes
+# the framework non-generalisable, which is deliverable (ii). A scenario dropped
+# in as JSON is merged here instead, so a new dam needs no code change.
+#
+# This loader is deliberately thin: it merges parameters only. It grants nothing.
+# A new scenario still has to author a geometry manifest with a SOURCED
+# `crest_elev_m` and still has to pass `validate_geometry` and gates G1-G5 like
+# every built-in one. Dropping a JSON in buys a scenario the right to be
+# REFUSED on the record, which is the point.
+
+SCENARIO_DEF_DIR = Path(__file__).resolve().parents[1] / "data" / "scenarios_def"
+
+# What the pipeline reads off a scenario before the geometry gate can even run.
+# Missing any of these is a refusal, not a default -- the same rule that removed
+# `wse_m + 5.0`. `crest_elev_m` is NOT here: it lives on the geometry manifest,
+# where it is gated together with its source and classification.
+_SCENARIO_REQUIRED = (
+    "name", "lat", "lon", "bbox", "utm_epsg",
+    "wse_m", "thalweg_m", "dam_height_m", "volume_mcm",
+    "breach_lat", "breach_lon", "event_type", "flow_regime",
+)
+
+
+def _load_external_scenarios(directory: Path | None = None) -> dict[str, dict]:
+    """Merge `data/scenarios_def/<key>.json` definitions into SCENARIOS.
+
+    Fail-closed per file: a malformed or incomplete definition is skipped with a
+    warning and never half-registered. One bad file must not take down the
+    scenarios that are fine, and must not silently become a scenario with
+    defaults filled in.
+    """
+    directory = directory or SCENARIO_DEF_DIR
+    out: dict[str, dict] = {}
+    if not directory.is_dir():
+        return out
+    for path in sorted(directory.glob("*.json")):
+        key = path.stem
+        try:
+            cfg = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            logger.warning("scenario definition %s is unreadable (%s) — skipped", path.name, exc)
+            continue
+        if not isinstance(cfg, dict):
+            logger.warning("scenario definition %s is not an object — skipped", path.name)
+            continue
+        missing = [f for f in _SCENARIO_REQUIRED if cfg.get(f) is None]
+        if missing:
+            logger.warning("scenario definition %s is missing %s — skipped, not defaulted",
+                           path.name, ", ".join(missing))
+            continue
+        if key in SCENARIOS:
+            logger.warning("scenario definition %s shadows a built-in scenario — skipped",
+                           path.name)
+            continue
+        cfg["bbox"] = tuple(cfg["bbox"])
+        cfg.setdefault("definition_source", str(path))
+        out[key] = cfg
+        logger.info("scenario '%s' registered from %s", key, path.name)
+    return out
+
+
+SCENARIOS.update(_load_external_scenarios())
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # DEM
 # ──────────────────────────────────────────────────────────────────────────────
 
