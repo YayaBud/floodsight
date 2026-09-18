@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "scenario_key": "derna",
+  "classification": "PROXY",
+  "source": "GHS-POP R2023A E2020",
+  "coverage": "scenario DEM grid; OSM settlement tags do not establish historical event population",
+  "reason": "population product is a present-day proxy, not event census"
+}

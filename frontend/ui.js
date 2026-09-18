@@ -114,9 +114,10 @@
         rishiganga: "Joshimath Cantonment Safe Ridge (Elev. 2,150m)",
         phutkal: "Padum High Plateau Relief Center (Elev. 3,650m)",
         south_lhonak: "Chungthang Upper Ridge Assembly Haven (Elev. 1,850m)",
-        derna: "Al-Fatayeh High Plateau Emergency Camp (Elev. 145m)",
-        ivanovo: "Biser High Hill Community Center (Elev. 185m)",
-        malpasset: "Frejus High Ridge Disaster Base (Elev. 45m)",
+        // OUT-OF-SCOPE-NON-INDIAN: dead lookups once the scenarios are gone. Restore together.
+        // derna: "Al-Fatayeh High Plateau Emergency Camp (Elev. 145m)",
+        // ivanovo: "Biser High Hill Community Center (Elev. 185m)",
+        // malpasset: "Frejus High Ridge Disaster Base (Elev. 45m)",
       };
       shelterEl.textContent = SHELTER_NAMES[scenarioKey] || "High-Ground Safe Haven";
     }
@@ -130,8 +131,15 @@
   function setRow(id, v, suffix) {
     const el = $(id);
     if (!el) return;
-    el.textContent = (v === null || v === undefined || Number.isNaN(+v))
-      ? "—" : `T+${Math.round(+v)}${suffix || ""}`;
+    if (v === null || v === undefined || Number.isNaN(+v)) {
+      el.textContent = "—";
+      return;
+    }
+    const r = Math.round(+v);
+    // A pre-breach event has negative t_s; "T+-150" is a sign-and-prefix
+    // collision, not a real value. Same convention as spine.js's fmtT.
+    const sign = r < 0 ? `T-${Math.abs(r)}` : r === 0 ? "T 0" : `T+${r}`;
+    el.textContent = `${sign}${suffix || ""}`;
   }
 
   // The evacuation window is two timestamps, and their ORDER is the finding —
@@ -237,9 +245,10 @@
     rishiganga:   "Rishi Ganga natural lake — Uttarakhand, 7 February 2021",
     phutkal:      "Phutkal river landslide dam — Ladakh, 2015",
     south_lhonak: "South Lhonak GLOF & Chungthang dam — Sikkim, 4 October 2023",
-    derna:        "Derna, Libya — Abu Mansour + Al-Bilad dam collapse, 11 September 2023",
-    ivanovo:      "Ivanovo dam collapse — Biser, Bulgaria, 6 February 2012 (GFD Observed)",
-    malpasset:    "Malpasset arch dam — Reyran Valley, France, 2 December 1959 (Canonical Field Benchmark)",
+    // OUT-OF-SCOPE-NON-INDIAN: dead lookups once the scenarios are gone. Restore together.
+    // derna:        "Derna, Libya — Abu Mansour + Al-Bilad dam collapse, 11 September 2023",
+    // ivanovo:      "Ivanovo dam collapse — Biser, Bulgaria, 6 February 2012 (GFD Observed)",
+    // malpasset:    "Malpasset arch dam — Reyran Valley, France, 2 December 1959 (Canonical Field Benchmark)",
     annamayya:    "Annamayya dam breach — Cheyyeru River, Andhra Pradesh, 19 November 2021",
   };
 

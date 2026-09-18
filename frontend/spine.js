@@ -23,8 +23,8 @@ window.Spine = (function () {
   const ROAD_W = 1000, ROAD_H = 26;      // viewBox of #lane-roads
   const ROAD_BINS = 140;
   const RISK_LEAD_MIN = 15;              // "cut soon" = cut within this many minutes
-  const MIN_PIN_GAP = 0.032;             // fraction of width before pins merge
-  const LABEL_GAP   = 0.105;             // fraction of width needed to show a label
+  const MIN_PIN_GAP = 0.024;             // fraction of width before pins merge
+  const LABEL_GAP   = 0.065;             // fraction of width needed to show a label
 
   let tMin = 0;                          // domain start, minutes (can be negative for lake formation)
   let tMax = 0;                          // domain end, minutes
@@ -51,7 +51,7 @@ window.Spine = (function () {
     
     // Check if the current scenario has a historical event clock configured
     try {
-      const activeDam = window.CURRENT_DAM || (window.SCENARIO_DAMS && window.CURRENT_SCENARIO_KEY && window.SCENARIO_DAMS[window.CURRENT_SCENARIO_KEY]);
+      const activeDam = window.CURRENT_DAM;
       if (activeDam && activeDam.event_clock && activeDam.event_clock.origin_iso) {
         const d = new Date(activeDam.event_clock.origin_iso);
         d.setMinutes(d.getMinutes() + roundT);
@@ -125,50 +125,136 @@ window.Spine = (function () {
   // ── events lane ──────────────────────────────────────────────────────────
   function setEvents(features, meta) {
     events = [];
-    if (tMin < 0) {
-      events.push({
-        t: tMin,
-        label: "River Blockage & Lake Formation",
-        kind: "lake",
-        major: true,
-        payload: {
-          village_name: "Lake Impoundment",
-          water_arrival_min: `${tMin}`,
-          isolation_time_min: null,
-          pop_at_risk: 0,
-          description: "Natural barrier / river blockage impounds upstream water"
-        }
-      });
-      events.push({
-        t: -10,
-        label: "Spillway Capacity Reached",
-        kind: "lake",
-        major: false,
-        payload: {
-          village_name: "Dam Crest Level",
-          water_arrival_min: "-10",
-          isolation_time_min: null,
-          pop_at_risk: 0,
-          description: "Reservoir reaches 100% capacity; overtopping threshold initiated"
-        }
-      });
-    }
-    events.push({ t: 0, label: "Dam Breach", kind: "breach", major: true, payload: null });
+    const activeScenario = (meta && (meta.scenario || meta.scenario_key)) ||
+      (window.CURRENT_SCENARIO_KEY || document.getElementById("scenario-select")?.value || "");
 
-    if (meta && meta.cascade_arrival_min) {
+    if (activeScenario === "annamayya") {
+      // Historical evidence disaster sequence (EVD-01 through EVD-18)
+      if (tMin <= -170) {
+        events.push({
+          t: tMin,
+          label: "Rainfall Onset (EVD-01, 180mm)",
+          kind: "weather",
+          major: false,
+          payload: {
+            village_name: "Catchment Storm Onset",
+            water_arrival_min: `${tMin}`,
+            description: "Jawad precursor depression delivers 180mm storm over Cheyyeru basin (EVD-01)"
+          }
+        });
+      }
       events.push({
-        t: meta.cascade_arrival_min,
-        label: "Surge Hits Downstream Dam",
+        t: -150,
+        label: "Pincha Ring Bund Washout (EVD-04)",
         kind: "cascade",
         major: true,
         payload: {
-          village_name: meta.downstream_structure?.name || "Downstream Structure",
-          water_arrival_min: `${meta.cascade_arrival_min}`,
-          isolation_time_min: null,
-          pop_at_risk: 0,
-          description: `Upstream breach wave reaches downstream structure, initiating cascading failure`
+          village_name: "Pincha Dam",
+          water_arrival_min: "-150",
+          description: "Upstream temporary ring bund washed out at 03:15 AM IST (T-150 min), releasing 1.40 lakh cusecs surge down Cheyyeru (EVD-04/05)"
         }
       });
+      events.push({
+        t: -25,
+        label: "Surge Arrives at Reservoir (EVD-07)",
+        kind: "cascade",
+        major: false,
+        payload: {
+          village_name: "Annamayya Reservoir",
+          water_arrival_min: "-25",
+          description: "Cheyyeru gorge transit completed (EVD-07); reservoir storage rises rapidly from FRL toward crest"
+        }
+      });
+      events.push({
+        t: -15,
+        label: "Spillway Overwhelmed (EVD-12/14)",
+        kind: "lake",
+        major: false,
+        payload: {
+          village_name: "Annamayya Spillway",
+          water_arrival_min: "-15",
+          description: "4 operational radial gates discharge at full 4,136 m³/s capacity; gate #4 jammed inoperable (EVD-14)"
+        }
+      });
+      events.push({
+        t: 0,
+        label: "Overtopping Initiation (EVD-16)",
+        kind: "breach",
+        major: true,
+        payload: {
+          village_name: "Annamayya Dam Crest",
+          water_arrival_min: "0",
+          description: "Water level exceeds +206.0m crest at 05:45 AM IST (T=0), initiating embankment erosion (EVD-16)"
+        }
+      });
+      events.push({
+        t: 30,
+        label: "Embankment Collapse (EVD-17)",
+        kind: "breach",
+        major: true,
+        payload: {
+          village_name: "336m Earthen Section",
+          water_arrival_min: "30",
+          description: "Full washout of 336m earthen bund at 06:15 AM IST (T+30 min), peak release ~12,200 m³/s (EVD-17/18)"
+        }
+      });
+      events.push({
+        t: 45,
+        label: "MHA Failure Time (EVD-17)",
+        kind: "breach",
+        major: false,
+        payload: {
+          village_name: "Official Incident Record",
+          water_arrival_min: "45",
+          description: "Disaster timestamp recorded in Ministry of Home Affairs report D692 (06:30 AM IST, EVD-17)"
+        }
+      });
+    } else {
+      if (tMin < 0) {
+        events.push({
+          t: tMin,
+          label: "River Blockage & Lake Formation",
+          kind: "lake",
+          major: true,
+          payload: {
+            village_name: "Lake Impoundment",
+            water_arrival_min: `${tMin}`,
+            isolation_time_min: null,
+            pop_at_risk: 0,
+            description: "Natural barrier / river blockage impounds upstream water"
+          }
+        });
+        events.push({
+          t: -10,
+          label: "Spillway Capacity Reached",
+          kind: "lake",
+          major: false,
+          payload: {
+            village_name: "Dam Crest Level",
+            water_arrival_min: "-10",
+            isolation_time_min: null,
+            pop_at_risk: 0,
+            description: "Reservoir reaches 100% capacity; overtopping threshold initiated"
+          }
+        });
+      }
+      events.push({ t: 0, label: "Dam Breach", kind: "breach", major: true, payload: null });
+
+      if (meta && meta.cascade_arrival_min) {
+        events.push({
+          t: meta.cascade_arrival_min,
+          label: "Surge Hits Downstream Dam",
+          kind: "cascade",
+          major: true,
+          payload: {
+            village_name: meta.downstream_structure?.name || "Downstream Structure",
+            water_arrival_min: `${meta.cascade_arrival_min}`,
+            isolation_time_min: null,
+            pop_at_risk: 0,
+            description: `Upstream breach wave reaches downstream structure, initiating cascading failure`
+          }
+        });
+      }
     }
 
     const ranked = (features || [])
@@ -309,6 +395,12 @@ window.Spine = (function () {
     _pinEls = [];
     _pinPassed = [];
 
+    // Historical arrival-window bands were removed: the backend deliberately
+    // withdrew this exact data (src/m10_validation/compare_arrivals.py sets
+    // HISTORICAL_ARRIVALS = {} after ruling it not eligible as historical
+    // truth without a source manifest). Real data belongs behind
+    // /api/validation/{id}/arrivals when that is wired into the timeline.
+
     placed.forEach((e, i) => {
       const p = pct(e.t);
       const btn = document.createElement("button");
@@ -338,8 +430,10 @@ window.Spine = (function () {
       // Time above, name below, both centred on the pin. Stacking them means a
       // long place name cannot drag the time out of alignment with its dot.
       const lab = document.createElement("span");
-      lab.className = "pin-label" + (animatable() ? " pin-in" : "");
+      const isStaggered = i % 2 === 1;
+      lab.className = "pin-label" + (isStaggered ? " pin-label-stagger" : "") + (animatable() ? " pin-in" : "");
       lab.style.left = (p * 100).toFixed(3) + "%";
+      if (isStaggered) lab.style.top = "24px";
       if (animatable()) lab.style.animationDelay = `${Math.min(i * 45 + 60, 460)}ms`;
       lab.innerHTML =
         `<b>${fmtT(e.t)} min</b><span dir="auto">${escapeHtmlLocal(e.label)}</span>`;

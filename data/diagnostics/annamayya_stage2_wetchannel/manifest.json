@@ -1,0 +1,119 @@
+{
+  "artifacts": {
+    "hydrograph": {
+      "bytes": 7368,
+      "media_type": "application/json",
+      "path": "hydrograph.json",
+      "provenance": {},
+      "required": true,
+      "sha256": "b9391693e2cb77754f33fb60b562705b4a3abe4ed9e0712b0ba4cc349662499e"
+    },
+    "max_depth": {
+      "bytes": 59890,
+      "media_type": "image/tiff",
+      "path": "max_depth.tif",
+      "provenance": {},
+      "required": true,
+      "sha256": "8061ec4315352302d4f5b81dfa74053f5b079e7d57de92d127fcbb625761ed3b"
+    },
+    "results": {
+      "bytes": 39552,
+      "media_type": "application/geo+json",
+      "path": "results.geojson",
+      "provenance": {},
+      "required": true,
+      "sha256": "e41acac050834445fbaef8d06ad92aec4962d54b01e148ba6398c66bd84e29ed"
+    },
+    "snapshots_index": {
+      "bytes": 68621,
+      "media_type": "application/json",
+      "path": "snapshots_index.json",
+      "provenance": {},
+      "required": true,
+      "sha256": "db16ac32cb5ee425e513a598fdeac83437769053a112b6f8042024ab548ab91a"
+    }
+  },
+  "completed_at": "2026-09-13T21:46:03Z",
+  "component_states": {},
+  "config": {
+    "channel_roughness": true,
+    "condition_flowline": true,
+    "dx_m": 152.4427468969299,
+    "manning_n": "channel 0.035 / floodplain 0.045",
+    "open_outlets": true,
+    "save_interval_s": 900.0,
+    "spinup_hours": 18.0
+  },
+  "config_hash": "f0788f30bb847bbc0d7e5a7d3e00d0251bf1a5ebf0aa85bc064b4657f8d01359",
+  "consequence_scope": "central_only",
+  "created_at": "2026-09-13T21:46:03Z",
+  "event_clock": {},
+  "fingerprint": "3d25d67141ef6429d5b541b4c53fdac98caee801bf73b8fb6d691012d5d0100f",
+  "input_hash": "9f946e07d07c1e83882b483ae281af9930f0a0b511987eda078790e94b617818",
+  "inputs": {
+    "dem": "data/dem/annamayya_dem.tif",
+    "sources": {
+      "gross_storage_mcm": "Annamayya gross capacity 2.24 TMC / 63.43 MCM -- National Register of Large Dams (CWC) / AP Irrigation (annamayya_gross_volume_mcm)",
+      "outflow_capacity_m3s": "Annamayya rated discharge capacity 2.17 lakh cusec",
+      "peak_total_inflow_annamayya_m3s": "MHA Report D692 vs CWC Technical Appraisal (2021) vs IISc (2023), EVD-15 -- range preserved, not collapsed",
+      "pincha_surge_peak_m3s": "AP Irrigation Official Flood Report (Nov 2021), EVD-05",
+      "spillway_operating_discharge_m3s": "MHA National Situation Report D692 (EVD-12/14)"
+    }
+  },
+  "metrics": {
+    "buildings_provenance": "NOT_COMPUTED: no OSM building layer exists for this AOI",
+    "flooded_km2": 202.061288453481,
+    "max_depth_m": 12.532808946460287,
+    "settlements_inundated": 10,
+    "total_buildings": null,
+    "total_par": 19950
+  },
+  "model": {
+    "run_type": "FORCED_HYDROGRAPH_INUNDATION",
+    "solver": "swe_2d well-balanced MUSCL SSP-RK2"
+  },
+  "model_hash": "fd8d5202c416bf959671faac0aaa4f921a493dfb7e5f837be2113ef79dc2f61e",
+  "pipeline_result": {
+    "cell_size_m": 152.4427468969299,
+    "coarsen": 5,
+    "hydrograph_json": "D:\\sih_work\\floodsight\\data\\scenarios\\annamayya_stage2_wetchannel\\hydrograph.json",
+    "max_depth_tif": "D:\\sih_work\\floodsight\\data\\scenarios\\annamayya_stage2_wetchannel\\max_depth.tif",
+    "results_geojson": "D:\\sih_work\\floodsight\\data\\scenarios\\annamayya_stage2_wetchannel\\results.geojson",
+    "snapshots_index": "D:\\sih_work\\floodsight\\data\\scenarios\\annamayya_stage2_wetchannel\\snapshots_index.json"
+  },
+  "request": {
+    "cap_hours": 24.0,
+    "coarsen": 5,
+    "dam_name": "Annamayya Dam (Cheyyeru) - routed release",
+    "hours": 8.0,
+    "mode": "forced_hydrograph_route"
+  },
+  "request_hash": "e89c86b1e707fc5dcda4bdeaac77a4cee080b9c8d83a45c138503c2a2654d556",
+  "resolved_scenario": {},
+  "run_id": "annamayya_stage2_wetchannel",
+  "scenario_key": "annamayya",
+  "schema_version": 1,
+  "started_at": "2026-09-13T21:46:03Z",
+  "status": "completed",
+  "timeline_events": [],
+  "validity": {
+    "geometry": "not_applicable",
+    "impoundment_modelled": false,
+    "mass_balance_relative_error": 1.775531783842859e-08,
+    "physics": true,
+    "reasons": [
+      "FORCED-HYDROGRAPH ROUTE, not a reservoir drainage. The release is PRESCRIBED from sourced figures and routed; discharge is an input here, not a measured output.",
+      "The impoundment is not modelled: Copernicus GLO-30 over this AOI is a DSM captured with the reservoir full (flat 192.50 m water plane against a published 206.0 m crest), so the dam and the valley floor beneath the pool are absent from the terrain.",
+      "Mass closure 0.0000%; outflow 3.280e+05 m3 - the domain is effectively sealed, so the extent is an upper bound on ponding."
+    ],
+    "required_artifacts": [
+      "results",
+      "max_depth",
+      "hydrograph",
+      "snapshots_index"
+    ],
+    "run_type": "FORCED_HYDROGRAPH_INUNDATION",
+    "sources": true,
+    "valid": true
+  }
+}

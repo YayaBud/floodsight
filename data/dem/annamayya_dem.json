@@ -1,0 +1,25 @@
+{
+  "schema_version": 1,
+  "path": "annamayya_dem.tif",
+  "source_urls": [
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N13_00_E078_00_DEM/Copernicus_DSM_COG_10_N13_00_E078_00_DEM.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N13_00_E079_00_DEM/Copernicus_DSM_COG_10_N13_00_E079_00_DEM.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N14_00_E078_00_DEM/Copernicus_DSM_COG_10_N14_00_E078_00_DEM.tif",
+    "https://copernicus-dem-30m.s3.amazonaws.com/Copernicus_DSM_COG_10_N14_00_E079_00_DEM/Copernicus_DSM_COG_10_N14_00_E079_00_DEM.tif"
+  ],
+  "source_sha256": "4318296e7ac6f06fd84a9f81a0d68bbe61ecc90ddc7376659fa4435b63f2990f",
+  "bbox": [
+    78.96,
+    13.85,
+    79.42,
+    14.5
+  ],
+  "crs": "EPSG:32644",
+  "resolution_m": [
+    30.48854937938598,
+    30.48854937938598
+  ],
+  "nodata": -9999.0,
+  "created_at": "2026-09-13T17:23:26.814080+00:00",
+  "classification": "RASTER_DSM"
+}

@@ -30,6 +30,7 @@ fill its own AOI and using its hull would silently delete every false alarm.
 from __future__ import annotations
 
 import glob
+import hashlib
 import json
 import logging
 from dataclasses import dataclass
@@ -85,45 +86,44 @@ SOURCES: dict[str, ObservedSource] = {
         roads_glob="ems/EMSR696/*transportationL*.json",
         buildings_glob="ems/EMSR696/*builtUpP*.json",
     ),
-    "ivanovo": ObservedSource(
-        key="ivanovo",
-        event="Ivanovo Dam Collapse — Biser, Bulgaria, 6 February 2012",
-        source="Global Flood Database / Dartmouth Flood Observatory, DFO 3896",
-        licence="CC BY-NC 4.0 — Tellman et al., Nature (2021)",
-        activation_json=None,
-        extent_glob="gfd_dam/ivanovo_observed.geojson",
-        roads_glob=None,
-        buildings_glob=None,
-    ),
-    "malpasset": ObservedSource(
-        key="malpasset",
-        event="Malpasset Arch Dam Failure — France, 2 December 1959",
-        source="Laboratoire National d'Hydraulique (LNH) physical model & field survey",
-        licence="Public domain hydraulic benchmark",
-        activation_json=None,
-        extent_glob="malpasset/malpasset_observed_extent.geojson",
-        roads_glob=None,
-        buildings_glob=None,
-    ),
-    "annamayya": ObservedSource(
-        key="annamayya",
-        event="Annamayya Dam Failure & Cheyyeru Flood — Andhra Pradesh, 19 November 2021",
-        source="Sentinel-1A SAR C-Band Backscatter (< -16 dB) & Field Survey Records",
-        licence="Copernicus Open Access / Public Record",
-        activation_json=None,
-        extent_glob="annamayya/annamayya_observed_extent.geojson",
-        roads_glob=None,
-        buildings_glob=None,
-    ),
+    # ivanovo, malpasset and annamayya were registered here against
+    # hand-authored "observed" extents (a 5-vertex rectangle for ivanovo,
+    # an SAR-branded polygon for annamayya). Those files were fabricated,
+    # are deleted, and the sources are unregistered rather than left
+    # pointing at nothing. Re-add a key only with a real, citable product.
 }
 
 
 def available(scenario_key: str) -> bool:
-    """True when observed data for this scenario is on disk."""
+    """True only when source metadata and bundled observed artifacts exist."""
     src = SOURCES.get(scenario_key)
     if src is None:
         return False
-    return bool(glob.glob(str(VALIDATION_DIR / src.extent_glob)))
+    try:
+        _validate_source_identity(scenario_key)
+        return bool(glob.glob(str(VALIDATION_DIR / src.extent_glob)))
+    except (OSError, ValueError, json.JSONDecodeError):
+        return False
+
+
+def _validate_source_identity(scenario_key: str) -> None:
+    """Validate bundled artifact identity before any loader certifies it."""
+    src = SOURCES.get(scenario_key)
+    if src is None:
+        raise ValueError(f"unknown observed source: {scenario_key}")
+    if scenario_key != "derna":
+        raise ValueError(f"{scenario_key}: observed artifact identity is not registered")
+    meta = VALIDATION_DIR / "ems696.json"
+    data = json.loads(meta.read_text(encoding="utf-8"))
+    results = data.get("results") or []
+    if not results or results[0].get("code") != "EMSR696":
+        raise ValueError("Derna artifact identity is not EMSR696")
+    for path in glob.glob(str(VALIDATION_DIR / src.extent_glob)):
+        p = Path(path).resolve()
+        if VALIDATION_DIR.resolve() not in p.parents:
+            raise ValueError("observed artifact escapes validation directory")
+        if not p.is_file() or not hashlib.sha256(p.read_bytes()).hexdigest():
+            raise ValueError(f"observed artifact cannot be hashed: {path}")
 
 
 def describe(scenario_key: str) -> Optional[dict]:
@@ -136,6 +136,9 @@ def describe(scenario_key: str) -> Optional[dict]:
         "source": src.source,
         "licence": src.licence,
         "provenance": str(src.provenance),
+        "classification": "OBSERVED",
+        "artifact_files": sorted(Path(p).relative_to(VALIDATION_DIR).as_posix()
+                                  for p in glob.glob(str(VALIDATION_DIR / src.extent_glob))),
     }
 
 
@@ -159,6 +162,8 @@ def _read_many(pattern: str) -> gpd.GeoDataFrame:
 
 def load_observed_extent(scenario_key: str) -> gpd.GeoDataFrame:
     """Observed flood polygons, WGS84."""
+    if not available(scenario_key):
+        raise FileNotFoundError(f"{scenario_key}: verified observed extent unavailable")
     return _read_many(SOURCES[scenario_key].extent_glob)
 
 
@@ -167,6 +172,8 @@ def load_observed_roads(scenario_key: str) -> gpd.GeoDataFrame:
     g = SOURCES[scenario_key].roads_glob
     if not g:
         raise FileNotFoundError(f"no observed roads wired for {scenario_key}")
+    if not available(scenario_key):
+        raise FileNotFoundError(f"{scenario_key}: verified observed roads unavailable")
     return _read_many(g)
 
 
@@ -174,12 +181,11 @@ def load_observed_domain(scenario_key: str) -> gpd.GeoDataFrame:
     """
     The mapped Areas of Interest — the only cells where an observation exists.
 
-    Read from the activation metadata. Falls back to the convex hull of the
-    observed flood polygons *only* if the metadata is missing, and says so
-    loudly: a hull domain cannot see a false alarm outside the flood, so any
-    FAR computed on it reads better than the truth.
+    Read from activation metadata. Missing metadata means NOT_AVAILABLE.
     """
     src = SOURCES[scenario_key]
+    if not available(scenario_key):
+        raise FileNotFoundError(f"{scenario_key}: verified observed AOI unavailable")
     meta = VALIDATION_DIR / (src.activation_json or "")
     if src.activation_json and meta.exists():
         with open(meta) as f:
@@ -200,14 +206,8 @@ def load_observed_domain(scenario_key: str) -> gpd.GeoDataFrame:
             return gpd.GeoDataFrame({"aoi": names}, geometry=geoms,
                                     crs="EPSG:4326")
 
-    logger.warning(
-        "%s: no AOI metadata — falling back to the convex hull of the observed "
-        "flood. False alarms outside the flood cannot be counted, so FAR from "
-        "this run is optimistic and must be labelled as such.", scenario_key)
-    ext = load_observed_extent(scenario_key)
-    return gpd.GeoDataFrame({"aoi": ["hull"]},
-                            geometry=[ext.union_all().convex_hull],
-                            crs="EPSG:4326")
+    raise FileNotFoundError(
+        f"{scenario_key}: observed AOI metadata unavailable; convex-hull scoring disabled")
 
 
 def _rasterize(gdf: gpd.GeoDataFrame, shape_hw, transform, crs) -> np.ndarray:
@@ -273,7 +273,9 @@ def compare_extent(
 
     obs = _rasterize(obs_gdf, depth.shape, transform, crs)
     domain = _rasterize(dom_gdf, depth.shape, transform, crs)
-    sim = np.nan_to_num(depth, nan=0.0) >= threshold_m
+    valid_depth = np.isfinite(depth)
+    domain &= valid_depth
+    sim = np.where(valid_depth, depth >= threshold_m, False)
 
     overlapped = bool(domain.any())
     if not overlapped:

@@ -138,9 +138,13 @@ def _rusanov_gpu(hL, huL, hvL, uL, vL, hR, huR, hvR, uR, vR, normal_axis):
 
 def _rhs_gpu(h, hu, hv, z, dx, dy):
     """
-    GPU mirror of ``swe_2d._rhs``. Same well-balanced construction, same
-    dry-cell tilt correction, same slicing via the shared ``_ax`` helper
-    (pure Python — works identically on cupy arrays, no change needed).
+    GPU mirror of ``swe_2d._rhs``. Same Audusse (2004) hydrostatic
+    reconstruction — interface bed as the MAX, free surface against the cell's
+    own bed, face-pair bed-slope source — and the same slicing via the shared
+    ``_ax`` helper (pure Python — works identically on cupy arrays).
+
+    This must stay a line-for-line mirror. The two backends are only ever
+    compared within a wide tolerance, so a divergence here is silent.
     """
     ny, nx = h.shape
     pad = 2
@@ -163,31 +167,32 @@ def _rhs_gpu(h, hu, hv, z, dx, dy):
         n = nx if axis == 1 else ny
         L = n + 2 * pad
 
-        zi = 0.5 * (zp[_ax(axis, None, -1)] + zp[_ax(axis, 1, None)])
+        # Audusse et al. (2004): interface bed single-valued and taken as the
+        # MAX, free surface reconstructed against the cell's OWN bed, and the
+        # cell-mean-preserving dry tilt removed. See `swe_2d._rhs` for the full
+        # reasoning — this file must stay a line-for-line mirror of it, because
+        # a divergence between the backends is silent (audit Part VI N-5 is
+        # exactly that defect, in this file).
+        zi = cp.maximum(zp[_ax(axis, None, -1)], zp[_ax(axis, 1, None)])
         core = slice(1, L - 1)
         z_m = zi[_ax(axis, 0, n + 2)]
         z_p = zi[_ax(axis, 1, n + 3)]
-        z_bar = 0.5 * (z_m + z_p)
+        z_c = zp[_ax(axis, core.start, core.stop)]
 
         h_c = hp[_ax(axis, core.start, core.stop)]
         u_c = up[_ax(axis, core.start, core.stop)]
         v_c = vp[_ax(axis, core.start, core.stop)]
-        eta_c = h_c + z_bar
+        eta_c = h_c + z_c
 
         eta_m, eta_p = _edge_values_gpu(eta_c, axis)
         u_m, u_p = _edge_values_gpu(u_c, axis)
         v_m, v_p = _edge_values_gpu(v_c, axis)
 
-        dry_p = eta_p < z_p
-        eta_m = cp.where(dry_p, 2.0 * eta_c - z_p, eta_m)
-        eta_p = cp.where(dry_p, z_p, eta_p)
-
-        dry_m = eta_m < z_m
-        eta_p = cp.where(dry_m, 2.0 * eta_c - z_m, eta_p)
-        eta_m = cp.where(dry_m, z_m, eta_m)
-
         h_m = cp.maximum(eta_m - z_m, 0.0)
         h_p = cp.maximum(eta_p - z_p, 0.0)
+        # The same edge values against the CELL's own bed — see swe_2d._rhs.
+        hc_m = cp.maximum(eta_m - z_c, 0.0)
+        hc_p = cp.maximum(eta_p - z_c, 0.0)
 
         hL, hR = h_p[_ax(axis, None, -1)], h_m[_ax(axis, 1, None)]
         uL, uR = u_p[_ax(axis, None, -1)], u_m[_ax(axis, 1, None)]
@@ -211,16 +216,24 @@ def _rhs_gpu(h, hu, hv, z, dx, dy):
         F_hv_l, F_hv_r = F_hv_l[trim], F_hv_r[trim]
 
         cell = _ax(axis, 1, n + 1)
-        h_bar = (0.5 * (h_m + h_p))[cell][trim]
-        dz = (z_p - z_m)[cell][trim]
+        # Audusse bed-slope source: the difference of the reconstructed edge
+        # depths squared, not a centred `h_bar * dz`. Mirror of `swe_2d._rhs`.
+        # Source acts only where there is a water column — see swe_2d._rhs.
+        wet_c = (h_c > _DRY)[cell][trim]
+        src = cp.where(
+            wet_c,
+            0.5 * _G * ((h_p * h_p - hc_p * hc_p)
+                        - (h_m * h_m - hc_m * hc_m))[cell][trim],
+            0.0,
+        )
 
         dh -= (F_h_r - F_h_l) / d
         dhu -= (F_hu_r - F_hu_l) / d
         dhv -= (F_hv_r - F_hv_l) / d
         if axis == 1:
-            dhu -= _G * h_bar * dz / d
+            dhu += src / d
         else:
-            dhv -= _G * h_bar * dz / d
+            dhv += src / d
 
         if axis == 1:
             outflux += float(F_h_r[:, -1].sum() - F_h_l[:, 0].sum()) * dy
@@ -288,7 +301,18 @@ def run_2d_swe_simulation_gpu(
     vol_initial = float(h.sum().get()) * cell_area
 
     max_h = h.copy()
-    arrival_time_gpu = cp.where(h >= arrival_depth_m, 0.0, cp.nan)
+    # P4 (audit §39): a cell that is under the reservoir at t = 0 has not been
+    # "reached by the flood" at t = 0 -- it was already wet. Seeding
+    # `arrival_time` with 0.0 there put the whole impoundment into the arrival
+    # raster as instantly inundated, and two villages reported a max depth of
+    # 58.0 m, which is exactly the reservoir depth. They keep NaN until the
+    # flood actually adds depth over them.
+    #
+    # This line read `cp.where(h >= arrival_depth_m, 0.0, cp.nan)` until
+    # 2026-09-13 -- the CPU path was fixed for P4 and its GPU mirror was not,
+    # so the two backends disagreed about what "arrival" means (audit Part VI
+    # N-5). Mirror of `swe_2d.py`'s `np.full(h.shape, np.nan)`.
+    arrival_time_gpu = cp.full(h.shape, cp.nan)
 
     inflow_mask = np.zeros((ny, nx), dtype=np.float64)
     for di in range(-2, 3):

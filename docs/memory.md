@@ -204,3 +204,128 @@ in `ui.md`.
 
 3. **Only FloodSight Server Allowed**:
    - Only the single FloodSight FastAPI server (`python.exe -m uvicorn src.api.main:app --port 8000`) should be active. All other background python/node sidecars must stay terminated.
+
+## Annamayya's event clock is T=0 = dam washout (06:30 IST), not overtopping (05:45)
+
+**Corrected 2026-09-11 — the entry this replaces had T=0 wrong and it was
+never actually reconciled against the numbers next to it.** The old text
+below claimed T=0=05:45 (overtopping) AND Pincha at "T-150 min" (03:15) in
+the same breath; 03:30 (the actual sourced Pincha time, EVD-04) to 05:45 is
+135 minutes, not 150. Nobody had checked the arithmetic before this session.
+
+The evidence — `data/evidence/annamayya_event_evidence.json`
+(`event_clock` block) and `ANNAMAYYA_DATA_AUDIT.md`'s EVD-01..28 table —
+has THREE candidate "T=0" moments, not one: EVD-16 overtopping initiation
+(05:30-06:00, a range), EVD-17 full washout (06:15-06:30, a range), and
+the MHA's own point value for the latter (06:30). **User decision**: T=0 is
+the dam failure/washout event, using the MHA point value 06:30 IST — not
+overtopping. This is now the single value in `event_clock.origin_iso`,
+served by `src/scenarios.py:load_event_clock()`, read from the evidence
+file. Nothing hardcodes it elsewhere; `frontend/map.js`'s 4 hardcoded
+`event_clock` blocks (rishiganga/derna/south_lhonak/annamayya, none of which
+had a citable source for their origin times) are deleted.
+
+Consequences that bind future work on this scenario:
+
+- Pincha ring-bund failure (EVD-04, OBSERVED, 03:30 IST) is `t_s = -10800`
+  (180 min before T=0), not `-150`. `src/data_fetcher.py`'s
+  `cascade.upstream.lead_time_s` was `9000.0` and is now `10800.0` to match.
+  Do not re-derive "150" from any of the three T=0 candidates — it never
+  matched any of them (135 min against 05:45, 150 against 06:00, 180 against
+  06:30 — the code had picked 05:45 for T=0 but kept the 150-based lead time
+  anyway, an internal inconsistency present from the start, not introduced
+  by this fix).
+- Overtopping initiation (EVD-16) is kept as its own timeline event, earlier
+  than T=0, not collapsed into it — the reservoir was already overtopping
+  for perhaps 30-60 minutes before the embankment fully washed out.
+- EVD-21 (Cheyyeru gorge exit) and EVD-22 (Togurupeta), sourced at
+  06:15-06:25, land *before* T=0=06:30. **User-confirmed physical reading**:
+  these are arrivals of the pre-washout overtopping discharge (crest flow
+  during the ~30-60 min the dam was overtopping but not yet gone), a
+  distinct and earlier pulse from the post-washout breach wave that reaches
+  the same points afterward — not measurement error, and not to be
+  "corrected" to positive t_s.
+- The full 9-event chronology (Pincha failure → overtopping → pre-washout
+  arrivals → washout/T=0 → Mandapalli → Pulapathur → Gundlur → Nandalur →
+  far-field) lives in `annamayya_event_evidence.json`'s `event_clock.
+  timeline_events`, each with `t_s`, `t_uncertainty_s`, a historical
+  time/range, `classification`, and `source`. This is meant to be extended,
+  not re-derived from scratch, if a future EVD record changes.
+
+Separately, unrelated to the clock fix but found while researching it: the
+prior claim that "Delft3D-FLOW is explicitly positioned as a precomputed
+synthetic benchmark reference" was itself the FS-15 fabrication — the
+"Delft3D" trace and its "±0.14 m RMSE" band were the Ritter analytical curve
+relabelled twice over (`y: h_analytical` for both series), not a Delft3D
+result under any framing. Deleted from `frontend/charts.js`. See
+`findings_results.md`'s 2026-09-11 entry for the fuller P0/P1 record.
+
+
+## The DEM fill is not trustworthy for any scenario yet — measured, not argued
+
+Established 2026-09-11 by P2 Gate 1 (`run_pipeline.py:442-475` diagnostic, all 7
+scenarios). Full numbers in `findings_results.md`.
+
+**rishiganga fills the gorge, not the impoundment, and the guard does not catch it.**
+`build_stage_storage` returned 9,672 MCM against a configured `v_frl_mcm` of 0.15
+(**64,483x**) and a dam height of 756.6 m against a configured 70 m. The pool's `z_min`
+came out **743.6 m below the declared `z_bed_m`**. The confinement guard passed because
+the pool never touches the raster edge — it just fills a canyon that stays in-domain.
+Edge-touching is therefore **not** a sufficient confinement test.
+
+This is the measured instance of the asserted-`wse_m` problem already recorded above:
+`run_pipeline.py:417` takes `wse_m` straight from `cascade_cfg["reservoir"]["z_crest_m"]`
+with no terrain reconciliation.
+
+**How to apply:** do not promote the DEM-derived stage-storage curve over the
+analytical power law (P2 Gate 2's plan) until the overrun is root-caused — candidates
+are seed placement, barrier emplacement, or the asserted `wse_m`. "The DEM fill is the
+physically honest one" is true in principle and currently false in practice.
+
+**Do not read 3 of the 7 Gate 1 results as scenario defects.** derna failed on a bug in
+the throwaway diagnostic script (missing output dir), not on physics — it is the one
+scenario that passes `test_run_lifecycle.py`. south_lhonak and annamayya died upstream
+in roads/terrain fetch before reaching the check. All three are **unknown**, and the
+sweep ran at `coarsen=16`, which smooths barriers and may itself cause edge-touching.
+
+## Kosi 2008's validation raster on disk is the wrong event
+
+Established 2026-09-11, verified directly against
+`data/validation/gfd_meta/dam_events.csv`. `DFO_3382_From_20080922_to_20080929.tif` is
+**ID 3382, India, 20.95 N / 84.41 E, began 2008-09-22, cause "Dam release and Heavy
+Rain"** — that is **Odisha, ~700 km from the Kusaha breach**, starting 35 days after
+it. Almost certainly the Sept 2008 Mahanadi/Hirakud release event.
+
+**Two repo documents assert otherwise and are wrong:**
+`FLOODSIGHT_DEEP_REVIEW_2026-09-11.md:321` ("covers the 2008 window and is **already on
+disk**" — the entire stated basis for "Kosi is the shortest path to a second validated
+case", repeated at `:328` and `:626`) and `data/validation/README.md:51`.
+
+**Why this is dangerous rather than merely wrong:** the GFD regional MODIS tile spans
+72-91 E, so it *does* overlap Bihar, and carries ~28,000 flooded pixels inside a
+Kosi-fan box. Scoring CSI against it returns **plausible-looking numbers from the wrong
+flood on the wrong date** instead of failing loudly.
+
+The correct event is **DFO 3365** (Nepal, 26.95 N / 84.92 E, began **2008-08-18** —
+the exact breach date), listed in `gfd_available_events.csv:511` but **not on disk**;
+32 MB download. It was filtered out because DFO labels its cause "Heavy monsoon rains"
+rather than an embankment cause, so the repo's dam-event filter will keep missing it.
+Its window is a 37-day maximum-extent composite, not a snapshot.
+
+## Kosi 2008 was not a flood-magnitude failure, and has no published breach coordinate
+
+Established 2026-09-11 from Sinha et al. 2013 (*Geology* 41(10):1099) and Sinha et al.
+2014 (*Geomorphology* 216:157-170), both read in full.
+
+The breach occurred at **~4078-4320 m3/s against a ~27,000 m3/s design capacity** —
+roughly **15% of design, 40% of bankfull** (bankfull 7458 m3/s at Birpur). Sinha 2014
+states outright the avulsion "was not caused by a large flood event". Mechanism is
+**toe/spur erosion plus seepage on a perched channel** whose bed sits ~4 m *above* the
+adjacent floodplain, after the thalweg migrated against the eastern embankment from
+2000 onward — **not overtopping**, and freeboard was never exceeded.
+
+**How to apply:** any Kosi scenario driven by a monsoon-peak hydrograph is physically
+wrong, and `failure_mechanism` for it is a seepage/lateral-scour case, not the
+overtopping kernel. Also: **no published breach lat/lon exists** in either paper — the
+best available is a village centroid with two similarly-named candidates ~20 km apart
+(Paschim Kasuha vs Purbakushaha). Do not present a derived coordinate as sourced.

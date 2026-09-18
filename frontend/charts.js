@@ -144,35 +144,13 @@ async function renderRitterPlot() {
     });
   }
 
-  // Delft3D precomputed RMSE band (±0.14 m around analytical) — PRECOMPUTED label
-  const delft3d_hi = h_analytical.map(h => h + 0.14);
-  const delft3d_lo = h_analytical.map(h => Math.max(0, h - 0.14));
-
   const traces = [
-    // Delft3D RMSE band (PRECOMPUTED benchmark)
-    {
-      x: [...x_analytical, ...[...x_analytical].reverse()],
-      y: [...delft3d_hi,   ...[...delft3d_lo].reverse()],
-      fill: "toself",
-      fillcolor: "rgba(196,83,31,0.10)",
-      line: { color: "transparent" },
-      name: "Delft3D ±RMSE (0.14 m, PRECOMPUTED)",
-      hoverinfo: "skip",
-    },
     // Ritter analytical (always shown)
     {
       x: x_analytical, y: h_analytical,
       mode: "lines",
       line: { color: T().urgent, width: 2.5 },
       name: "Ritter 1892 (analytical, exact)",
-    },
-    // Delft3D centre line (PRECOMPUTED)
-    {
-      x: x_analytical, y: h_analytical,
-      mode: "lines",
-      line: { color: T().urgent, width: 1, dash: "dot" },
-      name: "Delft3D-FLOW (PRECOMPUTED)",
-      opacity: 0.55,
     },
   ];
 
@@ -181,13 +159,6 @@ async function renderRitterPlot() {
       text: `t = ${t_s} s · h₁ = ${h1} m · Frictionless flat bed`,
       x: 0.5, y: 1.04, xref: "paper", yref: "paper",
       showarrow: false, font: { size: 10, color: T().muted },
-    },
-    {
-      text: "Delft3D RMSE = 0.14 m (PRECOMPUTED)",
-      x: 0.01, y: 0.97, xref: "paper", yref: "paper",
-      xanchor: "left", showarrow: false,
-      font: { size: 11, color: T().urgent, family: T().mono },
-      bgcolor: T().paper, borderpad: 4,
     },
   ];
 
@@ -379,6 +350,9 @@ document.addEventListener("floodsight:themechange", () => {
   if (typeof window.renderMalpassetBenchmark === "function") {
     Promise.resolve(window.renderMalpassetBenchmark()).catch(() => {});
   }
+  if (typeof window.renderScenarioSolverComparison === "function") {
+    Promise.resolve(window.renderScenarioSolverComparison()).catch(() => {});
+  }
   // Anything still on screen at least gets the new backgrounds.
   document.querySelectorAll(".js-plotly-plot").forEach((el) => {
     Plotly.relayout(el, {
@@ -405,9 +379,15 @@ window.renderMalpassetBenchmark = async function() {
     const hwm = data.high_water_marks || [];
     const xs = hwm.map(p => p.distance_m / 1000); // km
     const yObs = hwm.map(p => p.measured_wse_m);
-    const ySim = hwm.map(p => p.simulated_wse_m);
     const labels = hwm.map(p => p.point);
 
+    // Observations only. There was a second trace here named "FloodSight 2D SWE
+    // Simulation", drawn from a `simulated_wse_m` field in the benchmark file.
+    // No code in this project produced those numbers — malpasset fails the
+    // geometry gate at every coarsening and has never been run — so the field
+    // was removed from the data rather than relabelled, and the trace with it
+    // (audit Part VI §58, FS-46). Re-add a simulated series only when it comes
+    // from an actual run.
     const traces = [
       {
         x: xs,
@@ -417,20 +397,17 @@ window.renderMalpassetBenchmark = async function() {
         name: "Surveyed High-Water Mark (P1–P14)",
         text: labels,
         hovertemplate: "%{text}: %{y:.1f} m WSE at %{x:.2f} km<extra></extra>",
-      },
-      {
-        x: xs,
-        y: ySim,
-        mode: "lines",
-        line: { color: "#38BDF8", width: 2.2 },
-        name: "FloodSight 2D SWE Simulation",
-        hovertemplate: "Simulated: %{y:.1f} m at %{x:.2f} km<extra></extra>",
       }
     ];
 
+    const notRun = data.simulation_status && data.simulation_status.has_been_run === false;
+    const titleText = notRun
+      ? "Water Surface Elevation along Valley Profile — surveyed marks only, no simulation on record"
+      : "Water Surface Elevation along Valley Profile";
+
     const layout = {
       ...PLOT_LAYOUT_BASE,
-      title: { text: "Water Surface Elevation along Valley Profile", font: { size: 12, color: T().text, family: T().sans } },
+      title: { text: titleText, font: { size: 12, color: T().text, family: T().sans } },
       xaxis: { title: "Distance from Dam (km)", gridcolor: T().grid, linecolor: T().grid, tickfont: { family: T().mono, size: 10, color: T().muted } },
       yaxis: { title: "Max Elevation (m)", gridcolor: T().grid, linecolor: T().grid, tickfont: { family: T().mono, size: 10, color: T().muted } },
       legend: { orientation: "h", y: -0.32, font: { size: 10, family: T().sans } },
@@ -443,3 +420,123 @@ window.renderMalpassetBenchmark = async function() {
     console.warn("Failed to render Malpasset benchmark:", err);
   }
 };
+
+let _lastSolverCompData = null;
+
+window.renderScenarioSolverComparison = async function(compData) {
+  const container = document.getElementById("scenario-solver-comparison-chart");
+  if (!container || typeof Plotly === "undefined") return;
+
+  if (compData) {
+    _lastSolverCompData = compData;
+  } else if (_lastSolverCompData) {
+    compData = _lastSolverCompData;
+  } else if (window.currentJobId) {
+    try {
+      const res = await fetch(`/api/solver-comparison/${window.currentJobId}`);
+      if (res.ok) {
+        compData = await res.json();
+        _lastSolverCompData = compData;
+      }
+    } catch (e) {
+      console.warn("Could not fetch solver comparison:", e);
+    }
+  }
+
+  if (!compData) {
+    Plotly.newPlot(container, [], {
+      ...PLOT_LAYOUT_BASE,
+      height: 260,
+      margin: { l: 50, r: 50, t: 30, b: 45 },
+      annotations: [{
+        text: "Run an Annamayya simulation to view 1D SWE-SPH vs 2D FV SWE thalweg profiles",
+        x: 0.5, y: 0.5, xref: "paper", yref: "paper",
+        showarrow: false, font: { size: 11, color: T().muted }
+      }]
+    }, PLOTLY_CONFIG);
+    return;
+  }
+
+  const xs = compData.stations_km || [];
+  const fv = compData.fv_peak_depth_m || [];
+  const sph = compData.sph_peak_depth_m || [];
+  const bed = compData.bed_elevation_m || [];
+
+  const traces = [
+    {
+      x: xs,
+      y: fv,
+      mode: "lines",
+      name: "2D Finite-Volume SWE (Roe/HLLC)",
+      line: { color: "#38BDF8", width: 2.5 },
+      hovertemplate: "FV SWE Depth: %{y:.2f} m at %{x:.2f} km<extra></extra>",
+      yaxis: "y1"
+    },
+    {
+      x: xs,
+      y: sph,
+      mode: "lines",
+      name: "1D SWE-SPH (Lagrangian Particles)",
+      line: { color: "#10B981", width: 2.2, dash: "dot" },
+      hovertemplate: "SWE-SPH Depth: %{y:.2f} m at %{x:.2f} km<extra></extra>",
+      yaxis: "y1"
+    }
+  ];
+
+  if (bed.length === xs.length) {
+    traces.push({
+      x: xs,
+      y: bed,
+      mode: "lines",
+      name: "Thalweg Bed Elevation (DEM)",
+      line: { color: "#64748B", width: 1.2, dash: "dash" },
+      hovertemplate: "Bed Elevation: %{y:.1f} m at %{x:.2f} km<extra></extra>",
+      yaxis: "y2",
+      opacity: 0.6
+    });
+  }
+
+  const rmseStr = compData.rmse_m != null ? `${compData.rmse_m.toFixed(2)} m` : "N/A";
+  const wallStr = compData.sph_wall_time_s != null ? `${compData.sph_wall_time_s.toFixed(2)} s` : "N/A";
+
+  const layout = {
+    ...PLOT_LAYOUT_BASE,
+    height: 280,
+    margin: { l: 55, r: 55, t: 35, b: 50 },
+    xaxis: {
+      ...PLOT_LAYOUT_BASE.xaxis,
+      title: { text: "Distance along Cheyyeru Corridor from Dam Face (km)", font: { size: 11, color: T().muted } },
+    },
+    yaxis: {
+      ...PLOT_LAYOUT_BASE.yaxis,
+      title: { text: "Peak Depth h (m)", font: { size: 11, color: "#38BDF8" } },
+      rangemode: "tozero",
+    },
+    yaxis2: {
+      title: { text: "Bed Elevation (m)", font: { size: 10, color: "#64748B" } },
+      overlaying: "y",
+      side: "right",
+      showgrid: false,
+      tickfont: { size: 9, color: T().muted },
+    },
+    legend: {
+      orientation: "h",
+      x: 0,
+      y: 1.18,
+      font: { size: 10, color: T().text },
+      bgcolor: "transparent"
+    },
+    annotations: [
+      {
+        text: `SWE-SPH vs FV RMSE = ${rmseStr} · SPH Walltime = ${wallStr}`,
+        x: 0.99, y: 1.18, xref: "paper", yref: "paper",
+        xanchor: "right", showarrow: false,
+        font: { size: 10, color: T().accent, family: T().mono },
+        bgcolor: T().paper, borderpad: 3
+      }
+    ]
+  };
+
+  Plotly.newPlot(container, traces, layout, PLOTLY_CONFIG);
+};
+

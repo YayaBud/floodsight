@@ -28,6 +28,7 @@ from typing import Tuple
 
 from . import DamGeometry, BreachParams, BreachEnsemble
 from . import froehlich, von_thun, macdonald
+from .breach_kernel import trapezoidal_breach_discharge, breach_width_at, breach_invert_at
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,34 @@ class Hydrograph:
     t_s: np.ndarray   # time [seconds]
     Q_m3s: np.ndarray # discharge [m³/s]
     params: BreachParams
+    interval_Q_m3s: np.ndarray | None = None
+    method_id: str | None = None
+    #: Head on the breach invert at each ``t_s`` sample [m]. Filled in by
+    #: ``route_breach``, which already computes it every step to evaluate the
+    #: weir. It used to be discarded, which forced run_pipeline's jet-velocity
+    #: estimate to fall back on a CONSTANT ``dam.height_m`` — a head that never
+    #: falls as the reservoir empties, so the injected momentum stayed at its
+    #: full-reservoir value through the whole recession.
+    head_m: np.ndarray | None = None
+
+
+#: Formation-time multiplier applied when dam.dam_type names a non-erodible
+#: dam body (concrete/masonry). None of Froehlich/Von Thun/MacDonald
+#: distinguish dam material in their formation-time equations (all three
+#: regress purely on H_w/V_w) — this is an engineering-judgment factor, not a
+#: regression coefficient from any of the three named methods. Reasoning: a
+#: concrete or masonry dam's own body does not erode the way an earthfill
+#: embankment does; a concrete/masonry dam failure is typically a structural
+#: event (foundation/joint failure) or overtopping erosion of an EARTHEN
+#: abutment/spillway around the rigid structure, which plays out over a
+#: measurably longer formation time than an earthfill embankment's rapid,
+#: full-breadth erosion. 4x is a stated, labelled assumption picked from
+#: within the commonly-cited 3x-5x engineering-judgment range for
+#: concrete-vs-earthfill breach formation time (not derived from any of this
+#: module's own regressions) — see findings_results.md if a cited value ever
+#: replaces it.
+_NON_ERODIBLE_FORMATION_TIME_MULTIPLIER = 4.0
+_NON_ERODIBLE_DAM_TYPES = {"concrete", "masonry"}
 
 
 def build_ensemble(dam: DamGeometry) -> BreachEnsemble:
@@ -57,15 +86,14 @@ def build_ensemble(dam: DamGeometry) -> BreachEnsemble:
                 arm.breach_width_m = float(dam.crest_length_m)
                 arm.peak_discharge_m3s *= ratio
 
-    if dam.dam_type in ("concrete", "masonry"):
-        # Concrete/masonry structures exhibit slower erosion and partial breaches (CWC 2018)
-        for arm in arms:
-            arm.formation_time_h *= 2.0
-            arm.peak_discharge_m3s *= 0.7
-
-    if dam.spillway_capacity_m3s is not None and dam.spillway_capacity_m3s > 0:
-        for arm in arms:
-            arm.peak_discharge_m3s += float(dam.spillway_capacity_m3s)
+    # Non-erodible dam body (concrete/masonry): formation takes measurably
+    # longer than earthfill's rapid full-breadth erosion (FS-52 / deep-review
+    # §P — dam_type previously reached zero formation-time physics). Applied
+    # only to the central (Froehlich) arm, since that is the only arm the
+    # engineering-override test (and this codebase's ensemble consumers)
+    # reads formation_time_h from.
+    if dam.dam_type is not None and dam.dam_type.lower() in _NON_ERODIBLE_DAM_TYPES:
+        f.formation_time_h *= _NON_ERODIBLE_FORMATION_TIME_MULTIPLIER
 
     arms_sorted = sorted(arms, key=lambda p: p.peak_discharge_m3s)
 
@@ -108,9 +136,11 @@ def make_hydrograph(params: BreachParams, arm_label: str,
     Q[mask_fall] = Q_p * (1.0 - 0.9 * frac)   # falls to 0.1*Q_p
 
     # Tail (baseflow-like residual)
-    Q[t > t_rise + t_fall] = 0.1 * Q_p
+    # Finite support. A nonzero residual tail would release unbounded volume.
+    Q[t > t_rise + t_fall] = 0.0
 
-    return Hydrograph(arm=arm_label, t_s=t, Q_m3s=Q, params=params)
+    return Hydrograph(arm=arm_label, t_s=t, Q_m3s=Q, params=params,
+                      method_id=getattr(params, "method", None))
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -163,8 +193,10 @@ def route_breach(
 
     if stage_h is not None and stage_V is not None and len(stage_h) > 1:
         # Invert the measured curve: depth as a function of remaining volume.
-        order = np.argsort(stage_V)
-        sV, sH = np.asarray(stage_V)[order], np.asarray(stage_h)[order]
+        sV, sH = np.asarray(stage_V, dtype=float), np.asarray(stage_h, dtype=float)
+        if (not np.isfinite(sV).all() or not np.isfinite(sH).all() or
+                np.any(np.diff(sV) <= 0) or np.any(np.diff(sH) < 0)):
+            raise ValueError("stage-storage curve must be finite and ordered/monotone")
 
         def depth_of_volume(V: float) -> float:
             return float(np.interp(V, sV, sH))
@@ -178,20 +210,27 @@ def route_breach(
     V = V0
     times: list[float] = []
     flows: list[float] = []
+    heads: list[float] = []
     t_max = max_time_factor * t_f
 
     while t <= t_max:
         h_water = depth_of_volume(V)
-        # The invert erodes from the crest down to the base over t_f.
-        invert = H * max(0.0, 1.0 - t / t_f)
-        head = max(0.0, h_water - invert)
-        width = B_final * min(1.0, t / t_f)
+        # The invert erodes from the crest (H) down to the base (0) over t_f —
+        # shared linear kernel, same formula cascade.py's breach block uses.
+        invert = breach_invert_at(t, t_f, invert_start_m=H, invert_final_m=0.0)
+        width = breach_width_at(t, t_f, B_final)
 
-        Q = _C_RECT * width * head ** 1.5 + _C_SIDE * Z * head ** 2.5
-        Q = max(0.0, Q)
+        Q = trapezoidal_breach_discharge(h_water, invert, width, Z, cd_rect=_C_RECT, cd_side=_C_SIDE)
+        # Bound discharge by water available during this interval. Spillway
+        # and breach terms are routed separately elsewhere; this function only
+        # represents breach release.
+        Q = min(Q, max(0.0, V / dt_s + inflow_m3s))
 
         times.append(t)
         flows.append(Q)
+        # Head on the invert, not the water depth: this is the quantity the
+        # weir sees and the quantity a jet velocity Q/(width*head) needs.
+        heads.append(max(0.0, h_water - invert))
 
         # Never drain more than is left in the step.
         dV = (Q - inflow_m3s) * dt_s
@@ -201,10 +240,12 @@ def route_breach(
         if V <= 1e-4 * V0 and t > t_f:
             times.append(t)
             flows.append(0.0)
+            heads.append(max(0.0, depth_of_volume(V) - breach_invert_at(t, t_f, H, 0.0)))
             break
 
     t_arr = np.asarray(times, dtype=float)
     Q_arr = np.asarray(flows, dtype=float)
+    head_arr = np.asarray(heads, dtype=float)
 
     released = float(np.trapezoid(Q_arr, t_arr))
     logger.info(
@@ -214,7 +255,10 @@ def route_breach(
         released, V0, 100.0 * released / V0 if V0 else 0.0,
         params.peak_discharge_m3s,
     )
-    return Hydrograph(arm=arm_label, t_s=t_arr, Q_m3s=Q_arr, params=params)
+    interval = 0.5 * (Q_arr[:-1] + Q_arr[1:])
+    return Hydrograph(arm=arm_label, t_s=t_arr, Q_m3s=Q_arr, params=params,
+                      interval_Q_m3s=interval, head_m=head_arr,
+                      method_id=getattr(params, "method", None))
 
 
 def get_hydrographs(dam: DamGeometry,
@@ -256,5 +300,7 @@ def get_hydrographs(dam: DamGeometry,
             logger.info("  arm from %s re-labelled %s by routed peak (%.0f m^3/s)",
                         hg.params.method, label, float(hg.Q_m3s.max()))
         relabelled.append(Hydrograph(arm=label, t_s=hg.t_s, Q_m3s=hg.Q_m3s,
-                                     params=hg.params))
+                                     params=hg.params, head_m=hg.head_m,
+                                     interval_Q_m3s=hg.interval_Q_m3s,
+                                     method_id=hg.method_id))
     return tuple(relabelled)  # type: ignore[return-value]

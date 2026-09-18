@@ -52,7 +52,8 @@ def test_compute_lake_depth_grids():
 
 def test_scenario_cascade_and_lake_metadata():
     """Verify scenarios have lake formation, cascading structures, and solver parameters."""
-    req_scenarios = ["rishiganga", "phutkal", "south_lhonak", "derna", "annamayya"]
+    # OUT-OF-SCOPE-NON-INDIAN: "derna" dropped from this list — commented out of SCENARIOS.
+    req_scenarios = ["rishiganga", "phutkal", "south_lhonak", "annamayya"]
     for key in req_scenarios:
         assert key in SCENARIOS, f"Scenario '{key}' missing from SCENARIOS"
         sc = SCENARIOS[key]
@@ -71,11 +72,13 @@ def test_scenario_cascade_and_lake_metadata():
     assert "downstream_structure" in rishi
     assert "Tapovan Vishnugad HEP Barrage" in rishi["downstream_structure"]["name"]
 
-    # Verify Derna cascade (Abu Mansour -> Al-Bilad)
-    derna = SCENARIOS["derna"]
-    assert "cascade" in derna or "downstream_structure" in derna
-    assert "Abu Mansour" in derna.get("name", "") or "Abu Mansour" in str(derna)
-    assert "Al-Bilad" in str(derna.get("downstream_structure", ""))
+    # OUT-OF-SCOPE-NON-INDIAN: the Derna cascade assertions are commented out with the scenario.
+    # Restore them together — they are the only coverage of a two-structure
+    # cascade (Abu Mansour -> Al-Bilad) in this file.
+    # derna = SCENARIOS["derna"]
+    # assert "cascade" in derna or "downstream_structure" in derna
+    # assert "Abu Mansour" in derna.get("name", "") or "Abu Mansour" in str(derna)
+    # assert "Al-Bilad" in str(derna.get("downstream_structure", ""))
 
 
 def test_gee_sentinel1_sar_analyzer():
@@ -89,14 +92,8 @@ def test_gee_sentinel1_sar_analyzer():
     )
 
     assert sar_fc["type"] == "FeatureCollection"
-    assert len(sar_fc["features"]) > 0
-    f0 = sar_fc["features"][0]
-    assert "geometry" in f0
-    props = f0["properties"]
-    assert props["platform"] == "Sentinel-1A SAR C-Band"
-    assert props["polarization"] == "VH"
-    assert "backscatter_threshold_db" in props
-    assert props["backscatter_threshold_db"] == -16.0
+    assert sar_fc["features"] == []
+    assert sar_fc["metadata"]["classification"] == "NOT_AVAILABLE"
 
 
 def test_api_scenarios_metadata_and_sar_layer():
@@ -115,7 +112,8 @@ def test_api_scenarios_metadata_and_sar_layer():
     assert sar_resp.status_code == 200
     sar_data = sar_resp.json()
     assert sar_data["type"] == "FeatureCollection"
-    assert len(sar_data["features"]) > 0
+    assert sar_data["features"] == []
+    assert sar_data.get("metadata", {}).get("classification") == "NOT_AVAILABLE"
 
     # Lake formation for non-existent job
     lake_resp = client.get("/api/lake_formation/missing_job_123")
