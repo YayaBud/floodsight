@@ -49,12 +49,12 @@ let mapMarkingsVisible = true;
 let shelterMarkers = [];
 let sheltersVisible = true;
 
-const SCENARIO_DAMS = {
+const SCENARIO_PRESENTATION = {
   rishiganga: {
     name: "Rishi Ganga Avalanche Barrier & Cascade",
     sub: "2,450 m WSE · 70 m Barrier Height",
-    lon: 79.71228,
-    lat: 30.46915,
+    _fallbackLon: 79.71228,
+    _fallbackLat: 30.46915,
     wse: 2450,
     height: 70,
     crest_length_m: 350,
@@ -66,29 +66,21 @@ const SCENARIO_DAMS = {
     breach_short: "AVALANCHE OUTBURST",
     q_peak: "~25,000 m³/s",
     desc: "A massive rock and ice avalanche from Ronti Peak impounded the Raunthi Gad confluence gorge, creating an ephemeral barrier that failed catastrophically.",
-    event_clock: {
-      origin_iso: "2021-02-07T10:20:00+05:30",
-      origin_label: "10:20 AM IST",
-    },
+    // event_clock removed (P1-2/FS-19/§I): the server is the one authority
+    // for event timing now (see _getDamData in this file, and
+    // src/scenarios.py's load_event_clock). No timestamp lives in JS.
     cascade: {
       type: "Avalanche Damming & Downstream HEP Cascade",
       upstream_name: "Ronti Avalanche Scar (5,500m)",
-      upstream_coords: [79.73100, 30.37500],
       upstream_status: "Detached (T-10 min)",
       subdam_name: "Rishiganga Small Hydro Project (HEP)",
-      subdam_coords: [79.69929, 30.47827],
       subdam_status: "Obliterated at T+10 min",
       downstream_name: "Tapovan Vishnugad Barrage (NTPC)",
-      downstream_coords: [79.62778, 30.49338],
       downstream_status: "Barrage destroyed at T+35 min",
       distance_km: 11.2,
       transit_min: 35,
       chain_desc: "Ronti Peak avalanche triggers debris dam -> bursts -> obliterates Rishiganga HEP -> tears downstream to demolish Tapovan Vishnugad barrage",
     },
-    dam_axis: [[79.71075, 30.47035], [79.71228, 30.46915], [79.71381, 30.46795]],
-    subdam_axis: [[79.62680, 30.49420], [79.62778, 30.49338], [79.62880, 30.49250]],
-    reservoir_pool: [[79.71075, 30.47035], [79.71228, 30.46915], [79.71381, 30.46795], [79.71850, 30.46450], [79.72400, 30.46100], [79.72150, 30.46650], [79.71520, 30.47150], [79.71075, 30.47035]],
-    outflow_vector: [[79.71228, 30.46915], [79.70650, 30.47350], [79.69929, 30.47827], [79.66500, 30.48500], [79.62778, 30.49338]],
     focus_pitch: 52,
     focus_bearing: 305,
     focus_zoom: 14.5,
@@ -96,8 +88,8 @@ const SCENARIO_DAMS = {
   phutkal: {
     name: "Phutkal Landslide Dam",
     sub: "3,878 m WSE · 58 m Dam Height",
-    lon: 77.05783,
-    lat: 33.25242,
+    _fallbackLon: 77.05783,
+    _fallbackLat: 33.25242,
     wse: 3878,
     height: 58,
     crest_length_m: 260,
@@ -112,15 +104,11 @@ const SCENARIO_DAMS = {
     cascade: {
       type: "Canyon Lake Outburst & Downstream Destruction",
       downstream_name: "Phuktal Monastery & Tsarap Bridges",
-      downstream_coords: [77.17700, 33.26800],
       downstream_status: "Suspension Bridges Swept Away",
       distance_km: 12.0,
       transit_min: 30,
       chain_desc: "Limestone cliff collapse impounds 15 km Tsarap Chu lake -> artificial diversion overtopping trenches 58m dam -> sweeps downstream bridges and Dorzong",
     },
-    dam_axis: [[77.05665, 33.25335], [77.05783, 33.25242], [77.05901, 33.25149]],
-    reservoir_pool: [[77.05665, 33.25335], [77.05783, 33.25242], [77.05901, 33.25149], [77.06650, 33.24550], [77.07800, 33.23800], [77.08500, 33.24300], [77.07100, 33.25100], [77.05665, 33.25335]],
-    outflow_vector: [[77.05783, 33.25242], [77.04200, 33.26400], [77.02480, 33.28350], [77.01680, 33.29150]],
     focus_pitch: 50,
     focus_bearing: 320,
     focus_zoom: 14.5,
@@ -128,8 +116,8 @@ const SCENARIO_DAMS = {
   derna: {
     name: "Abu Mansour Dam (Upper Derna)",
     sub: "170 m WSE · 74 m Dam Height",
-    lon: 22.57733,
-    lat: 32.65755,
+    _fallbackLon: 22.57733,
+    _fallbackLat: 32.65755,
     wse: 170,
     height: 74,
     crest_length_m: 300,
@@ -141,26 +129,16 @@ const SCENARIO_DAMS = {
     breach_short: "OVERTOPPING & CASCADE BREACH",
     q_peak: "~9,500 m³/s",
     desc: "Extreme rainfall from Storm Daniel filled the reservoir beyond crest, causing total collapse and sending a 22.5 MCM torrent that wiped out Al-Bilad downstream.",
-    event_clock: {
-      origin_iso: "2023-09-11T02:30:00+02:00",
-      origin_label: "02:30 AM EET",
-    },
     cascade: {
       type: "Dual Embankment Cascade",
       upstream_name: "Abu Mansour Dam (Upstream)",
-      upstream_coords: [22.57733, 32.65755],
       upstream_status: "Breached (02:30 AM)",
       downstream_name: "Al-Bilad Dam (Downstream City Dam)",
-      downstream_coords: [22.63058, 32.75237],
       downstream_status: "Destroyed at T+30 min (03:00 AM)",
       distance_km: 13.7,
       transit_min: 30,
       chain_desc: "Storm Daniel overwhelms Abu Mansour -> 22.5 MCM surge races 13.7 km down Wadi Derna -> instantly annihilates 45m Al-Bilad Dam -> sweeps through Derna city into Mediterranean",
     },
-    dam_axis: [[22.57605, 32.65868], [22.57733, 32.65755], [22.57861, 32.65642]],
-    subdam_axis: [[22.62920, 32.75320], [22.63058, 32.75237], [22.63196, 32.75154]],
-    reservoir_pool: [[22.57605, 32.65868], [22.57733, 32.65755], [22.57861, 32.65642], [22.57650, 32.65150], [22.57150, 32.64800], [22.56950, 32.65300], [22.57250, 32.65700], [22.57605, 32.65868]],
-    outflow_vector: [[22.57733, 32.65755], [22.59200, 32.67800], [22.61050, 32.71500], [22.63058, 32.75237], [22.64100, 32.76600]],
     focus_pitch: 48,
     focus_bearing: 40,
     focus_zoom: 14.5,
@@ -168,8 +146,8 @@ const SCENARIO_DAMS = {
   south_lhonak: {
     name: "South Lhonak Moraine Dam & Glacial Lake",
     sub: "5,200 m WSE · 60 m Moraine Height",
-    lon: 88.18742,
-    lat: 27.91478,
+    _fallbackLon: 88.18742,
+    _fallbackLat: 27.91478,
     wse: 5200,
     height: 60,
     crest_length_m: 310,
@@ -181,26 +159,16 @@ const SCENARIO_DAMS = {
     breach_short: "GLOF MORAINE FAILURE",
     q_peak: "~55,000 m³/s",
     desc: "Glacial lake outburst flood produced massive surge waves that tore down Teesta canyon through Chungthang concrete-rockfill dam and swept the Teesta basin.",
-    event_clock: {
-      origin_iso: "2023-10-04T01:00:00+05:30",
-      origin_label: "01:00 AM IST",
-    },
     cascade: {
       type: "GLOF Moraine Outburst & Hydro Cascade",
       upstream_name: "South Lhonak Glacial Lake",
-      upstream_coords: [88.18742, 27.91478],
       upstream_status: "Moraine Breach (T+0 min)",
       downstream_name: "Chungthang Dam (Teesta III HEP)",
-      downstream_coords: [88.65025, 27.59771],
       downstream_status: "Washed away in 10 min (T+75 min)",
       distance_km: 42.0,
       transit_min: 75,
       chain_desc: "Ice-rock avalanche triggers South Lhonak moraine breach -> 7,500 m³/s surge rushes down Teesta basin -> completely washes away 60m Chungthang concrete-rockfill dam",
     },
-    dam_axis: [[88.18610, 27.91610], [88.18742, 27.91478], [88.18874, 27.91346]],
-    subdam_axis: [[88.64890, 27.59860], [88.65025, 27.59771], [88.65160, 27.59682]],
-    reservoir_pool: [[88.18610, 27.91610], [88.18742, 27.91478], [88.18874, 27.91346], [88.17500, 27.90900], [88.16200, 27.91200], [88.16500, 27.92200], [88.17800, 27.92100], [88.18610, 27.91610]],
-    outflow_vector: [[88.18742, 27.91478], [88.22500, 27.89200], [88.35000, 27.78500], [88.65025, 27.59771]],
     focus_pitch: 54,
     focus_bearing: 120,
     focus_zoom: 14.2,
@@ -208,8 +176,8 @@ const SCENARIO_DAMS = {
   ivanovo: {
     name: "Ivanovo Dam (Bulgaria)",
     sub: "171 m WSE · 16 m Embankment Height",
-    lon: 25.85388,
-    lat: 41.86243,
+    _fallbackLon: 25.85388,
+    _fallbackLat: 41.86243,
     wse: 171,
     height: 16,
     crest_length_m: 180,
@@ -224,15 +192,11 @@ const SCENARIO_DAMS = {
     cascade: {
       type: "Valley Embankment Burst & Village Submergence",
       downstream_name: "Biser Village Flood Dykes & Bridge",
-      downstream_coords: [25.88330, 41.88330],
       downstream_status: "Submerged by 3-4m Flood Wave (T+20 min)",
       distance_km: 3.8,
       transit_min: 20,
       chain_desc: "Rapid snowmelt and downpours overtop earthen crest -> 20m embankment breach blasts open -> flood surge inundates Biser village in minutes",
     },
-    dam_axis: [[25.85300, 41.86175], [25.85388, 41.86243], [25.85476, 41.86311]],
-    reservoir_pool: [[25.85300, 41.86175], [25.85388, 41.86243], [25.85476, 41.86311], [25.85100, 41.86700], [25.84500, 41.86900], [25.84300, 41.86500], [25.84800, 41.86200], [25.85300, 41.86175]],
-    outflow_vector: [[25.85388, 41.86243], [25.86200, 41.86800], [25.87500, 41.87600], [25.88330, 41.88330]],
     focus_pitch: 45,
     focus_bearing: 65,
     focus_zoom: 14.8,
@@ -240,8 +204,8 @@ const SCENARIO_DAMS = {
   malpasset: {
     name: "Malpasset Arch Dam (France)",
     sub: "101.5 m WSE · 66.5 m Arch Height",
-    lon: 6.75684,
-    lat: 43.51216,
+    _fallbackLon: 6.75684,
+    _fallbackLat: 43.51216,
     wse: 101.5,
     height: 66.5,
     crest_length_m: 222,
@@ -256,15 +220,11 @@ const SCENARIO_DAMS = {
     cascade: {
       type: "Canyon Arch Collapse & Coastal Inundation",
       downstream_name: "Bozon Highway Bridge & Frejus Estuary",
-      downstream_coords: [6.74200, 43.43500],
       downstream_status: "Bridge Destroyed & City Inundated (T+20 min)",
       distance_km: 8.0,
       transit_min: 20,
       chain_desc: "Left rock abutment slip along tectonic foliation causes instantaneous arch collapse -> 40m surge wave sweeps down Reyran gorge to Fréjus in 20 min",
     },
-    dam_axis: [[6.75570, 43.51175], [6.75684, 43.51216], [6.75798, 43.51257]],
-    reservoir_pool: [[6.75570, 43.51175], [6.75684, 43.51216], [6.75798, 43.51257], [6.76100, 43.51650], [6.76050, 43.52200], [6.75600, 43.52100], [6.75400, 43.51500], [6.75570, 43.51175]],
-    outflow_vector: [[6.75684, 43.51216], [6.75400, 43.50400], [6.74800, 43.48200], [6.74200, 43.43500]],
     focus_pitch: 52,
     focus_bearing: 170,
     focus_zoom: 14.6,
@@ -272,8 +232,8 @@ const SCENARIO_DAMS = {
   annamayya: {
     name: "Annamayya Dam (Cheyyeru River)",
     sub: "215 m WSE · 25 m Dam Height",
-    lon: 79.02128,
-    lat: 14.21059,
+    _fallbackLon: 79.02128,
+    _fallbackLat: 14.21059,
     wse: 206.0,
     height: 26.0,
     crest_length_m: 630,
@@ -284,39 +244,100 @@ const SCENARIO_DAMS = {
     breach_mode: "Spillway Under-Capacity, Gate Jam & Severe Embankment Overtopping",
     breach_short: "EMBANKMENT OVERTOPPING",
     q_peak: "~13,500 m³/s",
-    desc: "Inflow from upstream Pincha dam breach pulse (03:30 AM) and Cheyyeru catchment runoff routed to Annamayya. With gate #4 jammed, reservoir overtopped the +206.0m crest at 06:00 AM, triggering dynamic breach formation and a catastrophic flash flood wave down the Cheyyeru corridor.",
-    event_clock: {
-      origin_iso: "2021-11-19T06:00:00+05:30",
-      origin_label: "06:00 AM IST",
-    },
+    desc: "Inflow from upstream Pincha ring bund washout (03:30 AM, EVD-04) and Cheyyeru catchment runoff routed to Annamayya. With gate #4 jammed (EVD-14), reservoir overtopped the +206.0m crest around 05:30-06:00 AM (EVD-16), and pre-washout overtopping discharge was already reaching the gorge by ~06:15-06:25 AM (EVD-21/22) before the dam's full 336m earthen section washout completed at 06:30 AM (T=0, EVD-17/18), sending the main breach wave down Cheyyeru to Penagaluru (EVD-28). Exact event timing: see the server-authored event clock.",
     cascade: {
       type: "Upstream Pincha Inflow Cascade",
-      upstream_name: "Pincha Dam (Upstream Pre-Dam)",
-      upstream_coords: [78.99956, 13.90890],
-      upstream_status: "Ring Bund Washed Out (03:30 AM / T-150 min)",
+      upstream_name: "Pincha Ring Bund (Upstream)",
+      upstream_status: "Ring Bund Washed Out (03:15 AM / T-150 min, EVD-04)",
       downstream_name: "Annamayya Dam (Downstream)",
-      downstream_coords: [79.02128, 14.21059],
-      downstream_status: "Earthen Section Washed Out (06:00 AM / T=0)",
+      downstream_status: "Overtopping at 05:45 AM (T=0, EVD-16); Bund Washout at 06:15 AM (EVD-17)",
       distance_km: 34.0,
       transit_min: 150,
-      chain_desc: "Upstream Pincha ring bund breached at 03:30 AM -> 34 km surge down Cheyyeru overwhelmed jammed spillway gate #4 -> Overtopped +206.0m crest at 06:00 AM",
+      chain_desc: "Upstream Pincha ring bund washed out at 03:15 AM (EVD-04) -> 34 km surge down Cheyyeru overwhelmed jammed spillway gate #4 (EVD-14) -> Overtopped +206.0m crest at 05:45 AM (EVD-16) -> Complete bund collapse at 06:15 AM (EVD-17)",
     },
-    predam_axis: [[78.99820, 13.90980], [78.99956, 13.90890], [79.00092, 13.90800]],
-    dam_axis: [[79.02128, 14.21059], [79.01823, 14.21282], [79.01736, 14.21428], [79.01678, 14.21551]],
-    reservoir_pool: [[79.01950, 14.21320], [79.02128, 14.21059], [79.02306, 14.20798], [79.01800, 14.20100], [79.01100, 14.19500], [79.00500, 14.20200], [79.01200, 14.21100], [79.01950, 14.21320]],
-    outflow_vector: [
-      [79.0182, 14.2128], [79.0168, 14.2157], [79.0153, 14.2217],
-      [79.0093, 14.2296], [79.0017, 14.2330], [78.9948, 14.2381],
-      [78.9934, 14.2442], [79.0043, 14.2485], [79.0095, 14.2507],
-      [79.0051, 14.2598], [79.0083, 14.2694], [79.0378, 14.2568],
-      [79.0434, 14.2510], [79.0611, 14.2571], [79.1064, 14.2544],
-      [79.1240, 14.2596]
-    ],
     focus_pitch: 45,
     focus_bearing: 35,
     focus_zoom: 13.5,
   },
 };
+
+// Real per-scenario hydraulic geometry, fetched from the backend (P1-1 /
+// FS-12,13,14,22). NOT the same object as SCENARIO_PRESENTATION above --
+// this one carries only what the geometry validator actually vouches for.
+// A scenario with hydraulic_ready === false gets an empty geometry object
+// here: drawing a fallback shape from anywhere else would be exactly the
+// fabrication this fix exists to remove.
+let SCENARIO_GEOMETRY = {};
+
+async function _loadScenarioGeometry() {
+  try {
+    const meta = await fetch("/api/scenarios/metadata").then(r => r.ok ? r.json() : {});
+    SCENARIO_GEOMETRY = meta || {};
+  } catch (e) {
+    console.warn("Could not load scenario geometry metadata:", e);
+    SCENARIO_GEOMETRY = {};
+  }
+}
+
+function _roleGeometry(scenarioKey, role) {
+  const feats = SCENARIO_GEOMETRY[scenarioKey]?.geometry?.features || [];
+  return feats.find(f => f.properties?.role === role)?.geometry || null;
+}
+
+function _lineStringToCoords(geom) {
+  return geom && geom.type === "LineString" ? geom.coordinates : null;
+}
+
+function _polygonToRing(geom) {
+  return geom && geom.type === "Polygon" ? geom.coordinates[0] : null;
+}
+
+function _pointToCoords(geom) {
+  return geom && geom.type === "Point" ? geom.coordinates : null;
+}
+
+// Adapter returning an object shaped like the old pre-rename dam-data
+// entries, so every existing call site below needs only its lookup swapped -- not its
+// internal logic. Hydraulic fields are populated ONLY when the backend
+// validator actually vouches for this scenario's geometry; otherwise they
+// are omitted (undefined), and _buildDamGeoJSON's existing
+// `if (dam.X && dam.X.length >= N)` guards already skip an undefined field
+// cleanly -- no fabricated fallback shape is substituted.
+function _getDamData(scenarioKey) {
+  const presentation = SCENARIO_PRESENTATION[scenarioKey];
+  if (!presentation) return null;
+  const meta = SCENARIO_GEOMETRY[scenarioKey];
+  const ready = !!meta?.availability?.hydraulic_ready;
+  const breachPointGeom = ready ? _pointToCoords(_roleGeometry(scenarioKey, "breach_point")) : null;
+  // lon/lat always come from the scenario's own resolved breach point in
+  // data_fetcher.SCENARIOS (via the API), whether or not the surrounding
+  // geometry validated -- a marker location is not the disputed hydraulic
+  // claim; the axis/reservoir/river shapes are.
+  const fallbackPoint = _pointToCoords(_roleGeometry(scenarioKey, "breach_point"));
+  const [lon, lat] = breachPointGeom || fallbackPoint || [presentation._fallbackLon, presentation._fallbackLat];
+  const dam = {
+    ...presentation,
+    lon, lat,
+    hydraulic_ready: ready,
+    geometry_reason: meta?.availability?.reasons?.[0] || null,
+    // One server-authored event clock (FS-19/§I) -- overrides any stale
+    // client-side origin_iso still on SCENARIO_PRESENTATION. A scenario with
+    // no evidence file gets classification NOT_AVAILABLE / origin_iso null
+    // from the backend, not a hardcoded fallback.
+    event_clock: meta?.event_clock || { origin_iso: null, classification: "NOT_AVAILABLE", timeline_events: [] },
+  };
+  if (ready) {
+    dam.dam_axis = _lineStringToCoords(_roleGeometry(scenarioKey, "dam_axis"));
+    const barrier = _roleGeometry(scenarioKey, "dam_body") || _roleGeometry(scenarioKey, "blockage");
+    dam.dam_body_polygon = _polygonToRing(barrier);
+    dam.outflow_vector = _lineStringToCoords(_roleGeometry(scenarioKey, "river"));
+  }
+  // reservoir_pool is intentionally never populated -- no scenario has a
+  // validated reservoir role yet (P1-1 scope). Leaving it undefined makes
+  // _buildDamGeoJSON's existing guard skip the reservoir layer entirely
+  // rather than draw something unbacked.
+  return dam;
+}
 
 // Demo scenario data (Phutkal AOI, J&K — precomputed for demo)
 // Empty until a run produces real output.
@@ -416,7 +437,6 @@ function initMap() {
       ["roads",          _addRoadLayer],
       ["buildings",      _addBuildingsLayer],
       ["validation",     _addValidationLayers],
-      ["sar radar",      _addGeesarLayers],
       ["dam structure",  _addDamStructureLayers],
       ["shelters",       _addSheltersLayer],
       ["villages",       _addVillageLayer],
@@ -784,6 +804,40 @@ function _getFallbackShelters(key) {
   return { type: "FeatureCollection", features };
 }
 
+let wseVisible = false;
+let wseMeta = null;
+
+window.toggleWse = function () {
+  wseVisible = !wseVisible;
+  const v = wseVisible ? "visible" : "none";
+  for (const id of ["wse-fill", "wse-outline",
+                    "wse-anchor-halo", "wse-anchor-point", "wse-anchor-label"]) {
+    if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", v);
+  }
+  const btn = document.getElementById("btn-toggle-wse");
+  if (btn) {
+    btn.classList.toggle("is-active", wseVisible);
+    btn.setAttribute("aria-pressed", wseVisible ? "true" : "false");
+  }
+  // Turning on a reconstructed layer says what is and is not evidence in it, once,
+  // where the user is looking. The caveat travels with the layer rather than
+  // living only in a doc. Two things have to land: the level is reported, the
+  // shoreline is not; and the layer stops where the reports stop.
+  const note = document.getElementById("wse-note");
+  if (note) {
+    note.hidden = !wseVisible;
+    if (wseVisible && wseMeta) {
+      const n = (wseMeta.anchors || []).length;
+      const reach = wseMeta.reach_km;
+      note.textContent = "Water LEVEL is reported (" + n + " high-water depths, "
+        + (wseMeta.acquisition_kind || "DOCUMENTARY") + "). The SHORELINE is not — it is "
+        + "read off the same Copernicus GLO-30 the model runs on, so this is not "
+        + "independent validation. Covers only the " + (reach != null ? reach + " km" : "reach")
+        + " between the outer anchors; the flood went further, the evidence does not.";
+    }
+  }
+};
+
 window.toggleShelters = function () {
   sheltersVisible = !sheltersVisible;
   const v = sheltersVisible ? "visible" : "none";
@@ -881,6 +935,127 @@ function _addValidationLayers() {
     },
   });
 
+  // Observed-anchored flood extent: reported high-water depths added to the
+  // sampled channel bed, interpolated along the Cheyyeru and cut against the DEM.
+  // This replaced the HAND corridor that used to occupy this slot -- HAND's
+  // 2/5/10 m stages were round numbers nobody chose, whereas these levels come
+  // off the record. It is STILL a separate source from "observed-extent": the
+  // level is reported, the shoreline is our own DEM, so it is not ground truth
+  // and must never be mistaken for it. Off by default; the toolbar button and
+  // #wse-note carry the caveat.
+  //
+  // Two features, an envelope from the low and high ends of the reported depth
+  // RANGES. The upper bound is emitted first so the tighter lower bound draws on
+  // top of it and the doubled fill marks the best-supported core.
+  map.addSource("observed-wse", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  map.addLayer({
+    id: "wse-fill",
+    type: "fill",
+    source: "observed-wse",
+    layout: { visibility: "none" },
+    paint: {
+      "fill-color": [
+        "match", ["get", "band"],
+        "lo", "#8b3fd1",
+        "hi", "#c77dff",
+        "#8b3fd1",
+      ],
+      "fill-opacity": 0.42,
+    },
+  });
+  map.addLayer({
+    id: "wse-outline",
+    type: "line",
+    source: "observed-wse",
+    layout: { visibility: "none" },
+    paint: {
+      "line-color": "#c77dff",
+      // the lower bound is the defensible edge, so it gets the heavier stroke
+      "line-width": ["case", ["==", ["get", "band"], "lo"], 1.6, 0.7],
+      "line-opacity": 0.7,
+    },
+  });
+
+  // The three reported depths the purple is built from. Drawn ON the layer so it
+  // explains itself: the shape exists because these points exist, and it ends
+  // where they end. Populated from the geojson's own `metadata.anchors` in
+  // _loadContextLayers -- the anchors already ride along with the polygons, so
+  // there is nothing extra to fetch.
+  map.addSource("wse-anchors", {
+    type: "geojson",
+    data: { type: "FeatureCollection", features: [] },
+  });
+  map.addLayer({
+    id: "wse-anchor-halo",
+    type: "circle",
+    source: "wse-anchors",
+    layout: { visibility: "none" },
+    paint: {
+      "circle-radius": 9,
+      "circle-color": "#c77dff",
+      "circle-opacity": 0.18,
+      "circle-stroke-width": 1,
+      "circle-stroke-color": "#c77dff",
+      "circle-stroke-opacity": 0.45,
+    },
+  });
+  map.addLayer({
+    id: "wse-anchor-point",
+    type: "circle",
+    source: "wse-anchors",
+    layout: { visibility: "none" },
+    paint: {
+      "circle-radius": 4,
+      "circle-color": "#f5e9ff",
+      "circle-stroke-width": 1.6,
+      "circle-stroke-color": "#7b2fbf",
+    },
+  });
+  map.addLayer({
+    id: "wse-anchor-label",
+    type: "symbol",
+    source: "wse-anchors",
+    layout: {
+      visibility: "none",
+      "text-field": ["get", "label"],
+      "text-size": 10,
+      "text-offset": [0, 1.5],
+      "text-anchor": "top",
+      "text-allow-overlap": false,
+    },
+    paint: {
+      "text-color": "#e9d5ff",
+      "text-halo-color": "#1a0b26",
+      "text-halo-width": 1.4,
+    },
+  });
+
+  const wsePopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "300px" });
+  map.on("mouseenter", "wse-anchor-halo", (e) => {
+    map.getCanvas().style.cursor = "help";
+    const p = (e.features && e.features[0] && e.features[0].properties) || {};
+    wsePopup.setLngLat(e.features[0].geometry.coordinates)
+      .setHTML(
+        `<div class="village-popup">`
+        + `<div class="pop-name">${escapeHtml(p.name || "")}</div>`
+        + `<div class="pop-sub" style="font-family:var(--font-mono);font-size:9.5px;color:#c77dff;margin-top:3px;">`
+        + `${escapeHtml(p.id || "")} &middot; reported ${p.depth_lo_m}&ndash;${p.depth_hi_m} m</div>`
+        + `<div class="pop-sub" style="font-family:var(--font-mono);font-size:9.5px;color:#94a3b8;margin-top:3px;">`
+        + `ground ${p.ground_elev_m} m &rarr; water surface ${p.wse_lo_m}&ndash;${p.wse_hi_m} m<br>`
+        + `${p.offset_from_stem_m} m off the Cheyyeru, station ${p.station_km} km</div>`
+        + `<div class="pop-sub" style="font-size:9px;color:#64748b;margin-top:4px;line-height:1.35;">`
+        + `${escapeHtml(p.source || "")}</div>`
+        + `</div>`)
+      .addTo(map);
+  });
+  map.on("mouseleave", "wse-anchor-halo", () => {
+    map.getCanvas().style.cursor = "";
+    wsePopup.remove();
+  });
+
   // The observed extent is drawn with a translucent cyan fill, dark casing, and
   // crisp optic dashed outline on top of everything, so the delineated truth
   // boundary stays unmistakable whichever fill or basemap is active.
@@ -950,78 +1125,10 @@ function _addValidationLayers() {
   });
 }
 
-// ── GEE Sentinel-1 SAR Radar Layer ──────────────────────────────────────
-let sarLayerVisible = false;
-function _addGeesarLayers() {
-  map.addSource("gee-sar", {
-    type: "geojson",
-    data: { type: "FeatureCollection", features: [] },
-  });
-
-  map.addLayer({
-    id: "gee-sar-fill",
-    type: "fill",
-    source: "gee-sar",
-    layout: { visibility: "none" },
-    paint: {
-      "fill-color": "#6366f1",
-      "fill-opacity": 0.28,
-    },
-  });
-
-  map.addLayer({
-    id: "gee-sar-outline",
-    type: "line",
-    source: "gee-sar",
-    layout: { visibility: "none" },
-    paint: {
-      "line-color": "#818cf8",
-      "line-width": 2.2,
-      "line-dasharray": [3, 2],
-      "line-opacity": 0.9,
-    },
-  });
-
-  map.on("mouseenter", "gee-sar-fill", () => {
-    map.getCanvas().style.cursor = "help";
-  });
-  map.on("mouseleave", "gee-sar-fill", () => {
-    map.getCanvas().style.cursor = "";
-  });
-}
-
-window.toggleGeeSarLayer = function () {
-  sarLayerVisible = !sarLayerVisible;
-  const v = sarLayerVisible ? "visible" : "none";
-  if (map.getLayer("gee-sar-fill")) map.setLayoutProperty("gee-sar-fill", "visibility", v);
-  if (map.getLayer("gee-sar-outline")) map.setLayoutProperty("gee-sar-outline", "visibility", v);
-  const btn = document.getElementById("btn-toggle-sar");
-  if (btn) {
-    btn.classList.toggle("is-active", sarLayerVisible);
-    btn.setAttribute("aria-pressed", sarLayerVisible ? "true" : "false");
-  }
-};
-
 // ── Dam Structure, Crest Axis, and Breach Geometry Layers ────────────────
 function _buildDamGeoJSON(dam) {
   if (!dam) return { type: "FeatureCollection", features: [] };
   const features = [];
-
-  // 1. Upstream Reservoir Pool Polygon
-  if (dam.reservoir_pool && dam.reservoir_pool.length >= 3) {
-    features.push({
-      type: "Feature",
-      properties: {
-        layer_type: "reservoir_pool",
-        label: "RESERVOIR POOL",
-        volume: dam.vol ? `${dam.vol} MCM` : "",
-      },
-      geometry: {
-        type: "Polygon",
-        coordinates: [dam.reservoir_pool]
-      }
-    });
-  }
 
   // 2. Downstream Outflow Surge Vector
   if (dam.outflow_vector && dam.outflow_vector.length >= 2) {
@@ -1034,6 +1141,22 @@ function _buildDamGeoJSON(dam) {
       geometry: {
         type: "LineString",
         coordinates: dam.outflow_vector
+      }
+    });
+  }
+
+  // Real DEM/OSM-derived barrier footprint (P1-1) -- only present when the
+  // backend geometry validator actually vouches for this scenario.
+  if (dam.dam_body_polygon && dam.dam_body_polygon.length >= 3) {
+    features.push({
+      type: "Feature",
+      properties: {
+        layer_type: "dam_body",
+        label: "BARRIER (DEM-DERIVED)",
+      },
+      geometry: {
+        type: "Polygon",
+        coordinates: [dam.dam_body_polygon]
       }
     });
   }
@@ -1096,7 +1219,9 @@ function _buildDamGeoJSON(dam) {
       name: `Breach: ${dam.name}`,
       mechanism: dam.breach_mode,
       wse: dam.wse,
-      q_peak: dam.q_peak
+      q_peak: dam.q_peak,
+      hydraulic_ready: !!dam.hydraulic_ready,
+      geometry_reason: dam.geometry_reason || null,
     },
     geometry: {
       type: "Point",
@@ -1176,7 +1301,7 @@ function _buildDamGeoJSON(dam) {
 
 function _addDamStructureLayers() {
   const currentKey = document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[currentKey] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(currentKey) || _getDamData("rishiganga");
   const initialGeo = _buildDamGeoJSON(dam);
 
   map.addSource("dam-structure", {
@@ -1332,14 +1457,14 @@ function _addDamStructureLayers() {
 function _updateDamStructure(scenarioKey) {
   if (!map || !map.getSource("dam-structure")) return;
   const key = scenarioKey || document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[key] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(key) || _getDamData("rishiganga");
   const geo = _buildDamGeoJSON(dam);
   map.getSource("dam-structure").setData(geo);
 }
 
 function _updateDamSetupCard(scenarioKey) {
   const key = scenarioKey || document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[key] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(key) || _getDamData("rishiganga");
   if (!dam) return;
 
   const tTitle = document.getElementById("dam-card-title");
@@ -1355,6 +1480,21 @@ function _updateDamSetupCard(scenarioKey) {
   if (tHeight) tHeight.textContent = `${dam.height} m · WSE ${dam.wse} m`;
   if (tVol) tVol.textContent = `${dam.vol} MCM`;
   if (tFailure) tFailure.textContent = dam.breach_short || dam.breach_mode || "Breach";
+
+  // Geometry-not-available indication (P1-1 / FS-12,13,14,22). Reuses the
+  // existing .dam-breach-mode-badge/.badge-label/.badge-val classes already
+  // styled for a warning callout in this same card -- no new CSS added.
+  const existingNotice = document.getElementById("dam-card-geometry-notice");
+  if (existingNotice) existingNotice.remove();
+  if (!dam.hydraulic_ready && tDesc && tDesc.parentElement) {
+    const notice = document.createElement("div");
+    notice.id = "dam-card-geometry-notice";
+    notice.className = "dam-breach-mode-badge";
+    notice.innerHTML =
+      '<span class="badge-label">Geometry Not Validated</span>' +
+      `<span class="badge-val">${dam.geometry_reason || "No validated hydraulic geometry for this scenario."}</span>`;
+    tDesc.insertAdjacentElement("afterend", notice);
+  }
 }
 
 function setValidationVisible(on) {
@@ -1603,7 +1743,7 @@ function _addFloodLayer() {
 // an empty collection, so a layer with nothing in it renders as nothing rather
 // than failing.
 async function _loadContextLayers(scenarioKey) {
-  for (const [kind, srcId] of [["rivers", "rivers"], ["buildings", "buildings"], ["villages", "villages"]]) {
+  for (const [kind, srcId] of [["rivers", "rivers"], ["buildings", "buildings"], ["villages", "villages"], ["observed_wse", "observed-wse"]]) {
     try {
       const r = await fetch(`/api/layers/${scenarioKey}/${kind}`);
       if (!r.ok) continue;
@@ -1612,6 +1752,45 @@ async function _loadContextLayers(scenarioKey) {
       if (src) src.setData(data);
       if (kind === "villages" && (!simulationResults || !simulationResults.features || !simulationResults.features.length)) {
         _updateVillageMarkers(data);
+      }
+      if (kind === "observed_wse") {
+        // The button is disabled for scenarios with no reconstruction on disk, so
+        // an enabled-but-empty control can never suggest "no flooding here".
+        wseMeta = (data && data.metadata) || null;
+        const n = (data && data.features && data.features.length) || 0;
+        // The anchors are already in the payload; turn them into points rather
+        // than fetching them a second time from somewhere else.
+        const asrc = map.getSource("wse-anchors");
+        if (asrc) {
+          asrc.setData({
+            type: "FeatureCollection",
+            features: ((wseMeta && wseMeta.anchors) || []).map((a) => ({
+              type: "Feature",
+              properties: {
+                id: a.id,
+                name: a.name,
+                label: `${a.name} · ${a.depth_lo_m}–${a.depth_hi_m} m`,
+                depth_lo_m: a.depth_lo_m,
+                depth_hi_m: a.depth_hi_m,
+                ground_elev_m: (a.ground_elev_m != null) ? a.ground_elev_m.toFixed(1) : "",
+                wse_lo_m: (a.wse_lo_m != null) ? a.wse_lo_m.toFixed(1) : "",
+                wse_hi_m: (a.wse_hi_m != null) ? a.wse_hi_m.toFixed(1) : "",
+                offset_from_stem_m: (a.offset_from_stem_m != null) ? Math.round(a.offset_from_stem_m) : "",
+                station_km: (a.station_m != null) ? (a.station_m / 1000).toFixed(2) : "",
+                source: a.source,
+              },
+              geometry: { type: "Point", coordinates: [a.lon, a.lat] },
+            })),
+          });
+        }
+        const btn = document.getElementById("btn-toggle-wse");
+        if (btn) {
+          btn.disabled = n === 0;
+          btn.title = n === 0
+            ? "No reported high-water depths for this scenario"
+            : "Extent from REPORTED high-water depths — level is observed, shoreline is DEM. Not ground truth, no skill score.";
+        }
+        if (n === 0 && wseVisible) window.toggleWse();
       }
     } catch (e) {
       console.warn(`context layer ${kind} unavailable:`, e);
@@ -1631,7 +1810,8 @@ async function _loadContextLayers(scenarioKey) {
       for (const id of ["observed-fill", "observed-casing", "observed-outline"]) {
         if (map.getLayer(id)) map.setLayoutProperty(id, "visibility", "visible");
       }
-      _updateObservedMarker(obsGeo, scenarioKey);
+      const obsMeta = await fetch(`/api/observed/scenarios`).then(r => r.ok ? r.json() : {}).catch(() => ({}));
+      _updateObservedMarker(obsGeo, obsMeta[scenarioKey] || null);
     } else {
       currentObservedGeoJSON = null;
       if (map.getSource("observed-extent")) {
@@ -1649,22 +1829,6 @@ async function _loadContextLayers(scenarioKey) {
     console.warn("observed layer unavailable:", e);
   }
 
-  // Load Sentinel-1 SAR / GEE satellite water extent
-  try {
-    const rSar = await fetch(`/api/layers/${scenarioKey}/sar`);
-    if (rSar.ok) {
-      const sarGeo = await rSar.json();
-      if (map.getSource("gee-sar")) {
-        map.getSource("gee-sar").setData(sarGeo);
-      }
-    } else {
-      if (map.getSource("gee-sar")) {
-        map.getSource("gee-sar").setData({ type: "FeatureCollection", features: [] });
-      }
-    }
-  } catch (e) {
-    console.warn("SAR layer unavailable:", e);
-  }
 
   // Load shelters & relief facilities
   try {
@@ -1757,41 +1921,54 @@ function _setFloodFrame(geojsonData) {
 
 function _transitionToFloodFrame(frame) {
   const current = map.getSource("flood-depth");
-  const next = map.getSource("flood-depth-next");
-  if (!current || !next || !frame) return;
+  if (!current || !frame) return;
 
   const transition = ++frameTransitionId;
   const raster = map.getSource("flood-raster");
-  if (raster && frame.raster_url && frame.preview_bounds) {
+  const hasRaster = !!(raster && frame.raster_url && frame.preview_bounds && frame.stage !== "reservoir_rise");
+
+  if (hasRaster) {
     raster.updateImage({ url: frame.raster_url, coordinates: frame.preview_bounds });
-  }
-  next.setData(frame.geojson);
-  map.setPaintProperty("flood-depth-next-fill", "fill-opacity", 0);
-  const started = performance.now();
-  const duration = 450;
-  let lastBucket = -1;
-  const animate = (now) => {
-    if (transition !== frameTransitionId) return;
-    const progress = Math.min(1, (now - started) / duration);
-    // Batch setPaintProperty to 4 steps (25%, 50%, 75%, 100%) to cut style updates by ~85%
-    const bucket = Math.floor(progress * 4);
-    if (bucket !== lastBucket && progress < 1) {
-      lastBucket = bucket;
-      const eased = progress * (2 - progress);
+    if (map.getLayer("flood-raster-fill")) {
+      map.setPaintProperty("flood-raster-fill", "raster-opacity", 0.82);
+    }
+    if (map.getLayer("flood-depth-fill")) {
       map.setPaintProperty("flood-depth-fill", "fill-opacity", 0);
-      map.setPaintProperty("flood-depth-next-fill", "fill-opacity", 0.72 * eased);
-      map.setPaintProperty("flood-depth-glow", "line-opacity", 0.12 * eased);
     }
-    if (progress < 1) {
-      requestAnimationFrame(animate);
-      return;
+    if (map.getLayer("flood-depth-next-fill")) {
+      map.setPaintProperty("flood-depth-next-fill", "fill-opacity", 0);
     }
-    current.setData(frame.geojson);
-    map.setPaintProperty("flood-depth-fill", "fill-opacity", 0);
+    if (map.getLayer("flood-depth-glow")) {
+      map.setPaintProperty("flood-depth-glow", "line-opacity", 0.12);
+    }
+    if (frame.geojson) current.setData(frame.geojson);
+    return;
+  }
+
+  // Vector fallback or reservoir rise
+  if (map.getLayer("flood-raster-fill")) {
+    map.setPaintProperty("flood-raster-fill", "raster-opacity", 0);
+  }
+  if (frame.geojson) current.setData(frame.geojson);
+  if (map.getLayer("flood-depth-fill")) {
+    if (frame.stage === "reservoir_rise") {
+      map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
+      map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+    } else {
+      map.setPaintProperty("flood-depth-fill", "fill-color", [
+        "step", ["get", "depth_class"],
+        depthRamp()[0], 1, depthRamp()[0], 2, depthRamp()[1],
+        3, depthRamp()[3], 4, depthRamp()[5],
+      ]);
+      map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.72);
+    }
+  }
+  if (map.getLayer("flood-depth-next-fill")) {
     map.setPaintProperty("flood-depth-next-fill", "fill-opacity", 0);
+  }
+  if (map.getLayer("flood-depth-glow")) {
     map.setPaintProperty("flood-depth-glow", "line-opacity", 0.12);
-  };
-  requestAnimationFrame(animate);
+  }
 }
 
 // ── Async: load snapshot frames after run completes ───────────────────────
@@ -1850,6 +2027,56 @@ async function _loadSnapshotFrames(jobId) {
     
     snapshotFrames = fetched.filter(Boolean);
     console.log(`Successfully loaded ${snapshotFrames.length} / ${frames.length} snapshot frames`);
+
+    // Idle-prefetch PNG raster images so timeline dragging has zero network latency
+    const prefetchImages = () => {
+      snapshotFrames.forEach(f => {
+        if (f.raster_url) {
+          const img = new Image();
+          img.src = f.raster_url;
+        }
+      });
+    };
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(prefetchImages);
+    } else {
+      setTimeout(prefetchImages, 100);
+    }
+
+    // Precompute wavefront data for all frames at load time
+    const curKey = document.getElementById("scenario-select")?.value || "annamayya";
+    const damInfo = _getDamData(curKey) || _getDamData("annamayya");
+    snapshotFrames.forEach(frame => {
+      if (!frame._wavefrontData && frame.geojson && frame.geojson.features) {
+        let maxDist = 0;
+        let wavePt = null;
+        let maxDepth = 0;
+        for (const f of frame.geojson.features) {
+          const dClass = f.properties?.depth_class || 1;
+          const dM = f.properties?.depth_lo_m || (dClass * 0.5);
+          if (dM > maxDepth) maxDepth = dM;
+          const coords = f.geometry?.coordinates;
+          if (!coords) continue;
+          const testRing = (ring) => {
+            const step = ring.length > 80 ? 3 : 1;
+            for (let i = 0; i < ring.length; i += step) {
+              const pt = ring[i];
+              const d = Math.hypot(pt[0] - damInfo.lon, pt[1] - damInfo.lat);
+              if (d > maxDist) {
+                maxDist = d;
+                wavePt = pt;
+              }
+            }
+          };
+          if (f.geometry.type === "Polygon") {
+            testRing(coords[0]);
+          } else if (f.geometry.type === "MultiPolygon") {
+            for (const poly of coords) testRing(poly[0]);
+          }
+        }
+        frame._wavefrontData = { wavePt, maxDist, maxDepth };
+      }
+    });
 
     if (snapshotFrames.length > 0) {
       // The range input is the timeline's only input surface: it lies
@@ -1912,11 +2139,33 @@ function _applySnapshotFrame(idx) {
     const current = map.getSource("flood-depth");
     if (current && frame.geojson) current.setData(frame.geojson);
     const raster = map.getSource("flood-raster");
-    if (raster && frame.raster_url && frame.preview_bounds) {
+    const hasRaster = !!(raster && frame.raster_url && frame.preview_bounds && frame.stage !== "reservoir_rise");
+
+    if (hasRaster) {
       raster.updateImage({ url: frame.raster_url, coordinates: frame.preview_bounds });
-    }
-    if (map.getLayer("flood-depth-fill")) {
-      map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.72);
+      if (map.getLayer("flood-raster-fill")) {
+        map.setPaintProperty("flood-raster-fill", "raster-opacity", 0.82);
+      }
+      if (map.getLayer("flood-depth-fill")) {
+        map.setPaintProperty("flood-depth-fill", "fill-opacity", 0);
+      }
+    } else {
+      if (map.getLayer("flood-raster-fill")) {
+        map.setPaintProperty("flood-raster-fill", "raster-opacity", 0);
+      }
+      if (map.getLayer("flood-depth-fill")) {
+        if (frame.stage === "reservoir_rise") {
+          map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
+          map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+        } else {
+          map.setPaintProperty("flood-depth-fill", "fill-color", [
+            "step", ["get", "depth_class"],
+            depthRamp()[0], 1, depthRamp()[0], 2, depthRamp()[1],
+            3, depthRamp()[3], 4, depthRamp()[5],
+          ]);
+          map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.72);
+        }
+      }
     }
     if (map.getLayer("flood-depth-next-fill")) {
       map.setPaintProperty("flood-depth-next-fill", "fill-opacity", 0);
@@ -1925,12 +2174,18 @@ function _applySnapshotFrame(idx) {
     _transitionToFloodFrame(frame);
   }
 
+  // Hide or dim static reservoir polygon during dynamic pre-breach rise
+  const isPreBreach = frame.stage === "reservoir_rise" || frame.stage === "lake_formation" || frame.t_min < 0;
+  if (map.getLayer("dam-pool-fill")) {
+    map.setPaintProperty("dam-pool-fill", "fill-opacity", isPreBreach ? 0.10 : 0.65);
+  }
+
   const t = Math.round(frame.t_min);
   const readout = document.getElementById("scrubber-time-val");
   if (readout) {
-    if (frame.stage === "lake_formation" || t < 0) {
+    if (frame.stage === "reservoir_rise" || frame.stage === "lake_formation" || t < 0) {
       const vol = frame.volume_mcm ? ` (${frame.volume_mcm} MCM)` : "";
-      const phase = frame.phase_title || "Lake Formation";
+      const phase = frame.phase_title || (frame.stage === "reservoir_rise" ? "Reservoir Rising" : "Lake Formation");
       readout.textContent = `T-${Math.abs(t)} min · ${phase}${vol}`;
     } else if (t === 0) {
       readout.textContent = "T 0 min · DAM BREACH INITIATION";
@@ -1947,6 +2202,7 @@ function _applySnapshotFrame(idx) {
   if (window.refreshAnswerCard) window.refreshAnswerCard(frame.t_min);
 
   _updateWavefrontMarker(frame, frame.t_min);
+  _updateSurgeWaveMarker(frame.t_min);
   _updateRoadCutMarkers(frame.t_min);
 }
 
@@ -2203,10 +2459,23 @@ function _loadDemoResults() {
 }
 
 function _renderVillages(geojson) {
+  // Settlements this run never wetted are dropped from the POLYGON layer as well
+  // as the markers. Removing only the marker left an unlabelled circle sitting on
+  // the map with nothing to explain it — worse than the badge, because a ring
+  // drawn around a village reads as "something happened here".
+  //
+  // Both layers filter on the same `villageStatus` call, so they cannot disagree.
+  // `_updateVillageMarkers` keeps its own check: it is also called from
+  // `_loadContextLayers` with the raw village layer, which carries no depth at
+  // all and must still draw every settlement before a run exists.
+  const shown = Object.assign({}, geojson, {
+    features: (geojson.features || []).filter(
+      (f) => villageStatus(f.properties || {}).statusClass !== "is-dry"),
+  });
   if (map.getSource("villages")) {
-    map.getSource("villages").setData(geojson);
+    map.getSource("villages").setData(shown);
   }
-  _updateVillageMarkers(geojson);
+  _updateVillageMarkers(shown);
 }
 
 // ── Time scrubber ──────────────────────────────────────────────────────────
@@ -2265,6 +2534,7 @@ function switchTab(tab) {
     if (tab === "compare") {
       renderRitterPlot();
       if (window.renderMalpassetBenchmark) window.renderMalpassetBenchmark();
+      if (window.renderScenarioSolverComparison) window.renderScenarioSolverComparison();
     }
   }
 }
@@ -2379,7 +2649,6 @@ async function runSimulation() {
   const body = {
     scenario_key:             document.getElementById("scenario-select").value,
     dam_name:                 document.getElementById("dam-name-input").value,
-    wse_m:                    parseFloat(document.getElementById("wse-input").value),
     failure_mode:             document.getElementById("failure-mode").value,
     reservoir_level_fraction: parseFloat(document.getElementById("reservoir-fraction").value),
     // Grid coarsening. The solver cost scales roughly with the cell count and
@@ -2687,8 +2956,24 @@ function updateCounters(features) {
   // lands. Roads cut and villages cut off are NOT set here -- they are read at
   // the playhead by refreshAnswerCard(), from the per-link cut times and the
   // per-village isolation times, so they change as you scrub.
-  animateCounter("val-par",       totalPAR,  ",");
-  animateCounter("val-buildings", totalBldg, ",");
+  //
+  // When EVERY value is missing there is no total to show, and rendering the
+  // empty sum as "0" states a finding the run never made -- "0 buildings
+  // flooded" reads as "we checked and none were", not "we never counted".
+  // A routed inundation over an AOI with no OSM building layer is exactly that
+  // case. Show the em dash the markup ships with instead.
+  const showTotal = (id, key, total) => {
+    const el = document.getElementById(id);
+    if (el && countMissing(key) === features.length && features.length > 0) {
+      _counterRuns.get(id)?.finish?.();
+      el.textContent = "—";
+      el.title = `Not computed: no ${key.replace(/_/g, " ")} is available for this run.`;
+      return;
+    }
+    animateCounter(id, total, ",");
+  };
+  showTotal("val-par",       "pop_at_risk",       totalPAR);
+  showTotal("val-buildings", "buildings_flooded", totalBldg);
 }
 
 // Counts up to the figure once, on a frame clock rather than a 30 ms timer, so
@@ -2872,7 +3157,7 @@ async function _loadValidation(jobId) {
   if (observed && map.getSource("observed-extent")) {
     map.getSource("observed-extent").setData(observed);
     currentObservedGeoJSON = observed;
-    _updateObservedMarker(observed, v.scenario || "");
+    _updateObservedMarker(observed, v);
   }
 
   const e = v.extent || {};
@@ -2957,7 +3242,13 @@ async function _loadValidation(jobId) {
 }
 
 // ── Bootstrap ─────────────────────────────────────────────────────────────
-document.addEventListener("DOMContentLoaded", initMap);
+// Fetch real scenario geometry before the map (and its dam-structure layer)
+// is built at all, so SCENARIO_GEOMETRY is populated before anything -- e.g.
+// the "dam structure" step inside map.on("load") -- tries to read it. Avoids
+// a race where the map could render dam structure before geometry loaded.
+document.addEventListener("DOMContentLoaded", () => {
+  _loadScenarioGeometry().then(initMap);
+});
 
 // MapLibre will not load its style while the canvas is hidden, and a canvas
 // sized in a zero-height viewport comes back wrong. Both are recorded in
@@ -3008,41 +3299,33 @@ window.updateScenarioDefaults = function() {
   _loadContextLayers(scenarioKey);
 
   const damInput = document.getElementById("dam-name-input");
-  const wseInput = document.getElementById("wse-input");
 
   if (scenarioKey === "rishiganga") {
     damInput.value = "Rishi Ganga Avalanche Barrier & Cascade (2021)";
-    wseInput.value = "2450";
     fly([79.712, 30.469], 12.5, 52, 305);
   } else if (scenarioKey === "phutkal") {
     damInput.value = "Phutkal River Landslide Dam 2015";
-    wseInput.value = "3878";
     fly([77.058, 33.252], 12.8, 50, 320);
   } else if (scenarioKey === "south_lhonak") {
     damInput.value = "South Lhonak Moraine Dam & Chungthang Cascade (2023)";
-    wseInput.value = "5200";
     fly([88.220, 27.880], 11.0, 54, 120);
   } else if (scenarioKey === "derna") {
     damInput.value = "Derna Dams — Abu Mansour + Al-Bilad Cascade (2023)";
-    wseInput.value = "170";
     fly([22.605, 32.705], 12.0, 48, 40);
   } else if (scenarioKey === "ivanovo") {
     damInput.value = "Ivanovo Dam — Biser, Bulgaria (2012)";
-    wseInput.value = "171";
     fly([25.868, 41.872], 13.0, 45, 65);
   } else if (scenarioKey === "malpasset") {
     damInput.value = "Malpasset Arch Dam — Reyran Valley, France (1959)";
-    wseInput.value = "101";
     fly([6.756, 43.508], 13.2, 52, 170);
   } else if (scenarioKey === "annamayya") {
     damInput.value = "Annamayya Dam Failure & Pincha Cascade (2021)";
-    wseInput.value = "206";
     fly([79.021, 14.211], 13.5, 45, 35);
   }
 
   window.CURRENT_SCENARIO_KEY = scenarioKey;
-  window.SCENARIO_DAMS = SCENARIO_DAMS;
-  window.CURRENT_DAM = SCENARIO_DAMS[scenarioKey];
+  window.SCENARIO_PRESENTATION = SCENARIO_PRESENTATION;
+  window.CURRENT_DAM = _getDamData(scenarioKey);
 
   // Automatically load the full simulation results, snapshots, and road network
   _autoLoadScenarioSimulation(scenarioKey);
@@ -3079,7 +3362,7 @@ document.addEventListener("floodsight:themechange", () => {
 function _updateDamMarker(scenarioKey) {
   if (!map) return;
   const key = scenarioKey || document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[key] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(key) || _getDamData("rishiganga");
   if (damMarker) {
     damMarker.remove();
     damMarker = null;
@@ -3390,7 +3673,7 @@ function _updateDamMarker(scenarioKey) {
 window.focusDamBreachPoint = function(scenarioKey) {
   if (!map) return;
   const key = scenarioKey || document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[key] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(key) || _getDamData("rishiganga");
   if (!dam) return;
 
   _updateDamMarker(key);
@@ -3448,24 +3731,25 @@ function _updateVillageMarkers(geojson) {
     const isRank1 = rank === 1;
     const isoMin = p.isolation_time_min;
     const isIsolated = !isMissing(isoMin);
-    const waterMin = p.water_arrival_min;
-    const isAtRisk = isIsolated || (!isMissing(waterMin) && +waterMin < 120);
 
-    let statusClass = "is-normal";
-    let statusText = "";
-    if (isRank1) {
-      statusClass = "is-rank1";
-      statusText = "RANK #1 · EVACUATE";
-    } else if (isIsolated) {
-      statusClass = "is-isolated";
-      statusText = `ISOLATED T+${Math.round(isoMin)}m`;
-    } else if (isAtRisk) {
-      statusClass = "is-risk";
-      statusText = `WATER T+${Math.round(waterMin)}m`;
-    } else if (rank) {
-      statusClass = "is-safe";
-      statusText = "SAFE";
-    }
+    // The badge rule lives in village_status.js so a test can assert on the
+    // real function. It used to be inline here and keyed on arrival time alone
+    // (`waterMin < 120`), which put a green SAFE on six settlements that were
+    // under water -- Paparajupalle at 3.78 m among them. Danger is depth.
+    const { statusClass, statusText, atRisk: isAtRisk } = villageStatus(p);
+
+    // Settlements this run never wetted are not drawn. They carry no operational
+    // instruction — nobody acts on "no water here" — and on the corrected
+    // exposure there are only two of them, so they were pure clutter.
+    //
+    // The cost, stated because INVARIANTS.md records the rule this bends:
+    // "absence of a marker is absence of evaluation". An empty patch of map now
+    // means either "scored, and dry" or "never scored" — and the affected area
+    // holds well over a hundred named villages against this layer's 23. The
+    // distinction survives in the ranked list, which still carries every
+    // scored settlement including the dry ones, and in `results.geojson`.
+    // It is gone from the map only.
+    if (statusClass === "is-dry") return;
 
     // At overview zoom, only Rank #1 shows the red evacuation badge to prevent map clutter;
     // other villages render as crisp tactical dots that reveal their badge on hover or high zoom
@@ -3499,7 +3783,7 @@ function _updateVillageMarkers(geojson) {
 
 function _updateWavefrontMarker(frame, tMin) {
   if (!map) return;
-  if (!frame || !frame.geojson || !frame.geojson.features || !frame.geojson.features.length) {
+  if (!mapMarkingsVisible || tMin < 0 || !frame || !frame.geojson || !frame.geojson.features || !frame.geojson.features.length) {
     if (wavefrontMarker) {
       wavefrontMarker.remove();
       wavefrontMarker = null;
@@ -3508,7 +3792,7 @@ function _updateWavefrontMarker(frame, tMin) {
   }
 
   const scenarioKey = document.getElementById("scenario-select")?.value || "rishiganga";
-  const dam = SCENARIO_DAMS[scenarioKey] || SCENARIO_DAMS.rishiganga;
+  const dam = _getDamData(scenarioKey) || _getDamData("rishiganga");
 
   if (!frame._wavefrontData) {
     let maxDist = 0;
@@ -3594,6 +3878,74 @@ function _updateWavefrontMarker(frame, tMin) {
   }
 }
 
+let surgeWaveMarker = null;
+
+function _updateSurgeWaveMarker(tMin, scenarioKey) {
+  if (!map) return;
+  const currentKey = scenarioKey || document.getElementById("scenario-select")?.value || "";
+  const dam = _getDamData(currentKey);
+  if (!mapMarkingsVisible || currentKey !== "annamayya" || !dam || !dam.cascade || tMin >= 0 || tMin < -160) {
+    if (surgeWaveMarker) {
+      surgeWaveMarker.remove();
+      surgeWaveMarker = null;
+    }
+    return;
+  }
+
+  // Pincha ring bund washed out at T-150 min (03:15 IST, EVD-04).
+  // Wave travels 34 km down Cheyyeru to Annamayya, arriving ~T-30 to T-15 min (EVD-07, 105-135 min travel time).
+  const tArrival = -25.0; // reaches Annamayya reservoir at ~T-25
+  const tStart = -150.0;
+  const progress = Math.max(0, Math.min(1, (tMin - tStart) / (tArrival - tStart)));
+
+  // Coordinate interpolation along the Cheyyeru corridor from Pincha [78.99956, 13.90890] to Annamayya [79.02128, 14.21059]
+  const pincha = dam.cascade.upstream_coords || [78.99956, 13.90890];
+  const annamayya = [dam.lon, dam.lat];
+  const midLon = 79.0120, midLat = 14.0600;
+  let curLon, curLat;
+  if (progress < 0.5) {
+    const p2 = progress * 2.0;
+    curLon = pincha[0] + (midLon - pincha[0]) * p2;
+    curLat = pincha[1] + (midLat - pincha[1]) * p2;
+  } else {
+    const p2 = (progress - 0.5) * 2.0;
+    curLon = midLon + (annamayya[0] - midLon) * p2;
+    curLat = midLat + (annamayya[1] - midLat) * p2;
+  }
+
+  const t = Math.round(tMin);
+  const distKm = (progress * 34.0).toFixed(1);
+
+  if (!surgeWaveMarker) {
+    const el = document.createElement("div");
+    el.className = "map-mark surge-wave-mark";
+    el.innerHTML = `
+      <div class="surge-wave-pin" style="display:flex;align-items:center;justify-content:center;position:relative">
+        <div class="surge-wave-ring" style="position:absolute;width:28px;height:28px;border-radius:50%;border:2px solid #f59e0b;animation:pinchaPulse 2s ease-out infinite"></div>
+        <div class="surge-wave-core" style="width:12px;height:12px;border-radius:50%;background:#f59e0b;box-shadow:0 0 10px #f59e0b"></div>
+      </div>
+      <div class="surge-wave-badge" style="background:rgba(15,23,42,0.94);border:1px solid #f59e0b;color:#f8fafc;padding:5px 9px;border-radius:6px;font-size:11px;white-space:nowrap;box-shadow:0 4px 14px rgba(0,0,0,0.6);margin-top:6px">
+        <div style="font-weight:700;color:#f59e0b;display:flex;align-items:center;gap:4px">
+          <span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block"></span>
+          PINCHA SURGE EN ROUTE (EVD-07)
+        </div>
+        <div style="color:#94a3b8;font-size:10px;margin-top:2px">
+          T<span id="surge-t">${t}</span> min · Cheyyeru <span id="surge-km">${distKm}</span> / 34 km
+        </div>
+      </div>
+    `;
+    surgeWaveMarker = new maplibregl.Marker({ element: el, anchor: "center" })
+      .setLngLat([curLon, curLat])
+      .addTo(map);
+  } else {
+    surgeWaveMarker.setLngLat([curLon, curLat]);
+    const tSpan = document.getElementById("surge-t");
+    if (tSpan) tSpan.textContent = String(t);
+    const kmSpan = document.getElementById("surge-km");
+    if (kmSpan) kmSpan.textContent = distKm;
+  }
+}
+
 let _roadCutPool = [];
 let _lastRoadCutT = -99999;
 
@@ -3608,6 +3960,13 @@ function _clearRoadCutPool() {
 
 function _updateRoadCutMarkers(tMin) {
   if (!map) return;
+  if (!mapMarkingsVisible) {
+    for (let i = 0; i < _roadCutPool.length; i++) {
+      _roadCutPool[i].el.style.display = "none";
+    }
+    roadCutMarkers = [];
+    return;
+  }
   if (!roadsGeoJSON || !roadsGeoJSON.features) return;
   const t = Math.round(tMin || 0);
   if (t === _lastRoadCutT) return;
@@ -3627,8 +3986,18 @@ function _updateRoadCutMarkers(tMin) {
       .sort((a, b) => (+a.properties.cut_time_min) - (+b.properties.cut_time_min));
   }
 
-  const cutLinks = roadsGeoJSON._cutFeatures.filter(f => +f.properties.cut_time_min <= t);
-  const displayed = cutLinks.slice(0, 6);
+  // Binary search for upper bound index where cut_time_min <= t
+  const cuts = roadsGeoJSON._cutFeatures;
+  let low = 0, high = cuts.length;
+  while (low < high) {
+    const mid = (low + high) >>> 1;
+    if (+cuts[mid].properties.cut_time_min <= t) {
+      low = mid + 1;
+    } else {
+      high = mid;
+    }
+  }
+  const displayed = cuts.slice(0, Math.min(low, 6));
 
   for (let i = 0; i < displayed.length; i++) {
     const f = displayed[i];
@@ -3688,13 +4057,19 @@ function _updateRoadCutMarkers(tMin) {
   roadCutMarkers = _roadCutPool.slice(0, displayed.length).map(p => p.marker);
 }
 
-function _updateObservedMarker(geojson, scenarioKeyOrMeta) {
+let _lastObservedMeta = null;
+
+function _updateObservedMarker(geojson, meta) {
   if (!map) return;
   if (observedMarker) {
     observedMarker.remove();
     observedMarker = null;
   }
   if (!geojson || !geojson.features || !geojson.features.length) return;
+  if (meta !== undefined) _lastObservedMeta = meta || null;
+  meta = meta !== undefined ? meta : _lastObservedMeta;
+  // No backend-vouched source metadata: draw nothing rather than a guessed tag.
+  if (!meta || !meta.source) return;
 
   // Compute centroid of the largest or primary feature
   let sumX = 0, sumY = 0, count = 0;
@@ -3731,26 +4106,11 @@ function _updateObservedMarker(geojson, scenarioKeyOrMeta) {
   const centerLng = sumX / count;
   const centerLat = sumY / count;
 
-  const scenarioKey = typeof scenarioKeyOrMeta === "string" && scenarioKeyOrMeta ?
-    scenarioKeyOrMeta : (document.getElementById("scenario-select")?.value || "");
-
-  let tagText = "SATELLITE TRACE";
-  let sourceText = "Satellite Ground Truth";
-  let eventText = "Observed Inundation";
-
-  if (scenarioKey === "ivanovo") {
-    tagText = "DFO 3896 · SATELLITE";
-    sourceText = "Global Flood Database (Tellman et al.)";
-    eventText = "DFO 3896 Satellite Trace & Survey";
-  } else if (scenarioKey === "derna") {
-    tagText = "COPERNICUS · EMSR696";
-    sourceText = "Copernicus EMS Rapid Mapping";
-    eventText = "EMSR696 Delineation Extent";
-  } else if (scenarioKey === "malpasset") {
-    tagText = "LNH BENCHMARK";
-    sourceText = "LNH Physical Model & Field Survey";
-    eventText = "Surveyed High-Water Mark";
-  }
+  // Provenance text comes only from the backend's own describe() response
+  // (served at /api/observed/scenarios) — never guessed from the scenario key.
+  const tagText = meta.classification || "OBSERVED";
+  const sourceText = meta.source;
+  const eventText = meta.event || "Observed Inundation";
 
   const el = document.createElement("div");
   el.className = "map-mark observed-mark";

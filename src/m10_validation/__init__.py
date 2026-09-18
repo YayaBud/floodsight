@@ -17,6 +17,7 @@ from .observed import (SOURCES, ObservedSource, ExtentComparison,
                        load_observed_extent, load_observed_roads,
                        load_observed_domain)
 from .roads import RoadSkill, compare_roads, DAMAGED_GRADES
+from .compare_arrivals import compare_arrivals, HISTORICAL_ARRIVALS
 
 __all__ = [
     "ExtentSkill", "confusion", "agreement_map",
@@ -26,4 +27,5 @@ __all__ = [
     "agreement_geojson", "observed_extent_geojson",
     "load_observed_extent", "load_observed_roads", "load_observed_domain",
     "RoadSkill", "compare_roads", "DAMAGED_GRADES",
+    "compare_arrivals", "HISTORICAL_ARRIVALS",
 ]

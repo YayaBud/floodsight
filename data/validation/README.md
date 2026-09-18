@@ -3,7 +3,11 @@
 Downloaded 31 Aug 2026. Purpose: score FloodSight simulations against **observed reality**,
 not only against the Ritter analytical solution.
 
-**Total on disk: 900 MB, 944 files.** Nothing here is synthetic.
+**Total on disk: 900 MB, 944 files.** Every file listed below is a third-party product, cited by source. It is
+NOT a claim that nothing in this repository is synthetic -- three
+hand-authored "observed" extents (ivanovo, malpasset, annamayya) and five
+"Sentinel-1 SAR" polygons WERE synthetic, were served as ground truth, and
+were deleted on 2026-09-12. `observed.SOURCES` now registers `derna` only.
 
 ```
 data/validation/

@@ -82,6 +82,7 @@ class SPHResult:
     steps: int
     wall_time_s: float
     mass_total: float        # invariant: fixed by construction
+    particle_masses: np.ndarray | None = None
 
     def sample_on(self, x_query: np.ndarray, hsml: float) -> np.ndarray:
         """
@@ -93,12 +94,14 @@ class SPHResult:
         than a nearest-particle approximation.
         """
         d = np.zeros_like(x_query, dtype=float)
-        m = self.mass_total / self.n_particles
+        masses = self.particle_masses
+        if masses is None:
+            masses = np.full(self.n_particles, self.mass_total / max(1, self.n_particles))
         for k, xq in enumerate(x_query):
             r = np.abs(self.x - xq)
             near = r < 2.0 * hsml
             if near.any():
-                d[k] = np.sum(m * _kernel_w(r[near], hsml))
+                d[k] = np.sum(masses[near] * _kernel_w(r[near], hsml))
         return d
 
 
@@ -159,15 +162,25 @@ def run_swe_sph_1d(
     z = np.zeros_like(x) if bed0 is None else np.asarray(bed0, dtype=float).copy()
     n = x.size
 
-    dx0 = float(np.median(np.diff(np.sort(x0))))
+    if x.ndim != 1 or d.ndim != 1 or z.ndim != 1 or not (len(x) == len(d) == len(z)) or n < 2:
+        raise ValueError("SPH inputs must be one-dimensional arrays of equal length >= 2")
+    if not (np.isfinite(x).all() and np.isfinite(d).all() and np.isfinite(z).all()):
+        raise ValueError("SPH inputs must be finite")
+    if np.any(d < 0.0) or total_duration_s < 0.0 or hsml_factor <= 0.0:
+        raise ValueError("SPH depth and solver parameters must be nonnegative/positive")
+    sorted_x = np.sort(x)
+    spacing = np.diff(sorted_x)
+    if np.any(spacing <= 0.0) or not np.allclose(spacing, spacing[0], rtol=1e-6, atol=1e-9):
+        raise ValueError("SWE-SPH requires finite, strictly increasing uniform spacing")
+
+    dx0 = float(spacing[0])
     hsml = hsml_factor * dx0
 
     # Particle mass is depth x spacing, fixed for all time. Total mass is then
     # an exact invariant of the scheme rather than something to be checked.
-    m = float(np.mean(d[d > 0]) * dx0) if np.any(d > 0) else dx0
-    # Give every particle the same mass so the summation is unbiased; particles
-    # in the dry region simply start with no neighbours contributing depth.
-    masses = np.full(n, m, dtype=float)
+    m = float(np.mean(d[d > 0]) * dx0) if np.any(d > 0) else 0.0
+    # Dry particles carry no water mass. This prevents dry-domain mass creation.
+    masses = np.where(d > _DRY, m, 0.0)
     mass_total = float(masses.sum())
 
     u = np.zeros(n, dtype=float)
@@ -227,7 +240,8 @@ def run_swe_sph_1d(
     logger.info("SWE-SPH: %d particles, %d steps, t=%.1f s, %.2f s wall, "
                 "mass invariant %.4e", n, step, t, wall, mass_total)
     return SPHResult(x=x, depth=d, u=u, t_s=t, n_particles=n, steps=step,
-                     wall_time_s=wall, mass_total=mass_total)
+                     wall_time_s=wall, mass_total=mass_total,
+                     particle_masses=masses)
 
 
 def ritter_dam_break_sph(
@@ -255,3 +269,93 @@ def ritter_dam_break_sph(
     )
     hsml = 1.5 * float(np.median(np.diff(np.sort(x0))))
     return res, hsml
+
+
+def run_scenario_thalweg_sph(
+    scenario_key: str,
+    dem_array: np.ndarray,
+    transform,
+    thalweg_pts_utm: Sequence[tuple[float, float]],
+    hydrograph_t_s: np.ndarray,
+    hydrograph_q_m3s: np.ndarray,
+    manning_n: float = 0.035,
+    channel_width_m: float = 120.0,
+    total_duration_s: float = 3600.0,
+    n_stations: int = 60,
+    max_depth_array: np.ndarray | None = None,
+) -> dict[str, Any]:
+    """
+    Simulate 1D longitudinal SPH propagation down the scenario thalweg corridor
+    driven by the physical breach hydrograph, and compare with 2D Finite-Volume SWE.
+
+    Parameters
+    ----------
+    scenario_key : str
+        Scenario name (e.g. "annamayya").
+    dem_array : np.ndarray
+        2D DEM elevation grid.
+    transform : Affine
+        Affine transform for raster coordinates.
+    thalweg_pts_utm : sequence of (x, y)
+        Longitudinal centerline / thalweg station points in UTM metres.
+    hydrograph_t_s : np.ndarray
+        Breach hydrograph time steps [s].
+    hydrograph_q_m3s : np.ndarray
+        Breach hydrograph discharge [m³/s].
+    manning_n : float
+        Manning roughness coefficient (matching Eulerian arm).
+    channel_width_m : float
+        Effective channel width [m].
+    total_duration_s : float
+        Duration to simulate [s].
+    n_stations : int
+        Number of profile stations along thalweg.
+    max_depth_array : np.ndarray, optional
+        2D maximum depth grid from the Eulerian solver to sample at each station.
+
+    Returns
+    -------
+    dict
+        Structured solver comparison dataset ready for JSON export and UI rendering.
+    """
+    # DELIBERATELY NOT RUN. This is deliverable (i)'s scenario arm and it stays
+    # refused, with the reason carried to the UI, because the comparison it
+    # would draw is not like-for-like:
+    #
+    #   * Forcing. Since P3 the 2D arm has NO forcing hydrograph -- the pool
+    #     drains through an opening cut in the barrier and Q is an OUTPUT. The
+    #     1D SPH arm here is driven by the 0-D ROUTED hydrograph, so the two
+    #     solvers are not being given the same event. Driving SPH with the 2D
+    #     run's MEASURED Q is the correct construction and is what this needs.
+    #   * Spatial support. 1D particles on a thalweg polyline against
+    #     cell-averaged depth on a 28-113 m grid: the 2D arm's depth at a
+    #     station is a cell mean over a gorge narrower than the cell, the 1D
+    #     arm's is a channel mean over a declared width. They are different
+    #     quantities and an RMSE between them is not a solver-agreement number.
+    #   * Comparison times. The 2D arm reports max depth over the whole run;
+    #     the SPH arm reports depth at its own final time. A max against an
+    #     instant is not a comparison.
+    #
+    # ~85 lines of unreachable implementation used to sit below this return.
+    # It is deleted rather than left dormant: code that cannot run cannot be
+    # trusted to be correct when someone eventually deletes the return.
+    return {
+        "available": False,
+        "status": "NOT_AVAILABLE",
+        "scenario": scenario_key,
+        "reason": (
+            "not a like-for-like comparison: the 2D arm now has no forcing "
+            "hydrograph (Q is measured at the opening, not prescribed), the two "
+            "arms average depth over different spatial support, and the 2D arm "
+            "reports a run maximum against the SPH arm's final instant. "
+            "Validated SWE-SPH is shown against the Ritter analytical solution "
+            "instead, which is a comparison both solvers can actually make."
+        ),
+        "what_would_make_it_real": [
+            "drive the 1D SPH arm with the 2D run's measured breach discharge",
+            "compare depth at matched times, not a run maximum against an instant",
+            "declare the 1D channel width per station and sample the 2D arm "
+            "over the same width rather than one cell",
+        ],
+        "method_lagrangian": "1D Depth-Averaged SWE-SPH (Monaghan Cubic Spline)",
+    }

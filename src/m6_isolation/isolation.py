@@ -25,11 +25,20 @@ Method
 
 The safe set
 ------------
-Safe nodes are those that stay dry for the entire simulation — sampled from the
-maximum-depth raster, not from an arbitrary bounding box. A village is isolated
-when it can no longer reach ground that never floods. This is self-consistent
-(it uses the same solver output as everything else) and needs no hand-placed
-box that could be drawn to flatter the result.
+Safe nodes are recomputed at every timestep from that timestep's own depth
+raster — a node is safe at time t if it is dry (< threshold) at time t, not if
+it happens to stay dry for the rest of the run. Using the max-depth raster to
+build one fixed safe set for the whole simulation would leak knowledge of the
+future into the present: a node that only floods at T+200 min would already be
+excluded from the safe set at T+0, so any village whose sole route runs through
+it would be reported isolated from the very first frame. The safe set is
+therefore per-timestep and self-consistent with only what has happened by t.
+
+Before any flooding is applied, a one-off baseline pass over the full, uncut
+road graph checks whether each village's snapped node has road connectivity at
+all when dry. A node that is isolated even in the unflooded graph (a stub with
+no through-path) is a pre-existing OSM gap, not a flood effect, and is flagged
+``OSM_GAP`` rather than being attributed a flood-caused isolation time.
 
 Depth thresholds (cited, and labelled on screen)
 ------------------------------------------------
@@ -83,43 +92,6 @@ def _is_projected(crs) -> bool:
 # ──────────────────────────────────────────────────────────────────────────────
 # Graph loading
 # ──────────────────────────────────────────────────────────────────────────────
-
-def load_road_graph(
-    bounds_wgs84: tuple[float, float, float, float],
-    cache_path: str | Path,
-    network_type: str = "drive",
-) -> nx.MultiDiGraph:
-    """
-    Load the OSM road network for the bounding box, downloading if not cached.
-
-    Parameters
-    ----------
-    bounds_wgs84 : (west, south, east, north) in WGS84
-    cache_path   : Path to the .graphml cache
-    network_type : "drive" (default) or "all"
-    """
-    if not _OSMNX:
-        raise RuntimeError("OSMnx not installed. Run: pip install osmnx")
-
-    cache_path = Path(cache_path)
-    if cache_path.exists():
-        logger.info("Loading cached road graph from %s", cache_path)
-        return ox.load_graphml(str(cache_path))
-
-    west, south, east, north = bounds_wgs84
-    logger.info("Downloading OSM road network for bbox %s …", bounds_wgs84)
-    # OSMnx >= 2.0 takes a single bbox tuple in (left, bottom, right, top) order.
-    G = ox.graph_from_bbox(
-        bbox=(west, south, east, north),
-        network_type=network_type,
-        retain_all=True,
-    )
-    cache_path.parent.mkdir(parents=True, exist_ok=True)
-    ox.save_graphml(G, str(cache_path))
-    logger.info("Road graph cached → %s  (%d nodes, %d edges)",
-                cache_path, G.number_of_nodes(), G.number_of_edges())
-    return G
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Geometry helpers — computed once, reused for every timestep
@@ -208,15 +180,20 @@ def compute_isolation_times(
     G                : Full (uncut) OSMnx road graph, WGS84.
     raster_stack     : ``[(t_seconds, depth_raster_path), ...]`` in time order.
     village_gdf      : Village polygons; centroids are snapped to road nodes.
-    max_depth_raster : Maximum-depth GeoTIFF for the run, used to define the
-                       safe set (nodes that never flood).
+    max_depth_raster : Maximum-depth GeoTIFF for the run. Kept as a parameter
+                       for callers/back-compat; no longer used to build a
+                       single fixed safe set (see module docstring — the safe
+                       set is now computed fresh per timestep).
     threshold_m      : Depth at which a road is treated as impassable.
 
     Returns
     -------
     ``village_gdf`` plus:
         ``isolation_time_s`` / ``_min``      first time the village is cut off
-                                             (NaN = never isolated in the window)
+                                             by flooding (NaN = never isolated
+                                             in the window, or not attributable
+                                             to flooding — see
+                                             ``isolation_status``)
         ``water_arrival_time_s`` / ``_min``  first time water reaches the centroid
         ``evacuation_window_s`` / ``_min``   arrival - isolation; how long people
                                              have between losing the road and the
@@ -225,6 +202,26 @@ def compute_isolation_times(
         ``road_nodes_found``                 False where the village has no road
                                              in the graph — metrics are NaN and
                                              must render as NO ROAD DATA.
+        ``baseline_connected``               True if the village's road node has
+                                             road connectivity in the unflooded
+                                             graph (component size > 1). False
+                                             means any apparent isolation is a
+                                             pre-existing OSM gap, not a flood
+                                             effect.
+        ``isolation_status``                 One of ``"FLOOD_ISOLATED"`` (cut
+                                             off by flooding), ``"NO_ROAD_DATA"``
+                                             (no road node found),
+                                             ``"OSM_GAP"`` (baseline_connected
+                                             is False — pre-existing graph gap,
+                                             isolation_time_s stays NaN), or
+                                             ``"NOT_ISOLATED"`` (never isolated
+                                             in the window).
+        ``n_road_exits``                    Degree of the village's snapped
+                                             node in the full, unflooded,
+                                             undirected road graph — how many
+                                             distinct road edges leave it when
+                                             nothing is flooded. 0 where
+                                             ``road_nodes_found`` is False.
     """
     if not _OSMNX:
         raise RuntimeError("OSMnx not installed. Run: pip install osmnx")
@@ -242,17 +239,10 @@ def compute_isolation_times(
                 G_proj.number_of_nodes(), len(edge_keys), int(is_bridge.sum()),
                 flood_crs)
 
-    # ── Safe set: nodes that never flood across the whole simulation ──────────
+    # ── Node positions, reused every timestep to build the per-timestep safe set ──
     node_ids = list(G_proj.nodes)
     nxs = np.array([G_proj.nodes[n]["x"] for n in node_ids])
     nys = np.array([G_proj.nodes[n]["y"] for n in node_ids])
-    with rasterio.open(max_depth_raster) as src:
-        max_depth_arr = src.read(1).astype(float)
-        max_tr = src.transform
-    node_max_depth = sample_raster(max_depth_arr, max_tr, nxs, nys)
-    safe_nodes = {n for n, d in zip(node_ids, node_max_depth) if d < threshold_m}
-    logger.info("Safe set: %d / %d road nodes never reach %.2f m",
-                len(safe_nodes), len(node_ids), threshold_m)
 
     # ── Snap villages to the nearest road node ───────────────────────────────
     # Node ids survive projection, so the nearest-node search runs on a metric
@@ -266,6 +256,30 @@ def compute_isolation_times(
     village_nodes: list[object | None] = list(ox.nearest_nodes(
         G_metric, cent_metric.x.to_numpy(), cent_metric.y.to_numpy()))
     road_found = np.array([n is not None for n in village_nodes], dtype=bool)
+
+    # ── Baseline (unflooded) connectivity — separates OSM gaps from flood
+    # isolation. A village node stuck in a tiny/singleton component even with
+    # zero flooding applied is a pre-existing road-network gap, not something
+    # the flood caused; it must never be reported as flood-isolated at t=0.
+    G_undirected = G_proj.to_undirected()
+    baseline_comp_size: dict[object, int] = {}
+    for comp in nx.connected_components(G_undirected):
+        size = len(comp)
+        for node in comp:
+            baseline_comp_size[node] = size
+    baseline_connected = np.array([
+        road_found[vi] and baseline_comp_size.get(vnode, 0) > 1
+        for vi, vnode in enumerate(village_nodes)
+    ], dtype=bool)
+
+    # Per-village egress-route count: degree of the snapped node in the full,
+    # unflooded, undirected graph — how many distinct road edges leave it when
+    # nothing is flooded. This is the real per-village exit count M7's ranking
+    # previously faked as a constant 1.
+    n_road_exits = np.array([
+        int(G_undirected.degree(vnode)) if road_found[vi] else 0
+        for vi, vnode in enumerate(village_nodes)
+    ], dtype=int)
 
     # Water arrival is sampled over the whole village FOOTPRINT, not just its
     # centroid. M5 declares a village inundated if any part of its polygon is
@@ -316,6 +330,14 @@ def compute_isolation_times(
             if np.nanmax(depth_arr[rows, cols], initial=0.0) >= threshold_m:
                 water_arr_t[vi] = t_s
 
+        # Safe set for THIS timestep only — a node is safe at t if it is dry
+        # (< threshold) right now, not if it happens to stay dry for the rest
+        # of the run. Recomputing this every iteration (rather than once from
+        # the max-depth raster) is what keeps a future flood event from
+        # leaking into an earlier timestep's isolation verdict.
+        node_depth_now = sample_raster(depth_arr, tr, nxs, nys)
+        safe_nodes_t = {n for n, d in zip(node_ids, node_depth_now) if d < threshold_m}
+
         # Cut the graph and label components once for this timestep
         G_cut = cut_flooded_edges(G_proj, depth_arr, tr, edge_keys, exs, eys,
                                   threshold_m=threshold_m,
@@ -326,11 +348,11 @@ def compute_isolation_times(
         for ci, comp in enumerate(nx.connected_components(G_cut.to_undirected())):
             for node in comp:
                 comp_of[node] = ci
-            if not safe_nodes.isdisjoint(comp):
+            if not safe_nodes_t.isdisjoint(comp):
                 safe_components.add(ci)
 
         for vi, vnode in enumerate(village_nodes):
-            if not road_found[vi] or not np.isnan(isolation_t[vi]):
+            if not road_found[vi] or not baseline_connected[vi] or not np.isnan(isolation_t[vi]):
                 continue
             ci = comp_of.get(vnode)
             if ci is None or ci not in safe_components:
@@ -338,8 +360,19 @@ def compute_isolation_times(
                 logger.info("  %s isolated at T+%.0f min",
                             village_gdf.iloc[vi].get("village_name", vi), t_s / 60.0)
 
+    # Classify each village: NO_ROAD_DATA (no snapped node) > OSM_GAP (baseline
+    # graph gap, not the flood's fault) > FLOOD_ISOLATED (cut off by flooding
+    # within the window) > NOT_ISOLATED (never cut off).
+    isolation_status = np.full(n_villages, "NOT_ISOLATED", dtype=object)
+    isolation_status[~road_found] = "NO_ROAD_DATA"
+    isolation_status[road_found & ~baseline_connected] = "OSM_GAP"
+    isolation_status[road_found & baseline_connected & ~np.isnan(isolation_t)] = "FLOOD_ISOLATED"
+
     result = village_gdf.copy()
     result["road_nodes_found"]      = road_found
+    result["baseline_connected"]    = baseline_connected
+    result["n_road_exits"]          = n_road_exits
+    result["isolation_status"]      = isolation_status
     result["isolation_time_s"]      = isolation_t
     result["water_arrival_time_s"]  = water_arr_t
     # Window = time between losing the road and the water arriving. Positive

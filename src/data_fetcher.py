@@ -31,6 +31,9 @@ from __future__ import annotations
 
 import logging
 import os
+import hashlib
+import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import numpy as np
@@ -57,14 +60,26 @@ _COP_S3 = "https://copernicus-dem-30m.s3.amazonaws.com"
 
 SCENARIOS = {
     "phutkal": {
+        # flow_regime: which physics class this event belongs to. Phuktal 2015: outburst of a landslide-dam lake through a gravel gorge. Sediment-
+        # laden, but the documented damage (bridges, banks, canals) is consistent with a
+        # water-dominated flood rather than a granular flow. SWE is an approximation here,
+        # biased low on depth and momentum.
+        "flow_regime": "hyperconcentrated",
         "name": "Phutkal River Landslide Dam (2015)",
         "lat": 33.25242, "lon": 77.05783,
         "bbox": (76.75, 33.12, 77.10, 33.40),      # west, south, east, north
         "utm_epsg": 32643,                          # UTM 43N
-        "wse_m": 3878.0,
-        "thalweg_m": 3820.0,
+        # wse_m / dam_height_m sourced 2026-09-13. The deposit was measured at 69 m
+        # from Cartosat-2 stereo imagery (Landslides 14:529-538), not 58 m. The DEM
+        # foundation under the blockage is 3736.11 m, so the crest is 3805.11 m.
+        # Cross-check: the conditioned DEM impounds 27.05 MCM at that crest and
+        # 31.38 MCM at 3810 m, against a documented >30 MCM -- the two independent
+        # observables (deposit height, impounded volume) agree within ~5 m of height.
+        # See findings_results.md 2026-09-13 for the stage-storage table.
+        "wse_m": 3805.11,
+        "thalweg_m": 3736.11,
         "breach_lon": 77.05783, "breach_lat": 33.25242,
-        "dam_height_m": 58.0,
+        "dam_height_m": 69.0,
         "volume_mcm": 30.0,
         "event_type": "natural_lake_formation",
         "lake_formation": {
@@ -83,6 +98,11 @@ SCENARIOS = {
         "failure_trigger": "Progressive crest overtopping through artificial diversion trench",
     },
     "rishiganga": {
+        # flow_regime: which physics class this event belongs to. Chamoli 7 Feb 2021: ~27e6 m3 of rock and glacier ice detached from Ronti Peak and
+        # became a debris flow carrying >20 m boulders, scouring valley walls to 220 m
+        # above the floor. The debris-dammed lake formed AFTER the flood. Clear-water SWE
+        # is not the governing model for this event; see m3_breach.DEBRIS_FLOW_MISSING_PHYSICS.
+        "flow_regime": "debris_flow",
         "name": "Rishi Ganga Natural Lake & Cascade (Feb 2021)",
         "lat": 30.46915, "lon": 79.71228,
         "bbox": (79.60, 30.38, 79.85, 30.58),
@@ -175,124 +195,156 @@ SCENARIOS = {
             },
         },
     },
-    "derna": {
-        "name": "Derna Dams — Abu Mansour + Al-Bilad, Libya (Sep 2023)",
-        "lat": 32.65755, "lon": 22.57733,
-        "bbox": (22.50, 32.60, 22.72, 32.82),
-        "utm_epsg": 32634,                          # UTM 34N
-        "wse_m": 170.0,
-        "thalweg_m": 96.0,
-        "breach_lon": 22.57733, "breach_lat": 32.65755,
-        "dam_height_m": 74.0,
-        "volume_mcm": 22.5,
-        "event_type": "cascading_dam_break",
-        "upstream_structure": {
-            "name": "Abu Mansour Dam (Upstream)",
-            "lat": 32.65755, "lon": 22.57733,
-            "height_m": 74.0, "volume_mcm": 22.5,
-            "status": "Overtopped and burst at 02:30 AM",
-            "role": "Primary upstream breach",
-        },
-        "downstream_structure": {
-            "name": "Al-Bilad Dam (Downstream City Dam)",
-            "lat": 32.75237, "lon": 22.63058,
-            "height_m": 45.0, "volume_mcm": 1.5,
-            "distance_km": 13.7,
-            "status": "Overtopped and destroyed at 03:00 AM (T+30 min)",
-            "role": "Secondary cascading failure into Derna city",
-        },
-        "cascade_arrival_min": 30.0,
-        "failure_trigger": "Storm Daniel precipitation + upstream reservoir overtopping",
-        # ── Generic cascade routing config ────────────────────────────────────
-        # CLASSIFICATION LEGEND:
-        #   upstream.peak_q_m3s: RECONSTRUCTION from 22.5 MCM / ~30min formation
-        #   routing: ASSUMPTION (flash-flood steep wadi, shorter K than natural river)
-        #   reservoir: OFFICIAL ESTIMATE from UNEP / Copernicus post-event survey
-        #   breach_ensemble: MODEL RECONSTRUCTION (Froehlich 2008)
-        "cascade": {
-            "scenario_key": "derna",
-            "upstream": {
-                "peak_q_m3s":   8000.0,     # RECONSTRUCTION: Abu Mansour 22.5 MCM rapid release
-                "base_q_m3s":    100.0,     # wadi base flow during Storm Daniel
-                "duration_s":   3600.0,     # ~60 min surge (steep wadi, fast emptying)
-                "lead_time_s":  1800.0,     # 30 min before downstream breach
-                "classification": "RECONSTRUCTION",
-            },
-            "routing": {
-                "k_s":          1200.0,     # ASSUMPTION: 13.7 km steep wadi ~K=20 min
-                "x":               0.15,
-                "classification": "ASSUMPTION",
-            },
-            "reservoir": {
-                "z_bed_m":        96.0,     # OFFICIAL ESTIMATE: Al-Bilad thalweg
-                "z_frl_m":       135.0,     # ASSUMPTION: estimated FRL from dam height
-                "z_crest_m":     141.0,     # OFFICIAL ESTIMATE: Al-Bilad crest
-                "v_frl_mcm":       1.5,     # OFFICIAL ESTIMATE: Al-Bilad capacity
-                "alpha_exp":       2.5,
-                "classification": "OFFICIAL ESTIMATE",
-            },
-            "spillway": {
-                "cd":              2.00,
-                "length_m":       30.0,
-                "z_crest_m":     138.0,
-                "max_q_m3s":    1200.0,     # ASSUMPTION: small spillway capacity
-            },
-            "catchment_runoff": {
-                "base_m3s":       50.0,
-                "peak_m3s":     3500.0,     # RECONSTRUCTION: Storm Daniel wadi catchment
-                "peak_offset_s": -900.0,
-                "sigma_s":      3600.0,
-            },
-            "breach_ensemble": {
-                "optimistic":  {"width_m": 20.0, "formation_s": 1200.0, "peak_q_m3s":  5000.0,
-                                "classification": "MODEL RECONSTRUCTION",
-                                "source": "Froehlich (2008) lower CI — small embankment dam"},
-                "central":     {"width_m": 35.0, "formation_s":  900.0, "peak_q_m3s":  9500.0,
-                                "classification": "MODEL RECONSTRUCTION",
-                                "source": "Froehlich (2008) best estimate — Al-Bilad 1.5 MCM"},
-                "pessimistic": {"width_m": 55.0, "formation_s":  600.0, "peak_q_m3s": 16000.0,
-                                "classification": "MODEL RECONSTRUCTION",
-                                "source": "Froehlich (2008) upper — UNEP estimated >15,000 m3/s surge"},
-            },
-        },
-    },
-    "malpasset": {
-        "name": "Malpasset Arch Dam — France (1959, Canonical Benchmark)",
-        "lat": 43.51216, "lon": 6.75684,
-        "bbox": (6.65, 43.41, 6.82, 43.55),
-        "utm_epsg": 32632,                          # UTM 32N
-        "wse_m": 101.5,
-        "thalweg_m": 35.0,
-        "breach_lon": 6.75684, "breach_lat": 43.51216,
-        "dam_height_m": 66.5,
-        "volume_mcm": 50.0,
-        "downstream_structure": {
-            "name": "Bozon Highway Bridge & Frejus Estuary",
-            "lat": 43.4350, "lon": 6.7420,
-            "distance_km": 8.0,
-            "status": "Bridge destroyed; Frejus submerged in 20 min",
-            "role": "Downstream coastal inundation",
-        },
-    },
-    "ivanovo": {
-        "name": "Ivanovo Dam — Bulgaria (2012, GFD Observed)",
-        "lat": 41.86243, "lon": 25.85388,
-        "bbox": (25.75, 41.78, 26.05, 41.96),
-        "utm_epsg": 32635,                          # UTM 35N
-        "wse_m": 171.0,
-        "thalweg_m": 155.0,
-        "breach_lon": 25.85388, "breach_lat": 41.86243,
-        "dam_height_m": 16.0,
-        "volume_mcm": 2.5,
-        "downstream_structure": {
-            "name": "Biser Village Bridge & Dykes",
-            "lat": 41.8833, "lon": 25.8833,
-            "distance_km": 3.8,
-            "status": "Submerged within 20 min of breach",
-            "role": "Downstream village inundation",
-        },
-    },
+    # ──────────────────────────────────────────────────────────────────────────
+    # OUT-OF-SCOPE-NON-INDIAN — commented out 2026-09-13 at the user's request.
+    #
+    # derna (Libya), malpasset (France) and ivanovo (Bulgaria) are not Indian
+    # events and are out of the current scope. They are COMMENTED, not deleted,
+    # because two of them carry assets nothing else replaces:
+    #
+    #   derna     — the only scenario with a certifiable observation
+    #               (Copernicus EMS EMSR696). It is the sole entry left in
+    #               m10_validation.observed.SOURCES, so with it commented out
+    #               M10 has no event to score any run against.
+    #   malpasset — the dam-break numerical benchmark. Its validation data and
+    #               the /api/benchmarks/malpasset endpoint read files directly
+    #               and do NOT go through SCENARIOS, so the benchmark still
+    #               works with the scenario commented out.
+    #   ivanovo   — carries nothing; its 'observation' was fabricated and was
+    #               already deleted.
+    #
+    # To restore: grep for OUT-OF-SCOPE-NON-INDIAN here and in tests/, and uncomment.
+    # Nothing else was changed — observed.py, the Malpasset benchmark data and
+    # the geometry manifests under data/geometry/ are all left in place.
+    # ──────────────────────────────────────────────────────────────────────────
+#    "derna": {
+#        # flow_regime: which physics class this event belongs to. Derna 2023: two engineered embankment dams into a wadi. Clear-water dam break.
+#        "flow_regime": "clear_water",
+#        "name": "Derna Dams — Abu Mansour + Al-Bilad, Libya (Sep 2023)",
+#        "lat": 32.65755, "lon": 22.57733,
+#        "bbox": (22.50, 32.60, 22.72, 32.82),
+#        "utm_epsg": 32634,                          # UTM 34N
+#        "wse_m": 170.0,
+#        "thalweg_m": 96.0,
+#        "breach_lon": 22.57733, "breach_lat": 32.65755,
+#        "dam_height_m": 74.0,
+#        "volume_mcm": 22.5,
+#        "event_type": "cascading_dam_break",
+#        "upstream_structure": {
+#            "name": "Abu Mansour Dam (Upstream)",
+#            "lat": 32.65755, "lon": 22.57733,
+#            "height_m": 74.0, "volume_mcm": 22.5,
+#            "status": "Overtopped and burst at 02:30 AM",
+#            "role": "Primary upstream breach",
+#        },
+#        "downstream_structure": {
+#            "name": "Al-Bilad Dam (Downstream City Dam)",
+#            "lat": 32.75237, "lon": 22.63058,
+#            "height_m": 45.0, "volume_mcm": 1.5,
+#            "distance_km": 13.7,
+#            "status": "Overtopped and destroyed at 03:00 AM (T+30 min)",
+#            "role": "Secondary cascading failure into Derna city",
+#        },
+#        "cascade_arrival_min": 30.0,
+#        "failure_trigger": "Storm Daniel precipitation + upstream reservoir overtopping",
+#        # ── Generic cascade routing config ────────────────────────────────────
+#        # CLASSIFICATION LEGEND:
+#        #   upstream.peak_q_m3s: RECONSTRUCTION from 22.5 MCM / ~30min formation
+#        #   routing: ASSUMPTION (flash-flood steep wadi, shorter K than natural river)
+#        #   reservoir: OFFICIAL ESTIMATE from UNEP / Copernicus post-event survey
+#        #   breach_ensemble: MODEL RECONSTRUCTION (Froehlich 2008)
+#        "cascade": {
+#            "scenario_key": "derna",
+#            "upstream": {
+#                "peak_q_m3s":   8000.0,     # RECONSTRUCTION: Abu Mansour 22.5 MCM rapid release
+#                "base_q_m3s":    100.0,     # wadi base flow during Storm Daniel
+#                "duration_s":   3600.0,     # ~60 min surge (steep wadi, fast emptying)
+#                "lead_time_s":  1800.0,     # 30 min before downstream breach
+#                "classification": "RECONSTRUCTION",
+#            },
+#            "routing": {
+#                "k_s":          1200.0,     # ASSUMPTION: 13.7 km steep wadi ~K=20 min
+#                "x":               0.15,
+#                "classification": "ASSUMPTION",
+#            },
+#            "reservoir": {
+#                "z_bed_m":        96.0,     # OFFICIAL ESTIMATE: Al-Bilad thalweg
+#                "z_frl_m":       135.0,     # ASSUMPTION: estimated FRL from dam height
+#                "z_crest_m":     141.0,     # OFFICIAL ESTIMATE: Al-Bilad crest
+#                "v_frl_mcm":       1.5,     # OFFICIAL ESTIMATE: Al-Bilad capacity
+#                "alpha_exp":       2.5,
+#                "classification": "OFFICIAL ESTIMATE",
+#            },
+#            "spillway": {
+#                "cd":              2.00,
+#                "length_m":       30.0,
+#                "z_crest_m":     138.0,
+#                "max_q_m3s":    1200.0,     # ASSUMPTION: small spillway capacity
+#            },
+#            "catchment_runoff": {
+#                "base_m3s":       50.0,
+#                "peak_m3s":     3500.0,     # RECONSTRUCTION: Storm Daniel wadi catchment
+#                "peak_offset_s": -900.0,
+#                "sigma_s":      3600.0,
+#            },
+#            "breach_ensemble": {
+#                "optimistic":  {"width_m": 20.0, "formation_s": 1200.0, "peak_q_m3s":  5000.0,
+#                                "classification": "MODEL RECONSTRUCTION",
+#                                "source": "Froehlich (2008) lower CI — small embankment dam"},
+#                "central":     {"width_m": 35.0, "formation_s":  900.0, "peak_q_m3s":  9500.0,
+#                                "classification": "MODEL RECONSTRUCTION",
+#                                "source": "Froehlich (2008) best estimate — Al-Bilad 1.5 MCM"},
+#                "pessimistic": {"width_m": 55.0, "formation_s":  600.0, "peak_q_m3s": 16000.0,
+#                                "classification": "MODEL RECONSTRUCTION",
+#                                "source": "Froehlich (2008) upper — UNEP estimated >15,000 m3/s surge"},
+#            },
+#        },
+#    },
+#    "malpasset": {
+#        # flow_regime: which physics class this event belongs to. Malpasset 1959: arch dam onto a dry rocky valley. The canonical clear-water case.
+#        "flow_regime": "clear_water",
+#        "name": "Malpasset Arch Dam — France (1959, Canonical Benchmark)",
+#        "lat": 43.51216, "lon": 6.75684,
+#        "bbox": (6.65, 43.41, 6.82, 43.55),
+#        "utm_epsg": 32632,                          # UTM 32N
+#        "wse_m": 101.5,
+#        "thalweg_m": 35.0,
+#        "breach_lon": 6.75684, "breach_lat": 43.51216,
+#        "dam_height_m": 66.5,
+#        "volume_mcm": 50.0,
+#        "downstream_structure": {
+#            "name": "Bozon Highway Bridge & Frejus Estuary",
+#            "lat": 43.4350, "lon": 6.7420,
+#            "distance_km": 8.0,
+#            "status": "Bridge destroyed; Frejus submerged in 20 min",
+#            "role": "Downstream coastal inundation",
+#        },
+#    },
+#    "ivanovo": {
+#        # flow_regime: which physics class this event belongs to. Ivanovo 2012: small embankment dam into a lowland floodplain.
+#        "flow_regime": "clear_water",
+#        "name": "Ivanovo Dam — Bulgaria (2012, GFD Observed)",
+#        "lat": 41.86243, "lon": 25.85388,
+#        "bbox": (25.75, 41.78, 26.05, 41.96),
+#        "utm_epsg": 32635,                          # UTM 35N
+#        "wse_m": 171.0,
+#        "thalweg_m": 155.0,
+#        "breach_lon": 25.85388, "breach_lat": 41.86243,
+#        "dam_height_m": 16.0,
+#        "volume_mcm": 2.5,
+#        "downstream_structure": {
+#            "name": "Biser Village Bridge & Dykes",
+#            "lat": 41.8833, "lon": 25.8833,
+#            "distance_km": 3.8,
+#            "status": "Submerged within 20 min of breach",
+#            "role": "Downstream village inundation",
+#        },
+#    },
     "south_lhonak": {
+        # flow_regime: which physics class this event belongs to. South Lhonak 2023: moraine-dam GLOF. The surge transported boulders and moraine
+        # and destroyed a 60 m concrete-face dam 42 km downstream. Granular phase is not
+        # incidental to this event, it IS the event.
+        "flow_regime": "debris_flow",
         "name": "South Lhonak GLOF & Chungthang Dam — Sikkim (Oct 2023)",
         "lat": 27.91478, "lon": 88.18742,
         "bbox": (88.15, 27.50, 88.75, 28.00),
@@ -373,16 +425,48 @@ SCENARIOS = {
         },
     },
     "annamayya": {
+        # flow_regime: which physics class this event belongs to. Annamayya 2021: earthen section of an engineered irrigation dam, monsoon flood.
+        "flow_regime": "clear_water",
         "name": "Annamayya Dam Failure & Pincha Cascade — Andhra Pradesh (Nov 2021)",
         "lat": 14.21059, "lon": 79.02128,
-        "bbox": (78.96, 14.12, 79.28, 14.36),
+        # Sized to hold BOTH stages of the routing chain on one grid, so the
+        # Stage-1 -> Stage-2 handoff needs no reprojection: south to 13.85 for
+        # Pincha (13.90890), north to 14.50 for the Cheyyeru-Pennar confluence
+        # (14.4311, 79.1699), east to 79.42 past it.
+        # The previous (…, 79.28, 14.36) claimed in its own comment to reach the
+        # confluence and did not: it stopped 7.9 km short, and the front stalled
+        # on that edge at 47.0 km of a 54.9 km stem in the 24 h run.
+        # NOT fully contained, measured 2026-09-13: the HAND-derived corridor
+        # layer spans (78.9500, 14.0800, 79.3142, 14.5253), so 2.8 km of it lies
+        # north of this edge and 1.1 km west of it. All 23 settlements ARE inside.
+        # This is Decision 1 Option A as fixed by the user; the shortfall is
+        # recorded, not absorbed.
+        "bbox": (78.96, 13.85, 79.42, 14.50),
         "utm_epsg": 32644,                          # UTM 44N
         "wse_m": 206.0,                             # Overtopping crest elevation (+206.000 m MSL, FRL is +203.600 m MSL)
         "thalweg_m": 180.0,                         # Deepest bed / breach invert (+180.000 m MSL)
+        # Terrain floor for condition_dem: below this the DEM holds reprojection
+        # artefact, not ground. NOT derived from thalweg_m -- that is the DAM-SITE
+        # bed, and this domain runs 40 km downstream to the Pennar, where the
+        # floodplain genuinely descends to ~64 m. thalweg_m - 100 = 80 m would wall
+        # 905 interior cells of real Penna floodplain (surrounding ring median
+        # 82.49 m), which is fabricating terrain in the path of the flood.
+        # 60.0 is measured, not chosen: at full resolution the cell population steps
+        # 29x across it -- [50,60) holds 104 cells, [60,70) holds 3,037 -- and of the
+        # 1,722 cells below it, 1,594 sit on the outer 15-cell reprojection frame.
+        # The 128 interior ones are a seam at col 1631 (98 cells) and one 5x7 pit at
+        # rows 1738-1742 whose own 5x5 neighbourhood has median ~100 m.
+        # Measured on the widened bbox, 2026-09-13. Re-measure if the bbox moves.
+        "dem_floor_m": 60.0,
         "breach_lon": 79.02128, "breach_lat": 14.21059,
         "dam_height_m": 26.0,                       # Crest - Thalweg (206.0 - 180.0 m)
         "volume_mcm": 63.43,                        # Gross storage at FRL (81.2 MCM at crest overtopping)
         "event_type": "cascading_dam_break",
+        # Event clock origin = the DAM FAILURE/WASHOUT, 06:30 IST (EVD-17, MHA
+        # D692), per event_clock.origin_iso in annamayya_event_evidence.json and
+        # its _decision_record of 2026-09-11. It is NOT overtopping initiation:
+        # that is EVD-16, ~05:30-06:00, and sits at t_s = -2,700 s.
+        "event_origin_ist": "2021-11-19T06:30:00+05:30",
         "breach_centerline_utm": [
             (286474.9, 1571922.1),
             (286144.5, 1572169.5),
@@ -393,22 +477,100 @@ SCENARIOS = {
         "structural_earthen_length_m": 336.0,       # Total washed-out earthen bund section (upper bound)
         "spillway_capacity_m3s": 4136.0,            # 4 operational radial gates (gate #4 jammed)
         "upstream_structure": {
-            "name": "Pincha Dam (Upstream)",
+            # 1j: EVD-03 — washout of temporary ring bund, NOT a concrete dam collapse.
+            "name": "Pincha Dam Ring Bund (Upstream)",
             "lat": 13.90890, "lon": 78.99956,
-            "height_m": 15.0, "volume_mcm": 14.0,
-            "status": "Overtopped & ring bund breached at 03:30 AM (T-150 min)",
-            "role": "Upstream feeder breach triggering Cheyyeru surge",
+            "height_m": 15.0,
+            # 1j: volume_mcm 14.0 is the surcharge maximum (gross is 9.28 MCM, EVD-02).
+            # Defensible — it was in surcharge when it failed — but noted explicitly.
+            "volume_mcm": 14.0,
+            "volume_gross_mcm": 9.28,
+            # 03:30 IST against the 06:30 T=0 is T-180 min (t_s = -10,800 s,
+            # timeline_events.pincha_failure). The old "T-150" label was anchored
+            # to the superseded 05:45 origin.
+            "status": "Overtopped & ring bund washed out at 03:30 AM (T-180 min)",
+            "role": "Upstream feeder ring bund washout triggering Cheyyeru surge",
         },
         "downstream_structure": {
             "name": "Annamayya Dam (Downstream)",
             "lat": 14.21059, "lon": 79.02128,
             "height_m": 26.0, "volume_mcm": 63.43,
             "distance_km": 34.0,
-            "status": "Overtopped & earthen bund washed out at 06:00 AM (T=0)",
+            # Two distinct events, previously conflated into one: overtopping
+            # STARTS at 05:45 (EVD-16, t_s = -2,700 s), the bund is fully washed
+            # out at 06:30 (EVD-17), and it is the washout that is T=0.
+            "status": "Overtopping began 05:45 AM (T-45 min); earthen bund fully washed out 06:30 AM (T=0)",
             "role": "Downstream catastrophic failure",
         },
-        "cascade_arrival_min": 150.0,
-        "failure_trigger": "Upstream Pincha breach surge + jammed spillway gate #4",
+        # Pincha washout to Annamayya T=0, against the 06:30 origin: 180 min,
+        # matching cascade.upstream.lead_time_s = 10,800 s. 150 was the same
+        # stale anchor as the T-150 label above.
+        "cascade_arrival_min": 180.0,
+        "failure_trigger": "Upstream Pincha ring bund washout surge + jammed spillway gate #4",
+        # ── 1c: Full cascade config (moved from simulate_annamayya_cascade) ────
+        # CLASSIFICATION LEGEND (ANNAMAYYA_DATA_AUDIT.md):
+        #   upstream: OFFICIAL ESTIMATE (Pincha surge ~1.40 lakh cusecs, EVD-05)
+        #   routing: RECONSTRUCTION (34 km Cheyyeru reach, EVD-06/07)
+        #   reservoir: OBSERVED (FRL +203.6m, Crest +206.0m, Bed +180.0m, EVD-08 to EVD-11)
+        #   spillway: OBSERVED (4 gates operating, gate #4 jammed, EVD-12/14)
+        #   catchment_runoff: derived from EVD-01 rainfall (180mm, IMD/APSDPS)
+        #   breach_ensemble:
+        #     1h: Three arms based on conflicting official peak inflow figures
+        #         MHA 6,412 / CWC 9,065 / IISc 12,740 m³/s (EVD-15).
+        #     1g: central formation_s = 1800 (30 min, EVD-16/17 initiation→washout).
+        "cascade": {
+            "scenario_key": "annamayya",
+            # FS-31: ~330 min needed to route the full Cheyyeru corridor from
+            # Pincha to the Pennar confluence (EVD-28) -- specific to this
+            # reach length, not a generic cascade requirement.
+            "min_coverage_duration_s": 20000.0,
+            "upstream": {
+                "peak_q_m3s": 3964.0, "base_q_m3s": 300.0, "duration_s": 5400.0,
+                # P1-2 (2026-09-11): recomputed from the reconciled event
+                # clock (data/evidence/annamayya_event_evidence.json,
+                # event_clock.origin_iso = 06:30 IST dam washout, EVD-17) --
+                # Pincha's OBSERVED failure time is 03:30 IST (EVD-04), which
+                # is 10800 s (180 min) before 06:30, not the previous 9000 s
+                # (150 min) figure, which was carried over from a "T-150"
+                # label that was itself never consistent with either the old
+                # or new T=0 anchor (see event_clock._decision_record).
+                "lead_time_s": 10800.0, "classification": "OFFICIAL ESTIMATE",
+            },
+            "routing": {"k_s": 7200.0, "x": 0.20, "classification": "RECONSTRUCTION"},
+            "reservoir": {
+                "z_bed_m": 180.0, "z_frl_m": 203.6, "z_crest_m": 206.0,
+                "v_frl_mcm": 63.43, "alpha_exp": 2.5, "classification": "OBSERVED",
+            },
+            "spillway": {"cd": 2.15, "length_m": 55.0, "z_crest_m": 189.6, "max_q_m3s": 4136.0},
+            # 1i: catchment_runoff now carries classification (EVD-01: 180mm rainfall).
+            # Runoff volume ≈ rainfall_depth × catchment_area × C_runoff.
+            # Catchment area: MODEL RECONSTRUCTION (DEM-derived).
+            # Runoff coefficient: ASSUMED (sensitivity range 0.30–0.60).
+            "catchment_runoff": {
+                "base_m3s": 800.0, "peak_m3s": 3800.0,
+                "peak_offset_s": -1800.0, "sigma_s": 5400.0,
+                "classification": "MODEL RECONSTRUCTION",
+                "source": "EVD-01: 180mm rainfall (IMD/APSDPS, Jawad precursor depression)",
+                "rainfall_mm": 180.0,
+                "rainfall_range_mm": [150.0, 240.0],
+            },
+            "breach_ensemble": {
+                # 1h: Arms labelled by source agency (EVD-15).
+                # Breach geometry held at central; inflow varied across 3 agencies.
+                "optimistic":  {"width_m":  85.0, "formation_s": 4200.0, "peak_q_m3s":  8800.0,
+                                "classification": "MODEL RECONSTRUCTION",
+                                "source": "Froehlich (2008) lower CI — MHA peak inflow 6,412 m³/s",
+                                "agency": "MHA", "agency_peak_inflow_m3s": 6412.0},
+                "central":     {"width_m": 130.0, "formation_s": 1800.0, "peak_q_m3s": 12200.0,
+                                "classification": "MODEL RECONSTRUCTION",
+                                "source": "Froehlich (2008) best estimate — CWC peak inflow 9,065 m³/s",
+                                "agency": "CWC", "agency_peak_inflow_m3s": 9065.0},
+                "pessimistic": {"width_m": 240.0, "formation_s": 2100.0, "peak_q_m3s": 15500.0,
+                                "classification": "MODEL RECONSTRUCTION",
+                                "source": "Froehlich (2008) upper envelope — IISc peak inflow 12,740 m³/s (bounded by 336m earthen section)",
+                                "agency": "IISc", "agency_peak_inflow_m3s": 12740.0},
+            },
+        },
     },
 }
 
@@ -441,6 +603,7 @@ def fetch_dem(scenario_key: str, force: bool = False) -> tuple[Path, Provenance]
     out_path = out_dir / f"{scenario_key}_dem.tif"
 
     if out_path.exists() and not force:
+        _validate_cached_dem(out_path, sc)
         logger.info("DEM already present: %s", out_path)
         return out_path, Provenance.COMPUTED_LIVE
 
@@ -489,10 +652,114 @@ def fetch_dem(scenario_key: str, force: bool = False) -> tuple[Path, Provenance]
     ) as dst:
         dst.write(dest, 1)
 
+    _write_dem_metadata(out_path, sc, tiles, dst_crs, dst_tr, dest)
+
     px = abs(dst_tr.a)
     logger.info("DEM → %s  (%dx%d, %.1f m cells, EPSG:%d)",
                 out_path, dst_w, dst_h, px, sc["utm_epsg"])
     return out_path, Provenance.COMPUTED_LIVE
+
+
+def _scenario_projected_bounds(sc: dict) -> tuple[float, float, float, float]:
+    from pyproj import Transformer
+    w, s, e, n = sc["bbox"]
+    tr = Transformer.from_crs("EPSG:4326", f"EPSG:{sc['utm_epsg']}", always_xy=True)
+    pts = [tr.transform(x, y) for x, y in ((w, s), (w, n), (e, s), (e, n))]
+    xs, ys = zip(*pts)
+    return min(xs), min(ys), max(xs), max(ys)
+
+
+def _bbox_stamp_ok(out_path: Path, sc: dict, write: bool = False) -> bool:
+    """Is this cached OSM layer the one the CURRENT scenario bbox asks for?
+
+    These caches key on FILENAME ONLY, so widening a scenario's bbox left them
+    silently stale: `annamayya_rivers.geojson` was still the 2026-09-05 fetch on
+    the pre-widening AOI, and because `build_rivers` returns the cache unless
+    `force=True`, every consumer got the old river network without a word. That
+    is not cosmetic -- `route_annamayya.py::locate_handoff` picks the handoff
+    section off this layer, so a stale layer silently moves a physics boundary.
+    The DEM never had this bug because `_validate_cached_dem` checks its bounds;
+    the OSM layers had no equivalent. This is it.
+
+    A sidecar `<name>.bbox.json` records the bbox the cache was built for.
+    A cache with no sidecar is treated as UNKNOWN, not as current: these files
+    predate the stamp, and assuming they match is the failure mode being fixed.
+    """
+    side = out_path.with_suffix(".bbox.json")
+    want = [float(v) for v in sc["bbox"]]
+    if write:
+        side.write_text(json.dumps({"bbox": want, "scenario_bbox_stamp": 1}), encoding="utf-8")
+        return True
+    if not side.exists():
+        return False
+    try:
+        got = json.loads(side.read_text(encoding="utf-8")).get("bbox")
+    except Exception:                                     # noqa: BLE001
+        return False
+    return bool(got) and [float(v) for v in got] == want
+
+
+def _load_labelled(out_path: Path, sc: dict, kind: str, hand_curated: bool = False):
+    """Serve a cached OSM layer, LABELLED with whether it matches this bbox.
+
+    Detect-and-label, not detect-and-refetch. The first version of this guard
+    refetched on a mismatch, which found a real bug (`annamayya_rivers.geojson`
+    was the 2026-09-05 fetch and had never contained the Pincha arm) but made
+    every consumer depend on Overpass being reachable. Overpass throttles, and
+    the measured cost was the test suite no longer completing -- it hung in
+    `test_run_lifecycle.py`, which runs the full pipeline and touches three OSM
+    layers for a scenario with no sidecar.
+
+    So: a layer whose bbox cannot be confirmed is returned with
+    `attrs["bbox_stale"] = True` and a warning. Callers that merely draw or
+    report it carry on. Callers that site a physics boundary or CARVE TERRAIN
+    from it -- `route_annamayya.py::locate_handoff` and `_condition_terrain` --
+    refuse that label. Refetching is an explicit `force=True`.
+    """
+    g = gpd.read_file(out_path)
+    if _bbox_stamp_ok(out_path, sc):
+        return g
+    g.attrs["bbox_stale"] = True
+    logger.warning(
+        "%s layer %s was built for a different (or unrecorded) bbox — serving it "
+        "labelled bbox_stale=True for %s.%s", kind.upper(), out_path.name,
+        tuple(sc["bbox"]),
+        " This layer is HAND-CURATED; re-authoring it is a deliberate act."
+        if hand_curated else " Refetch with force=True to refresh it.")
+    return g
+
+
+def _validate_cached_dem(path: Path, sc: dict) -> None:
+    """Reject cached rasters whose metric CRS or AOI does not match scenario."""
+    with rasterio.open(path) as ds:
+        if ds.crs is None or not ds.crs.is_projected:
+            raise ValueError(f"cached DEM {path} has no projected metric CRS; regenerate explicitly")
+        expected_crs = rasterio.crs.CRS.from_epsg(int(sc["utm_epsg"]))
+        if ds.crs != expected_crs:
+            raise ValueError(f"cached DEM {path} has CRS {ds.crs}, expected {expected_crs}; regenerate explicitly")
+        expected = _scenario_projected_bounds(sc)
+        left, bottom, right, top = ds.bounds
+        # Reprojection and floating point rounding can leave an edge short by
+        # one half-cell. Permit that normal rasterization tolerance only.
+        half_x, half_y = abs(float(ds.transform.a)) / 2.0, abs(float(ds.transform.e)) / 2.0
+        if (left > expected[0] + half_x or bottom > expected[1] + half_y or
+                right < expected[2] - half_x or top < expected[3] - half_y):
+            raise ValueError(f"cached DEM {path} does not cover scenario AOI; regenerate explicitly")
+        if (not np.isfinite(ds.transform.a) or not np.isfinite(ds.transform.e) or
+                abs(ds.transform.a) <= 0 or abs(ds.transform.e) <= 0):
+            raise ValueError(f"cached DEM {path} has invalid metric resolution; regenerate explicitly")
+
+
+def _write_dem_metadata(path: Path, sc: dict, urls: list[str], crs, transform, array: np.ndarray) -> None:
+    meta = {
+        "schema_version": 1, "path": path.name, "source_urls": urls,
+        "source_sha256": hashlib.sha256(array.tobytes()).hexdigest(),
+        "bbox": list(sc["bbox"]), "crs": crs.to_string(),
+        "resolution_m": [abs(float(transform.a)), abs(float(transform.e))],
+        "nodata": -9999.0, "created_at": datetime.now(timezone.utc).isoformat(),
+        "classification": "RASTER_DSM",
+    }
+    path.with_suffix(".json").write_text(json.dumps(meta, indent=2), encoding="utf-8")
 
 
 def generate_synthetic_dem(scenario_key: str) -> tuple[Path, Provenance]:
@@ -610,6 +877,15 @@ def fetch_population(scenario_key: str, force: bool = False) -> Path:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{scenario_key}_ghspop.tif"
     if out_path.exists() and not force:
+        meta_path = out_path.with_suffix(".json")
+        if not meta_path.exists():
+            meta_path.write_text(json.dumps({
+                "schema_version": 1, "scenario_key": scenario_key,
+                "classification": "PROXY",
+                "source": "GHS-POP R2023A E2020",
+                "coverage": "scenario DEM grid; OSM settlement tags do not establish historical event population",
+                "reason": "population product is a present-day proxy, not event census",
+            }, indent=2), encoding="utf-8")
         return out_path
 
     dem_path = DATA_DIR / "dem" / f"{scenario_key}_dem.tif"
@@ -641,6 +917,14 @@ def fetch_population(scenario_key: str, force: bool = False) -> Path:
     with rasterio.open(out_path, "w", **profile) as dst:
         dst.write(dest, 1)
 
+    out_path.with_suffix(".json").write_text(json.dumps({
+        "schema_version": 1, "scenario_key": scenario_key,
+        "classification": "PROXY", "source": "GHS-POP R2023A E2020",
+        "coverage": "scenario DEM grid",
+        "reason": "population product is a present-day proxy, not event census",
+        "crs": str(profile.get("crs")), "nodata": None,
+    }, indent=2), encoding="utf-8")
+
     logger.info("GHS-POP → %s  (%.0f people in the AOI)", out_path, float(dest.sum()))
     return out_path
 
@@ -649,15 +933,98 @@ def fetch_population(scenario_key: str, force: bool = False) -> Path:
 # OpenStreetMap layers
 # ──────────────────────────────────────────────────────────────────────────────
 
+# Overpass mirrors, tried in order. The main endpoint rate-limits and times out
+# under repeated querying, which is exactly what a session that refetches several
+# layers does -- measured 2026-09-14, a connect timeout on overpass-api.de while
+# the same query succeeded seconds later on a mirror. Failing the whole run on one
+# endpoint's throttle is a worse outcome than spending a few seconds on a retry.
+# osmnx 2.x names this `settings.overpass_url` and wants the API BASE, with no
+# /interpreter. osmnx 1.x called it `overpass_endpoint`. Setting the wrong one
+# fails silently -- every "mirror" then queries the default host, which is what
+# happened on the first attempt at this fix: three mirrors, three identical
+# timeouts against overpass-api.de. The setattr below is therefore checked.
+_OVERPASS_MIRRORS = (
+    "https://overpass-api.de/api",
+    "https://overpass.kumi.systems/api",
+    "https://overpass.osm.jp/api",
+    "https://overpass.private.coffee/api",
+)
+
+
+def _set_overpass(url: str) -> str:
+    """Point osmnx at `url`. Returns the previous value. Raises if neither
+    settings name exists -- a silent no-op here is what made the mirrors fake."""
+    import osmnx as ox
+    for attr in ("overpass_url", "overpass_endpoint"):
+        if hasattr(ox.settings, attr):
+            prev = getattr(ox.settings, attr)
+            setattr(ox.settings, attr, url)
+            return prev
+    raise RuntimeError("osmnx exposes neither settings.overpass_url nor "
+                       "settings.overpass_endpoint; cannot select a mirror")
+
+
+# Once every mirror has refused, stop paying for it. Four mirrors x 300 s is 20
+# minutes PER CALL, and a test suite that touches three OSM layers then spends an
+# hour discovering the same outage three times -- which is exactly how the suite
+# started hanging at 61 %. Reset it by reimporting or setting it back to False.
+_OVERPASS_DOWN = False
+
+
 def _osm_features(bbox, tags: dict):
-    """Query OSM features for a bbox, returning an empty frame on any failure."""
+    """Query OSM features; distinguish empty result from network failure."""
+    global _OVERPASS_DOWN
     import osmnx as ox
     w, s, e, n = bbox
+    if _OVERPASS_DOWN:
+        raise RuntimeError(
+            f"OSM query for tags {tags} skipped: every Overpass mirror already "
+            "failed once in this process (circuit breaker). Cached layers are "
+            "still served, labelled stale.")
+    prev_timeout = getattr(ox.settings, "requests_timeout", None)
+    # A read timeout means the mirror ACCEPTED the query and is computing it --
+    # a full-bbox waterway query is genuinely slow, and 60 s killed mirrors that
+    # were working. But 300 s x 4 mirrors is 20 minutes of wall time per call, and
+    # the caller that pays it is usually a test or a diagnostic that would have
+    # been perfectly happy with the cached layer. 120 s is long enough for a real
+    # query and caps the outage penalty at 8 minutes, once, before the circuit
+    # breaker below makes every later call instant.
+    ox.settings.requests_timeout = 120
+    prev_url = None
+    last = None
     try:
-        return ox.features_from_bbox(bbox=(w, s, e, n), tags=tags)
-    except Exception as exc:
-        logger.warning("OSM query %s returned nothing (%s)", tags, exc)
-        return gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+        for url in _OVERPASS_MIRRORS:
+            got = _set_overpass(url)
+            if prev_url is None:
+                prev_url = got
+            try:
+                result = ox.features_from_bbox(bbox=(w, s, e, n), tags=tags)
+                if result is None:
+                    return gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
+                if url != _OVERPASS_MIRRORS[0]:
+                    logger.warning("OSM: primary Overpass endpoint failed; served by %s", url)
+                return result
+            except Exception as exc:                       # noqa: BLE001
+                last = exc
+                logger.warning("OSM: %s failed (%s) — trying the next mirror",
+                               url, str(exc)[:140])
+    finally:
+        if prev_url is not None:
+            _set_overpass(prev_url)
+        if prev_timeout is not None:
+            ox.settings.requests_timeout = prev_timeout
+    _OVERPASS_DOWN = True
+    raise RuntimeError(f"OSM query failed for tags {tags} on all "
+                       f"{len(_OVERPASS_MIRRORS)} mirrors: {last}") from last
+
+
+def _is_legacy_synthetic_graph(graph) -> bool:
+    if len(graph.nodes) != 8 or len(graph.edges) != 14:
+        return False
+    for _, _, data in graph.edges(data=True):
+        if float(data.get("length", -1)) != 2500.0 or data.get("highway") != "primary":
+            return False
+    return True
 
 
 def download_osm_road_network(scenario_key: str, force: bool = False) -> Path:
@@ -670,24 +1037,19 @@ def download_osm_road_network(scenario_key: str, force: bool = False) -> Path:
     graph_path = out_dir / f"{scenario_key}_roads.graphml"
 
     if graph_path.exists() and not force:
+        import networkx as nx
+        cached = nx.read_graphml(graph_path)
+        if _is_legacy_synthetic_graph(cached):
+            raise RuntimeError(f"cached road graph {graph_path} matches rejected synthetic 8-node/14-edge signature")
         return graph_path
 
     logger.info("Fetching OSM road network for %s …", sc["name"])
     try:
         G = ox.graph_from_bbox(bbox=(w, s, e, n), network_type="drive", retain_all=True)
     except Exception as exc:
-        logger.warning("OSM road network fetch failed (%s); building connected valley corridor graph", exc)
-        import networkx as nx
-        G = nx.MultiDiGraph(crs="EPSG:4326")
-        step_x = (e - w) / 8
-        step_y = (n - s) / 8
-        for i in range(8):
-            x = w + i * step_x + 0.01
-            y = s + i * step_y + 0.01
-            G.add_node(i, x=x, y=y)
-            if i > 0:
-                G.add_edge(i - 1, i, length=2500.0, highway="primary", bridge=False)
-                G.add_edge(i, i - 1, length=2500.0, highway="primary", bridge=False)
+        raise RuntimeError(f"OSM road network fetch failed for '{scenario_key}': {exc}") from exc
+    if _is_legacy_synthetic_graph(G):
+        raise RuntimeError("OSM returned graph matching rejected synthetic 8-node/14-edge signature")
     ox.save_graphml(G, filepath=graph_path)
     logger.info("Road graph → %s (%d nodes, %d edges)",
                 graph_path, len(G.nodes), len(G.edges))
@@ -707,8 +1069,13 @@ def build_villages(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{scenario_key}_villages.geojson"
 
+    # NO bbox invalidation here, deliberately, unlike rivers/facilities/buildings.
+    # This file IS the population layer (INVARIANTS S1) and it is HAND-CURATED:
+    # annamayya_villages.geojson carries a corrected Nandalur coordinate, a
+    # reconciled population, and provenance fields on features. Silently
+    # refetching it on a bbox change would delete all of that. It warns instead.
     if out_path.exists() and not force:
-        return gpd.read_file(out_path)
+        return _load_labelled(out_path, sc, "villages", hand_curated=True)
 
     places = _osm_features(sc["bbox"], {"place": ["village", "hamlet", "town", "city"]})
     rows = []
@@ -744,6 +1111,7 @@ def build_villages(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
 
     gdf = gpd.GeoDataFrame(rows, crs="EPSG:4326")
     gdf.to_file(out_path, driver="GeoJSON")
+    _bbox_stamp_ok(out_path, sc, write=True)
     n_pop = int((gdf["pop_total"] > 0).sum())
     logger.info("Villages → %s (%d settlements, %d with an OSM population tag)",
                 out_path, len(gdf), n_pop)
@@ -765,7 +1133,7 @@ def build_rivers(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
     out_path = out_dir / f"{scenario_key}_rivers.geojson"
 
     if out_path.exists() and not force:
-        return gpd.read_file(out_path)
+        return _load_labelled(out_path, sc, "rivers")
 
     rivers = _osm_features(sc["bbox"],
                            {"waterway": ["river", "stream", "riverbank"]})
@@ -781,6 +1149,7 @@ def build_rivers(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
                                geometry=[], crs="EPSG:4326")
 
     gdf.to_file(out_path, driver="GeoJSON")
+    _bbox_stamp_ok(out_path, sc, write=True)
     logger.info("Rivers → %s (%d segments)", out_path, len(gdf))
     return gdf
 
@@ -793,7 +1162,7 @@ def build_facilities(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame
     out_path = out_dir / f"{scenario_key}_facilities.geojson"
 
     if out_path.exists() and not force:
-        return gpd.read_file(out_path)
+        return _load_labelled(out_path, sc, "facilities")
 
     facs = _osm_features(sc["bbox"],
                          {"amenity": ["hospital", "clinic", "doctors", "school"]})
@@ -813,6 +1182,7 @@ def build_facilities(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame
             geometry=facs.geometry.values, crs="EPSG:4326")
 
     gdf.to_file(out_path, driver="GeoJSON")
+    _bbox_stamp_ok(out_path, sc, write=True)
     logger.info("Facilities → %s (%d)", out_path, len(gdf))
     return gdf
 
@@ -825,7 +1195,7 @@ def build_buildings(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
     out_path = out_dir / f"{scenario_key}_buildings.geojson"
 
     if out_path.exists() and not force:
-        return gpd.read_file(out_path)
+        return _load_labelled(out_path, sc, "buildings")
 
     b = _osm_features(sc["bbox"], {"building": True})
     if len(b):
@@ -835,6 +1205,7 @@ def build_buildings(scenario_key: str, force: bool = False) -> gpd.GeoDataFrame:
         gdf = gpd.GeoDataFrame(geometry=[], crs="EPSG:4326")
 
     gdf.to_file(out_path, driver="GeoJSON")
+    _bbox_stamp_ok(out_path, sc, write=True)
     logger.info("Buildings → %s (%d footprints)", out_path, len(gdf))
     return gdf
 

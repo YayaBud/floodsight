@@ -83,10 +83,10 @@ def test_ritter_raises_on_t_zero():
 
 def test_breach_ensemble_ordering():
     """Pessimistic Q_p must be >= Central >= Optimistic."""
-    from src.m3_breach import DamGeometry
+    from src.m3_breach import DamGeometry, FailureMechanism
     from src.m3_breach.ensemble import build_ensemble, get_hydrographs
 
-    dam = DamGeometry(height_m=30.0, volume_m3=50e6, dam_height_m=35.0, failure_mode="overtopping")
+    dam = DamGeometry(height_m=30.0, volume_m3=50e6, dam_height_m=35.0, failure_mechanism=FailureMechanism.OVERTOPPING_EROSION)
     ens = build_ensemble(dam)
 
     assert ens.pessimistic.peak_discharge_m3s >= ens.central.peak_discharge_m3s, (
@@ -99,10 +99,16 @@ def test_breach_ensemble_ordering():
 
 def test_hydrograph_starts_at_zero():
     """All hydrographs must start with Q=0 at t=0."""
-    from src.m3_breach import DamGeometry
+    from src.m3_breach import DamGeometry, FailureMechanism
     from src.m3_breach.ensemble import get_hydrographs
 
-    dam = DamGeometry(height_m=20.0, volume_m3=100e6, dam_height_m=22.0, failure_mode="piping")
+    # Was failure_mode="piping" before FailureMechanism existed; piping is
+    # NOT_IMPLEMENTED (deep-review's mechanism table) and now raises via
+    # require_implemented_mechanism. This test only checks the hydrograph
+    # shape (Q[0] ~ 0), which is identical for any implemented mechanism, so
+    # PROGRESSIVE_BREACH (the other implemented mechanism) keeps this test's
+    # original intent of exercising a non-default mechanism value.
+    dam = DamGeometry(height_m=20.0, volume_m3=100e6, dam_height_m=22.0, failure_mechanism=FailureMechanism.PROGRESSIVE_BREACH)
     for hyd in get_hydrographs(dam):
         assert hyd.Q_m3s[0] == pytest.approx(0.0, abs=1.0), (
             f"{hyd.arm} hydrograph Q[0] should be ~0, got {hyd.Q_m3s[0]}"

@@ -54,17 +54,29 @@ def build_stage_storage(
     barrier_xy: Optional[tuple[float, float]] = None,
     barrier_radius_m: float = 150.0,
     barrier_crest_m: Optional[float] = None,
+    barrier_mask: Optional[np.ndarray] = None,
+    dem_array: Optional[np.ndarray] = None,
+    transform: Optional[object] = None,
 ) -> ImpoundmentGeometry:
     """
     Build the stage-storage curve and impoundment geometry.
 
     Parameters
     ----------
-    dem_path        : conditioned UTM DEM.
+    dem_path        : conditioned UTM DEM. Used to read the array from disk
+                      UNLESS `dem_array`/`transform` are both supplied.
     wse_m           : water surface elevation [m] at failure.
     seed_xy         : (x, y) in the DEM's CRS, inside the impoundment. Required.
     outlet_point_xy : optional (x, y) of the outlet; unused for volume, kept for
                       callers that already know the pour point.
+    dem_array, transform : pass the CALLER's already-loaded (and possibly
+                      coarsened) DEM array + affine transform instead of
+                      re-reading `dem_path` from disk at full resolution.
+                      Required whenever `barrier_mask` was rasterized against
+                      a coarsened grid (`run_pipeline.py`'s `coarsen` support)
+                      — reading a fresh full-resolution array from `dem_path`
+                      here would silently mismatch that mask's shape. Both
+                      must be given together, or neither.
 
     Connectivity
     ------------
@@ -80,12 +92,29 @@ def build_stage_storage(
     dem_path = Path(dem_path)
     logger.info("Fill analysis on %s (WSE %.1f m)", dem_path, wse_m)
 
-    with rasterio.open(dem_path) as src:
-        dem_array = src.read(1).astype(float)
-        tr = src.transform
-        nodata = src.nodata
-        row, col = src.index(seed_xy[0], seed_xy[1])
+    if (dem_array is None) != (transform is None):
+        raise ValueError("dem_array and transform must be supplied together, or neither")
 
+    if dem_array is not None:
+        # Already conditioned by the caller (run_pipeline.py runs every DEM
+        # through condition_dem before this point), so nodata is already
+        # resolved — no separate nodata pass needed here.
+        dem_array = np.asarray(dem_array, dtype=float).copy()
+        tr = transform
+        nodata = None
+        row, col = rasterio.transform.rowcol(tr, seed_xy[0], seed_xy[1])
+    else:
+        with rasterio.open(dem_path) as src:
+            if src.crs is None or not src.crs.is_projected:
+                raise ValueError("stage-storage DEM must use a projected CRS with metre units")
+            dem_array = src.read(1).astype(float)
+            tr = src.transform
+            nodata = src.nodata
+            row, col = src.index(seed_xy[0], seed_xy[1])
+
+    ny, nx = dem_array.shape
+    if not (0 <= row < ny and 0 <= col < nx):
+        raise ValueError(f"Seed {seed_xy} lies outside the DEM extent")
     if nodata is not None:
         dem_array = np.where(dem_array == nodata, np.inf, dem_array)
 
@@ -93,7 +122,13 @@ def build_stage_storage(
     # spreads downstream along the open valley, the rim minimum sits at the
     # water surface, and freeboard is 0 by construction — the fill measures the
     # whole valley system instead of what the dam holds back.
-    if barrier_xy is not None:
+    if barrier_mask is not None:
+        if np.asarray(barrier_mask).shape != dem_array.shape:
+            raise ValueError("barrier_mask must match DEM shape")
+        if barrier_crest_m is None or not np.isfinite(barrier_crest_m):
+            raise ValueError("barrier_crest_m required with barrier_mask")
+        dem_array = np.where(np.asarray(barrier_mask, dtype=bool) & (dem_array < barrier_crest_m), barrier_crest_m, dem_array)
+    elif barrier_xy is not None:
         brow, bcol = rasterio.transform.rowcol(tr, barrier_xy[0], barrier_xy[1])
         px = abs(tr.a)
         rad = max(1, int(barrier_radius_m / px))
@@ -103,10 +138,6 @@ def build_stage_storage(
         dem_array = np.where(blocked & (dem_array < crest), crest, dem_array)
         logger.info("  blockage emplaced: %d cells raised to %.1f m over a %.0f m radius",
                     int(blocked.sum()), crest, barrier_radius_m)
-
-    ny, nx = dem_array.shape
-    if not (0 <= row < ny and 0 <= col < nx):
-        raise ValueError(f"Seed {seed_xy} lies outside the DEM extent")
 
     pix_area_m2 = abs(tr.a * tr.e)
 
@@ -137,6 +168,20 @@ def build_stage_storage(
 
     total_volume = float(V_arr[-1])
     total_area   = float(A_arr[-1])
+
+    # The seed's connected component can be empty at levels only fractionally
+    # above z_min (the pool's own lowest cell, per construction, generally
+    # sits AT z_min, not strictly below it, so `connected_pool` returns
+    # nothing until `level` climbs past it) -- this produces a run of leading
+    # V=0 duplicate stages. A stage-storage curve consumers rely on (e.g.
+    # m3_breach.ensemble.route_breach) must be STRICTLY increasing to invert
+    # (depth as a function of remaining volume); collapse the flat run to its
+    # single true floor point rather than passing duplicate zeros through and
+    # having every downstream consumer defend against it separately.
+    first_positive = int(np.argmax(V_arr > 0.0)) if np.any(V_arr > 0.0) else 0
+    if first_positive > 1:
+        keep = np.concatenate(([first_positive - 1], np.arange(first_positive, len(stages))))
+        stages, V_arr, A_arr = stages[keep], V_arr[keep], A_arr[keep]
 
     # Confinement check. Filling a continuous valley to an arbitrary level
     # always finds a rim cell a few centimetres above the surface, so "lowest
@@ -190,14 +235,30 @@ def compute_lake_depth_grids(
     barrier_xy: Optional[tuple[float, float]] = None,
     barrier_radius_m: float = 200.0,
     barrier_crest_m: Optional[float] = None,
+    levels_m: Optional[list[float]] = None,
+    barrier_mask: Optional[np.ndarray] = None,
 ) -> list[dict]:
     """
     Generate 2D depth grids showing the progressive filling and upstream
     expansion of the natural lake / reservoir behind the river blockage or dam
     prior to breach failure.
+
+    Parameters
+    ----------
+    levels_m : list[float] or None
+        When provided, use these absolute water surface elevations directly
+        instead of deriving them from ``fractions`` of ``wse_m``.  This allows
+        pre-breach frames to use physically computed elevations from
+        ``simulate_prebreach_rise`` rather than generic fractions.
     """
     dem_work = dem_array.copy().astype(float)
-    if barrier_xy is not None:
+    if barrier_mask is not None:
+        if np.asarray(barrier_mask).shape != dem_work.shape:
+            raise ValueError("barrier_mask must match DEM shape")
+        if barrier_crest_m is None or not np.isfinite(barrier_crest_m):
+            raise ValueError("barrier_crest_m required with barrier_mask")
+        dem_work = np.where(np.asarray(barrier_mask, dtype=bool) & (dem_work < barrier_crest_m), barrier_crest_m, dem_work)
+    elif barrier_xy is not None:
         brow, bcol = rasterio.transform.rowcol(transform, barrier_xy[0], barrier_xy[1])
         px = abs(transform.a)
         rad = max(1, int(barrier_radius_m / px))
@@ -208,8 +269,8 @@ def compute_lake_depth_grids(
 
     row, col = rasterio.transform.rowcol(transform, seed_xy[0], seed_xy[1])
     ny, nx = dem_work.shape
-    row = int(np.clip(row, 0, ny - 1))
-    col = int(np.clip(col, 0, nx - 1))
+    if not (0 <= row < ny and 0 <= col < nx):
+        raise ValueError("seed lies outside DEM extent")
 
     pix_area_m2 = abs(transform.a * transform.e)
 
@@ -225,6 +286,36 @@ def compute_lake_depth_grids(
         return []
 
     z_min = float(dem_work[full_pool].min())
+
+    # When levels_m is provided, use absolute elevations directly.
+    # Otherwise derive from fractions of (wse_m - z_min).
+    if levels_m is not None:
+        levels = np.asarray(levels_m, dtype=float)
+        if levels.ndim != 1 or levels.size == 0 or not np.all(np.isfinite(levels)) or np.any(np.diff(levels) < 0):
+            raise ValueError("levels_m must be finite and nondecreasing")
+        if float(levels[0]) < z_min or float(levels[-1]) > wse_m:
+            raise ValueError("levels_m must lie within connected pool stage range")
+        results = []
+        for level in levels:
+            frac = (level - z_min) / (wse_m - z_min) if wse_m > z_min else 0.0
+            pool = connected_pool(level)
+            if pool.any():
+                depth = np.where(pool, np.maximum(0.0, level - dem_work), 0.0).astype(np.float32)
+                vol = float(np.sum(depth) * pix_area_m2)
+                area = float(pool.sum() * pix_area_m2)
+            else:
+                depth = np.zeros_like(dem_work, dtype=np.float32)
+                vol = 0.0
+                area = 0.0
+            results.append({
+                "fraction": float(np.clip(frac, 0.0, 1.0)),
+                "level_m": float(level),
+                "volume_m3": vol,
+                "area_m2": area,
+                "depth_grid": depth,
+            })
+        return results
+
     results = []
     for f in fractions:
         level = z_min + float(f) * (wse_m - z_min)

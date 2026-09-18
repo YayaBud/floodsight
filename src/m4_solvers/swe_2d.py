@@ -51,6 +51,8 @@ from typing import Union
 
 import numpy as np
 
+from src.m3_breach.breach_kernel import breach_invert_at, breach_width_at
+
 logger = logging.getLogger(__name__)
 
 _G   = 9.81      # gravity [m/s²]
@@ -181,6 +183,70 @@ except ImportError:                                   # pragma: no cover
 
 
 @dataclass
+class InflowBoundary:
+    """One inflow point for the multi-inflow interface (Part 3).
+
+    Mirrors the scalar ``inflow_x_idx``/``inflow_y_idx``/``hydrograph_t_s``/
+    ``hydrograph_Q_m3s``/``hydrograph_v_ms``/``inflow_direction`` parameters of
+    ``run_2d_swe_simulation``, one instance per boundary, so a compound event
+    with multiple breach/inflow locations can inject at each independently.
+    """
+    x_idx:             int
+    y_idx:             int
+    hydrograph_t_s:    np.ndarray
+    hydrograph_Q_m3s:  np.ndarray
+    hydrograph_v_ms:   np.ndarray | None = None
+    direction:         tuple[float, float] | None = None
+
+
+@dataclass
+class BreachOpening:
+    """A hole cut in the emplaced barrier, widening and deepening with time.
+
+    This is what replaces the volumetric injection (audit defect C2). The
+    injection put the breach hydrograph into the reservoir at its own deepest
+    cell as a 5x5 Gaussian source -- so the discharge was an INPUT, the water
+    had to be supplied a second time on top of the impoundment already in the
+    domain (C1), and there was no structure for a breach to open (C3).
+
+    Here the solver lowers the bed over the opening instead. The pool drains
+    through it because its free surface is above the invert, and Q becomes an
+    OUTPUT measured from the drop in upstream storage rather than a curve the
+    caller hands in.
+
+    `mask` is `breach_mask & barrier_mask` from `validate_geometry` -- both were
+    already computed and both were thrown away. `z_natural` is the bed BEFORE
+    the barrier was emplaced: erosion stops there, so a breach cannot cut below
+    the valley floor the structure was built on.
+    """
+    mask:            np.ndarray            # bool, the cells the opening may occupy
+    z_natural:       np.ndarray            # pre-emplacement bed; the erosion floor
+    crest_elev_m:    float                 # invert starts here
+    invert_final_m:  float                 # invert erodes to here
+    formation_s:     float                 # t_f
+    final_width_m:   float                 # B_final
+    trigger_s:       float = 0.0           # nothing happens before this
+    #: Distance of each cell from the breach centre measured ALONG the dam
+    #: axis, in metres. `width(t)` is applied against this, so the opening
+    #: grows sideways along the structure rather than radially. None falls back
+    #: to plan distance from the mask's centroid, which is only right for a
+    #: breach whose zone is already a narrow buffer on the axis.
+    axis_distance_m: np.ndarray | None = None
+
+    def state_at(self, t_s: float) -> tuple[float, float]:
+        """`(invert_elev_m, width_m)` at time `t_s`, from the shared kernel."""
+        elapsed = t_s - self.trigger_s
+        if elapsed < 0.0:
+            return self.crest_elev_m, 0.0
+        return (
+            breach_invert_at(elapsed, self.formation_s,
+                             invert_start_m=self.crest_elev_m,
+                             invert_final_m=self.invert_final_m),
+            breach_width_at(elapsed, self.formation_s, self.final_width_m),
+        )
+
+
+@dataclass
 class SimulationResult:
     times_s:             list[float]
     depth_grids:         list[np.ndarray]
@@ -192,24 +258,51 @@ class SimulationResult:
     dy_m:                float
     elevation_grid:      np.ndarray
     scenario_name:       str = ""
+    #: Depth at t = 0 (the impoundment). `max_depth_grid` includes it; anything
+    #: measuring CONSEQUENCE must subtract it -- see audit SS39 / P4.
+    initial_depth_grid:  np.ndarray | None = None
     #: Volume bookkeeping, filled in by the integrator.
     volume_injected_m3:  float = 0.0
     volume_outflow_m3:   float = 0.0
     volume_clipped_m3:   float = 0.0
     volume_initial_m3:   float = 0.0
+    #: Gross volume that actually crossed the outer faces OUTWARD. `volume_outflow_m3`
+    #: is the NET and can be zero either because the domain is sealed or because
+    #: inflow through a transmissive boundary cancelled the outflow; this one
+    #: answers "can water leave at all".
+    volume_outflow_gross_m3: float = 0.0
+    #: Storage re-attributed by lowering the bed under standing water. When the
+    #: breach erodes, the free surface is held and the DEPTH grows to match the
+    #: new bed -- the water was always there, the container changed. Counted
+    #: separately and never folded into `clipped`, which is manufactured mass.
+    volume_bed_lowering_m3: float = 0.0
+    #: Simulated time actually reached. Equals the requested duration unless the
+    #: run stopped on quiescence, so consumers (timeline, animation) must read
+    #: this rather than assuming the configured window.
+    end_time_s:          float = 0.0
+    #: True when the run ended because the flood stopped, not because it hit the cap.
+    stopped_early:       bool = False
+    #: Breach discharge MEASURED, not prescribed: t and Q sampled each save.
+    breach_q_t_s:    list = field(default_factory=list)
+    breach_q_m3s:    list = field(default_factory=list)
+    breach_invert_m: list = field(default_factory=list)
+    breach_width_m:  list = field(default_factory=list)
 
     def mass_closure(self) -> dict:
         """Volume in vs volume accounted for, as a relative error."""
         total_in = self.volume_initial_m3 + self.volume_injected_m3
         stored = float(self.depth_grids[-1].sum() * self.dx_m * self.dy_m) \
             if self.depth_grids else 0.0
-        residual = total_in - stored - self.volume_outflow_m3 + self.volume_clipped_m3
+        residual = (total_in + self.volume_bed_lowering_m3 - stored
+                    - self.volume_outflow_m3 + self.volume_clipped_m3)
         return {
             "initial_m3":   self.volume_initial_m3,
             "injected_m3":  self.volume_injected_m3,
             "stored_m3":    stored,
             "outflow_m3":   self.volume_outflow_m3,
+            "outflow_gross_m3": self.volume_outflow_gross_m3,
             "clipped_m3":   self.volume_clipped_m3,
+            "bed_lowering_m3": self.volume_bed_lowering_m3,
             "residual_m3":  float(residual),
             "relative_error": float(abs(residual) / total_in) if total_in > 0 else 0.0,
         }
@@ -419,33 +512,6 @@ def _rusanov(hL, huL, hvL, uL, vL, hR, huR, hvR, uR, vR, normal_axis: int):
     return f_h, f_hu, f_hv, a
 
 
-def _lo(axis: int) -> tuple:
-    """Slice selecting all interfaces' left-hand cells along ``axis``."""
-    s = [slice(None), slice(None)]
-    s[axis] = slice(None, -1)
-    return tuple(s)
-
-
-def _hi(axis: int) -> tuple:
-    """Slice selecting all interfaces' right-hand cells along ``axis``."""
-    s = [slice(None), slice(None)]
-    s[axis] = slice(1, None)
-    return tuple(s)
-
-
-def _interior(axis: int, offset: int, n_along: int) -> tuple:
-    """
-    Interior slice: ``n_along`` entries from ``offset`` along ``axis``, and the
-    ghost ring stripped from the other axis.
-
-    Both axes must be trimmed. Slicing only the working axis leaves the padded
-    rows attached and the result no longer matches the interior grid.
-    """
-    s = [slice(1, -1), slice(1, -1)]
-    s[axis] = slice(offset, offset + n_along)
-    return tuple(s)
-
-
 def _ax(axis: int, start, stop) -> tuple:
     """Slice tuple selecting ``[start:stop]`` along ``axis``, all of the other."""
     s = [slice(None), slice(None)]
@@ -459,14 +525,23 @@ def _rhs(h, hu, hv, z, dx, dy):
 
     Well-balanced construction
     --------------------------
-    The bed is treated as **continuous** piecewise-linear: the bed elevation at
-    an interface is the average of the two adjoining cell values, so both sides
-    of an interface see the *same* bed. Each cell's bed is then re-derived as
-    the mean of its two interface values, and the free surface is reconstructed
-    relative to that. With a single-valued interface bed, the pressure flux
-    difference and the bed-slope source cancel algebraically for a flat free
-    surface — no correction terms, and no ``max()`` that would break the
-    cancellation at the shoreline.
+    Hydrostatic reconstruction, Audusse et al. (2004). The bed at an interface
+    is single-valued — both sides see the *same* bed — and is taken as the
+    **maximum** of the two adjoining cell values. Each cell's free surface is
+    reconstructed against **its own** bed ``z``, and the bed-slope source is the
+    pair of face corrections that construction requires, not a centred
+    ``h_bar * dz``. Lake at rest is then exact over **arbitrary** topography.
+
+    This replaced a mean-bed variant that took the interface bed as the average
+    of the two cells and re-derived each cell's bed as the mean of its two
+    interface values. That second step is ``z + lap(z)/4`` exactly, so the
+    scheme reconstructed ``eta_true + lap(z)/4`` and preserved a lake at rest
+    only where the bed's discrete Laplacian vanished — a flat or exactly linear
+    bed. Everywhere else a spurious gradient drove flow: measured 70–96 m of
+    free-surface drift and ~40 m/s in standing water on a walled pool, and a
+    one-cell barrier passed 55 % of its pool in 300 s because no face in the
+    domain sat at its crest. See the forensic audit, RC-1 through RC-4, and
+    ``tests/test_well_balanced.py``, which pins the property on this function.
 
     Boundaries are zero-gradient (transmissive) via replicated ghost cells.
     This must not use ``np.roll``: roll wraps, silently making the domain
@@ -488,6 +563,7 @@ def _rhs(h, hu, hv, z, dx, dy):
     dhu = np.zeros_like(h)
     dhv = np.zeros_like(h)
     outflux = 0.0
+    gross_out = 0.0
     max_a = 0.0
 
     for axis, d in ((1, dx), (0, dy)):
@@ -495,39 +571,66 @@ def _rhs(h, hu, hv, z, dx, dy):
         n = nx if axis == 1 else ny
         L = n + 2 * pad
 
-        # Interface bed elevations: single-valued, hence continuous.
-        zi = 0.5 * (zp[_ax(axis, None, -1)] + zp[_ax(axis, 1, None)])   # L-1
+        # Interface bed: single-valued, and the MAX of the two adjoining cells
+        # -- Audusse et al. (2004) as published. The MEAN that stood here
+        # averaged a barrier's crest away at its own upstream face: a 100 m
+        # reservoir cell beside a 160 m wall gave a face bed of 130 m, so a pool
+        # 5 m BELOW the crest saw 40 m of fictitious depth and a 19.81 m/s
+        # gravity wave, and a one-cell wall had no face anywhere at its own
+        # crest -- it did not exist to the flux operator (audit RC-2, RC-3).
+        zi = np.maximum(zp[_ax(axis, None, -1)], zp[_ax(axis, 1, None)])   # L-1
 
         # Core = one ghost ring around the interior: padded indices 1..L-2.
         core = slice(1, L - 1)
         z_m = zi[_ax(axis, 0, n + 2)]        # bed at each core cell's low edge
         z_p = zi[_ax(axis, 1, n + 3)]        # ... and its high edge
-        z_bar = 0.5 * (z_m + z_p)
+
+        # The cell's OWN bed. This used to be `0.5 * (z_m + z_p)`, the mean of
+        # the cell's two interface values, which expands to `z + lap(z)/4`
+        # exactly -- so the free surface the scheme reconstructed was
+        # `eta_true + lap(z)/4`, and the lake-at-rest state was preserved only
+        # where the bed's discrete Laplacian vanished. On real conditioned
+        # terrain that error averaged 2.1 m per axis at 28 m cells and 10.4 m at
+        # the production 112 m (audit RC-1, RC-4).
+        z_c = zp[_ax(axis, core.start, core.stop)]
 
         h_c  = hp[_ax(axis, core.start, core.stop)]
         u_c  = up[_ax(axis, core.start, core.stop)]
         v_c  = vp[_ax(axis, core.start, core.stop)]
-        eta_c = h_c + z_bar
+        eta_c = h_c + z_c
 
         eta_m, eta_p = _edge_values(eta_c, axis)
         u_m,   u_p   = _edge_values(u_c,   axis)
         v_m,   v_p   = _edge_values(v_c,   axis)
 
-        # Partially dry cells: tilt the surface back so the dry edge sits on the
-        # bed while the CELL MEAN IS PRESERVED. Clamping the depth with max(.,0)
-        # instead would destroy h = (h_m + h_p)/2, which is the identity the
-        # well-balanced cancellation rests on — that was the source of the
-        # residual shoreline currents.
-        dry_p = eta_p < z_p
-        eta_m = np.where(dry_p, 2.0 * eta_c - z_p, eta_m)
-        eta_p = np.where(dry_p, z_p, eta_p)
-
-        dry_m = eta_m < z_m
-        eta_p = np.where(dry_m, 2.0 * eta_c - z_m, eta_p)
-        eta_m = np.where(dry_m, z_m, eta_m)
-
+        # Positivity: the reconstructed edge depth is `max(0, eta - z_face)`,
+        # and nothing else. This is Audusse's `h*`.
+        #
+        # A cell-mean-preserving tilt used to stand here -- where an edge fell
+        # below its face bed, the surface was rotated about the cell centre so
+        # the dry edge sat on the bed and `h = (h_m + h_p)/2` was preserved. It
+        # existed because the OLD source term was `g * h_bar * dz`, and that
+        # form's cancellation rested on exactly that identity.
+        #
+        # The Audusse source above does not. It rests on the two face pressure
+        # fluxes cancelling, which needs `h*` and nothing more. Worse, with the
+        # interface bed now taken as the MAX, `eta_p < z_p` fires for every wet
+        # cell that merely neighbours a barrier -- a full 55 m reservoir cell
+        # beside a 160 m wall is not partially dry, but the tilt treated it as
+        # such and rewrote its 55 m of water as 50 m, destroying the lake at
+        # rest it was there to protect. Measured: it was the sole remaining
+        # failure of `test_well_balanced.py` after the max-bed and own-bed
+        # changes landed.
         h_m = np.maximum(eta_m - z_m, 0.0)
         h_p = np.maximum(eta_p - z_p, 0.0)
+
+        # The same two edge values measured against the CELL's own bed rather
+        # than the face bed. The bed-slope source below is the difference
+        # between these two readings of the same water column, so it vanishes
+        # identically wherever the cell bed and the face bed agree -- which is
+        # everywhere on a flat bed, and everywhere the neighbour is not higher.
+        hc_m = np.maximum(eta_m - z_c, 0.0)
+        hc_p = np.maximum(eta_p - z_c, 0.0)
 
         # Interface k joins core cells k and k+1 and shares one bed value.
         hL, hR = h_p[_ax(axis, None, -1)], h_m[_ax(axis, 1, None)]
@@ -555,24 +658,75 @@ def _rhs(h, hu, hv, z, dx, dy):
         F_hv_l, F_hv_r = F_hv_l[trim], F_hv_r[trim]
 
         cell = _ax(axis, 1, n + 1)
-        h_bar = (0.5 * (h_m + h_p))[cell][trim]
-        dz    = (z_p - z_m)[cell][trim]
+
+        # Bed-slope source, Audusse et al. (2004) eq. 2.16-2.17. With a
+        # single-valued interface bed taken as the max, the source is NOT a
+        # centred `h_bar * dz` term but a pair of face corrections,
+        # `(g/2)(h_c^2 - h*^2)` at each of the cell's two faces. The `g/2 h_c^2`
+        # halves cancel between them, leaving the difference of the
+        # reconstructed edge depths squared.
+        #
+        # Each face contributes `(g/2)(h*^2 - h_edge^2)`: the pressure the face
+        # actually carries, minus the pressure the cell's own column would
+        # carry at that edge. Two properties follow, and BOTH are required:
+        #
+        #   flat bed  -> z_c == z_m == z_p, so h_edge == h* at both faces and
+        #                the source is IDENTICALLY ZERO. It must be: a flat bed
+        #                has no bed slope to source. Getting this wrong is not
+        #                subtle -- it put Ritter RMSE at 1.379 m against a
+        #                0.043 m bar, because a dam break has a large `dh` and
+        #                the naive `(g/2)(h_p^2 - h_m^2)` form reads MUSCL's
+        #                depth gradient as if it were a bed gradient.
+        #
+        #   at rest   -> eta is constant so `h_edge` is the same at both faces
+        #                and cancels, leaving `(g/2)(h_p^2 - h_m^2)`, which is
+        #                exactly the difference of the two pressure fluxes
+        #                `_rusanov` returns. They annihilate, for ANY bed.
+        # ...and it acts only where there is a water column for the bed to push
+        # on. A dry cell has no column, so no bed reaction: without this mask
+        # the reconstruction's leftovers on dry cells produced up to 200 m^2/s^2
+        # of spurious `dhu`/`dhv` on real terrain, while `dh` stayed exactly
+        # zero. That momentum cannot move water immediately -- `_desingularise`
+        # reads zero velocity at zero depth -- but it sits on the cell waiting
+        # to be realised as a velocity the moment the flood arrives and wets it.
+        # Measured over WET cells the scheme was already exact to 4.5e-12; this
+        # makes it exact over the dry ones too.
+        wet_c = (h_c > _DRY)[cell][trim]
+        src = np.where(
+            wet_c,
+            0.5 * _G * ((h_p * h_p - hc_p * hc_p)
+                        - (h_m * h_m - hc_m * hc_m))[cell][trim],
+            0.0,
+        )
 
         dh  -= (F_h_r  - F_h_l)  / d
         dhu -= (F_hu_r - F_hu_l) / d
         dhv -= (F_hv_r - F_hv_l) / d
         if axis == 1:
-            dhu -= _G * h_bar * dz / d
+            dhu += src / d
         else:
-            dhv -= _G * h_bar * dz / d
+            dhv += src / d
 
-        # Net volume leaving through the two outer faces, for the mass ledger.
+        # Volume crossing the two outer faces, for the mass ledger.
+        #
+        # `outflux` is the NET flux and is what conservation needs: a
+        # transmissive boundary can let water back in, and the residual is only
+        # closed if that is subtracted. `gross_out` counts only the half that
+        # actually leaves, which is the quantity that answers "can water leave
+        # this domain at all" — the net alone cannot distinguish a sealed
+        # domain from one where inflow and outflow happen to cancel.
         if axis == 1:
-            outflux += float(F_h_r[:, -1].sum() - F_h_l[:, 0].sum()) * dy
+            hi, lo = F_h_r[:, -1], F_h_l[:, 0]
+            outflux += float(hi.sum() - lo.sum()) * dy
+            gross_out += (float(np.maximum(hi, 0.0).sum())
+                          + float(np.maximum(-lo, 0.0).sum())) * dy
         else:
-            outflux += float(F_h_r[-1, :].sum() - F_h_l[0, :].sum()) * dx
+            hi, lo = F_h_r[-1, :], F_h_l[0, :]
+            outflux += float(hi.sum() - lo.sum()) * dx
+            gross_out += (float(np.maximum(hi, 0.0).sum())
+                          + float(np.maximum(-lo, 0.0).sum())) * dx
 
-    return dh, dhu, dhv, max_a, outflux
+    return dh, dhu, dhv, max_a, outflux, gross_out
 
 
 def run_2d_swe_simulation(
@@ -592,6 +746,14 @@ def run_2d_swe_simulation(
     arrival_depth_m:   float = 0.10,
     progress_cb=None,
     backend:           str = "cpu",
+    hydrograph_v_ms:   np.ndarray | None = None,
+    inflow_direction:  tuple[float, float] | None = None,
+    inflows:           list[InflowBoundary] | None = None,
+    breach_opening:    "BreachOpening | None" = None,
+    upstream_cv_mask:  np.ndarray | None = None,
+    stop_when_quiescent: bool = False,
+    quiescent_speed_ms: float = 0.05,
+    quiescent_hold_s:    float = 600.0,
 ) -> SimulationResult:
     """
     Advance the 2D shallow water equations over a DEM.
@@ -612,6 +774,36 @@ def run_2d_swe_simulation(
         automatically. If cupy or the CUDA device is unavailable, this falls
         back to "cpu" and logs why rather than failing the run — a solver that
         cannot run is worse than one that ran on the slower backend.
+    hydrograph_v_ms : jet velocity [m/s] at each ``hydrograph_t_s`` sample,
+        interpolated the same way as ``hydrograph_Q_m3s``. Estimated by the
+        caller from continuity through the breach opening (``Q / (width *
+        head)``). ``None`` (default) injects mass at rest, exactly as before
+        this parameter existed.
+    inflow_direction : unit vector ``(dir_x, dir_y)`` in grid index space that
+        the injected momentum points along (the breach-to-downstream axis). A
+        single fixed direction for the whole run — the breach axis does not
+        rotate during one flood event. ``None`` (default) disables momentum
+        injection regardless of ``hydrograph_v_ms``.
+    stop_when_quiescent : when True, ``total_duration_s`` becomes a safety CAP
+        rather than the target, and the run ends once the flood has actually
+        stopped moving. A fixed window is arbitrary -- it either truncates a
+        flood that is still running or spends wall time integrating still
+        water. Quiescence requires ALL of: no boundary is still supplying
+        water, the breach is no longer discharging, and the fastest wet cell in
+        the domain is below ``quiescent_speed_ms`` -- held continuously for
+        ``quiescent_hold_s`` of simulated time so a momentary lull between
+        surges cannot end the run. ``SimulationResult.stopped_early`` and
+        ``.end_time_s`` record what happened.
+    quiescent_speed_ms : the domain is "still" below this speed [m/s].
+    quiescent_hold_s : how long stillness must persist before stopping [s].
+    inflows : optional list of ``InflowBoundary`` for multiple simultaneous
+        inflow points (compound events with more than one breach/structure).
+        When given, ``inflow_x_idx``/``inflow_y_idx``/``hydrograph_t_s``/
+        ``hydrograph_Q_m3s``/``hydrograph_v_ms``/``inflow_direction`` are
+        ignored and each boundary is injected independently, accumulating
+        into the same ``h``/``hu``/``hv`` state. ``None`` (default) is the
+        single scalar-inflow path, byte-identical to before this parameter
+        existed.
     """
     if backend == "gpu":
         from . import swe_2d_gpu
@@ -645,7 +837,11 @@ def run_2d_swe_simulation(
     logger.info("SWE solver (well-balanced, MUSCL + SSP-RK2): %dx%d grid, "
                 "dx=%.1f m dy=%.1f m, T=%.0f s", nx, ny, dx_m, dy_m, total_duration_s)
 
-    z = np.ascontiguousarray(elevation_grid, dtype=np.float64)
+    # A copy, not a view: the breach opening erodes `z` in place during the
+    # integration, and `np.ascontiguousarray` hands back the SAME array when
+    # the input is already contiguous float64 -- which would silently rewrite
+    # the caller's DEM.
+    z = np.array(elevation_grid, dtype=np.float64, order="C", copy=True)
 
     n_grid = (np.full((ny, nx), float(manning_n), dtype=np.float64)
               if np.isscalar(manning_n)
@@ -666,17 +862,88 @@ def run_2d_swe_simulation(
     vol_initial = float(h.sum() * cell_area)
 
     max_h = h.copy()
-    arrival_time = np.where(h >= arrival_depth_m, 0.0, np.nan)
+    # P4 (audit SS39): a cell that is under the reservoir at t = 0 has not been
+    # "reached by the flood" at t = 0 -- it was already wet. Seeding
+    # `arrival_time` with 0.0 there put the whole impoundment into the arrival
+    # raster as instantly inundated, and two villages reported a max depth of
+    # 58.0 m, which is exactly the reservoir depth. They keep NaN until the
+    # flood actually adds depth over them.
+    arrival_time = np.full(h.shape, np.nan)
+    #: The t = 0 state, carried through so the consequence stage can subtract
+    #: it. `max_depth_grid` deliberately still INCLUDES the reservoir -- the map
+    #: should show the pool -- so the subtraction belongs downstream, not here.
+    initial_depth_grid = h.copy()
 
-    # Gaussian inflow kernel over interior cells only, so injected water never
-    # lands on a boundary cell where it would immediately leave the domain.
-    inflow_mask = np.zeros((ny, nx), dtype=np.float64)
-    for di in range(-2, 3):
-        for dj in range(-2, 3):
-            iy = int(np.clip(inflow_y_idx + di, 1, ny - 2))
-            ix = int(np.clip(inflow_x_idx + dj, 1, nx - 2))
-            inflow_mask[iy, ix] += np.exp(-(di * di + dj * dj) / 2.0)
-    inflow_mask /= inflow_mask.sum()
+    def _gaussian_mask(iy_c: int, ix_c: int) -> np.ndarray:
+        """Gaussian inflow kernel over interior cells only, so injected water
+        never lands on a boundary cell where it would immediately leave the
+        domain. Same kernel as before Part 3; now reusable per boundary."""
+        mask = np.zeros((ny, nx), dtype=np.float64)
+        for di in range(-2, 3):
+            for dj in range(-2, 3):
+                iy = int(np.clip(iy_c + di, 1, ny - 2))
+                ix = int(np.clip(ix_c + dj, 1, nx - 2))
+                mask[iy, ix] += np.exp(-(di * di + dj * dj) / 2.0)
+        mask /= mask.sum()
+        return mask
+
+    # Normalise to one internal list of boundaries, whether the caller used
+    # the scalar single-inflow parameters (the original interface) or the
+    # `inflows` list (Part 3). This keeps the injection code below a single
+    # loop instead of two near-duplicate code paths.
+    if inflows is not None:
+        _boundaries = [
+            (b.x_idx, b.y_idx, _gaussian_mask(b.y_idx, b.x_idx),
+             b.hydrograph_t_s, b.hydrograph_Q_m3s, b.hydrograph_v_ms, b.direction)
+            for b in inflows
+        ]
+    else:
+        _boundaries = [
+            (inflow_x_idx, inflow_y_idx, _gaussian_mask(inflow_y_idx, inflow_x_idx),
+             hydrograph_t_s, hydrograph_Q_m3s, hydrograph_v_ms, inflow_direction)
+        ]
+    # ── P3: an opening REPLACES the injection, it never accompanies it ────────
+    # Keeping both would reinstate defect C1 -- the impoundment supplied once as
+    # `initial_depth` and again as an injected hydrograph, measured at exactly
+    # 2.00x. The audit (SS41) bans running them side by side "for comparison",
+    # so this refuses loudly rather than silently double counting.
+    if breach_opening is not None:
+        live = [b for b in _boundaries
+                if float(np.max(np.asarray(b[4], dtype=float), initial=0.0)) > 0.0]
+        if live:
+            raise ValueError(
+                "breach_opening and a non-zero inflow hydrograph were both supplied. "
+                "The opening drains the impoundment that is already in the domain; "
+                "injecting the same water again is defect C1 (measured 2.00x). "
+                "Pass one or the other."
+            )
+        _boundaries = []
+
+    # `z` is no longer read-only: the opening erodes it. Keep the pre-emplacement
+    # bed as the floor erosion cannot cut below.
+    _opening_floor = None
+    if breach_opening is not None:
+        _opening_floor = np.maximum(
+            np.asarray(breach_opening.z_natural, dtype=np.float64),
+            float(breach_opening.invert_final_m))
+        if breach_opening.axis_distance_m is not None:
+            _axis_d = np.asarray(breach_opening.axis_distance_m, dtype=np.float64)
+        else:
+            rr, cc = np.nonzero(breach_opening.mask)
+            r0, c0 = (float(rr.mean()), float(cc.mean())) if rr.size else (0.0, 0.0)
+            ii, jj = np.indices(z.shape)
+            _axis_d = np.hypot((ii - r0) * dy_m, (jj - c0) * dx_m)
+
+    # Seed point(s) the active window must always contain, so the injection
+    # kernel of every boundary is never clipped.
+    _seed_points = [(iy, ix) for ix, iy, *_ in _boundaries]
+    if breach_opening is not None:
+        rr, cc = np.nonzero(breach_opening.mask)
+        if rr.size:
+            _seed_points += [(int(rr.min()), int(cc.min())),
+                             (int(rr.max()), int(cc.max()))]
+    if not _seed_points:
+        _seed_points = [(ny // 2, nx // 2)]
 
     saved_times: list[float] = []
     saved_h: list[np.ndarray] = []
@@ -691,17 +958,46 @@ def run_2d_swe_simulation(
     step = 0
     vol_injected = 0.0
     vol_outflow = 0.0
+    vol_outflow_gross = 0.0
     vol_clipped = 0.0
     t_wall = time.time()
 
-    win = _active_window(h, inflow_y_idx, inflow_x_idx)
+    def _window_for_all_seeds(h_, prev=None):
+        """`_active_window`, unioned across every inflow seed point.
+
+        `_active_window` itself is untouched (protected component) — this
+        only combines its single-seed result once per seed point, so every
+        boundary's injection kernel stays inside the window with a single
+        scalar inflow this reduces to exactly one `_active_window` call.
+        """
+        wins = [_active_window(h_, iy, ix, prev=prev) for iy, ix in _seed_points]
+        sy0 = min(w[0].start for w in wins); sy1 = max(w[0].stop for w in wins)
+        sx0 = min(w[1].start for w in wins); sx1 = max(w[1].stop for w in wins)
+        return slice(sy0, sy1), slice(sx0, sx1)
+
+    vol_bed_lowering = 0.0
+    cv = None if upstream_cv_mask is None else np.asarray(upstream_cv_mask, dtype=bool)
+    q_t: list[float] = []
+    q_meas: list[float] = []
+    q_invert: list[float] = []
+    q_width: list[float] = []
+    _cv_prev = float(h[cv].sum() * cell_area) if cv is not None else 0.0
+    _cv_lowering_acc = 0.0
+
+    win = _window_for_all_seeds(h)
+    # Quiescence tracking. `_quiet_s` accumulates only while every stillness
+    # condition holds; any motion resets it to zero, so a lull between surges
+    # cannot end the run.
+    _quiet_s = 0.0
+    _stopped_early = False
+
     while t < total_duration_s:
         # ── Active window ────────────────────────────────────────────────────
         # Rebuilt on a step count, and immediately if water has reached the
         # perimeter. Everything below operates on this box; the rest of the
         # domain is dry and its update is identically zero.
         if step % _WINDOW_EVERY == 0 or _window_breached(h, win):
-            win = _active_window(h, inflow_y_idx, inflow_x_idx, prev=win)
+            win = _window_for_all_seeds(h, prev=win)
         sy, sx = win
         hw, huw, hvw = h[sy, sx], hu[sy, sx], hv[sy, sx]
         zw = z[sy, sx]
@@ -718,17 +1014,71 @@ def run_2d_swe_simulation(
         dt = min(cfl * min(dx_m, dy_m) / max_wave, 5.0, total_duration_s - t)
         dt = max(dt, 1e-3)
 
-        # ── Inflow: mass, and the momentum that mass arrives with ────────────
-        Q_now = float(np.interp(t, hydrograph_t_s, hydrograph_Q_m3s))
-        if Q_now > 0.0:
-            # The window always contains the inflow point and the halo exceeds
-            # the kernel radius, so no injected mass falls outside it.
-            add_h = (Q_now / cell_area) * dt * inflow_mask[sy, sx]
+        # ── Inflow: mass, and — when a jet velocity/direction is supplied —
+        # the momentum that mass actually arrives with. Looped over every
+        # boundary (one iteration for the original scalar-inflow interface,
+        # more for Part 3's `inflows` list), accumulating into the same
+        # shared hw/huw/hvw each step.
+        for _ix, _iy, _mask, _t_s, _Q_m3s, _v_ms, _dir in _boundaries:
+            Q_now = float(np.interp(t, _t_s, _Q_m3s))
+            if Q_now <= 0.0:
+                continue
+            # The window always contains every inflow point and the halo
+            # exceeds the kernel radius, so no injected mass falls outside it.
+            add_h = (Q_now / cell_area) * dt * _mask[sy, sx]
             hw = hw + add_h
+            if _dir is not None and _v_ms is not None:
+                # Momentum arrives with the mass: v_jet_now is a single scalar
+                # per timestep (continuity through the breach opening,
+                # Q/(width*head), computed once by the caller), applied
+                # uniformly across the injection footprint. hu = h*u has units
+                # m^2/s, so d(hu) = add_h [m] * v_jet_now [m/s] * dir_x.
+                v_jet_now = float(np.interp(t, _t_s, _v_ms))
+                if v_jet_now > 0.0:
+                    huw = huw + add_h * v_jet_now * _dir[0]
+                    hvw = hvw + add_h * v_jet_now * _dir[1]
             vol_injected += Q_now * dt
 
+        # ── The opening erodes: `z` changes under the water ──────────────────
+        # Two things need care here (audit SS38.3).
+        #
+        # 1. Lowering the bed under standing water must hold the FREE SURFACE,
+        #    not the depth. eta = z + h; if z drops by d and h is held, eta
+        #    drops with it and the pool has silently lost d metres of head. If
+        #    h grows by d instead, eta is unchanged and the same water now sits
+        #    in a deeper container. That is a storage re-attribution, not an
+        #    inflow, so it is booked to its own counter and closes the ledger
+        #    explicitly rather than disappearing into `clipped`.
+        #
+        # 2. Well-balancedness survives this. `_rhs` re-derives the interface
+        #    bed from `z` on every call, so a `z` that changes between calls is
+        #    consistent by construction -- but the lake-at-rest benchmark is
+        #    re-run after this change, because that exact cancellation is the
+        #    property that makes this solver worth keeping.
+        if breach_opening is not None:
+            _inv, _wid = breach_opening.state_at(t)
+            if _wid > 0.0:
+                opening_cells = breach_opening.mask & (_axis_d <= 0.5 * _wid)
+                if opening_cells.any():
+                    z_target = np.maximum(_opening_floor, _inv)
+                    drop = np.where(opening_cells, z[...] - z_target, 0.0)
+                    np.maximum(drop, 0.0, out=drop)
+                    if drop.any():
+                        wet_now = h > _DRY
+                        # hold eta on wet cells; a dry cell just gets a lower bed
+                        h += np.where(wet_now, drop, 0.0)
+                        added = float((drop * wet_now).sum() * cell_area)
+                        vol_bed_lowering += added
+                        if cv is not None:
+                            _cv_lowering_acc += float(
+                                (drop * wet_now * cv).sum() * cell_area)
+                        z -= drop
+                        # the window's views are stale once z and h changed
+                        hw, huw, hvw = h[sy, sx], hu[sy, sx], hv[sy, sx]
+                        zw = z[sy, sx]
+
         # ── SSP-RK2 (Heun) ───────────────────────────────────────────────────
-        dh1, dhu1, dhv1, _, out1 = _rhs(hw, huw, hvw, zw, dx_m, dy_m)
+        dh1, dhu1, dhv1, _, out1, gout1 = _rhs(hw, huw, hvw, zw, dx_m, dy_m)
         h1  = hw  + dt * dh1
         hu1 = huw + dt * dhu1
         hv1 = hvw + dt * dhv1
@@ -738,7 +1088,7 @@ def run_2d_swe_simulation(
         hu1 = np.where(h1 > _DRY, hu1, 0.0)
         hv1 = np.where(h1 > _DRY, hv1, 0.0)
 
-        dh2, dhu2, dhv2, _, out2 = _rhs(h1, hu1, hv1, zw, dx_m, dy_m)
+        dh2, dhu2, dhv2, _, out2, gout2 = _rhs(h1, hu1, hv1, zw, dx_m, dy_m)
         h_new  = 0.5 * (hw  + h1  + dt * dh2)
         hu_new = 0.5 * (huw + hu1 + dt * dhu2)
         hv_new = 0.5 * (hvw + hv1 + dt * dhv2)
@@ -747,6 +1097,7 @@ def run_2d_swe_simulation(
         vol_clipped += float(neg.sum() * cell_area)
         h_new = np.maximum(h_new, 0.0)
         vol_outflow += 0.5 * (out1 + out2) * dt
+        vol_outflow_gross += 0.5 * (gout1 + gout2) * dt
 
         # ── Semi-implicit friction ───────────────────────────────────────────
         # Explicit Manning friction is stiff in thin films: the h^(4/3) in the
@@ -774,9 +1125,51 @@ def run_2d_swe_simulation(
         hu[sy, sx] = hu_new
         hv[sy, sx] = hv_new
 
+        # A diverged solve must SAY it diverged. Without this the run completes
+        # normally and returns NaN depths, a NaN `volume_clipped_m3` and a NaN
+        # mass-closure error; the validity gates then fail closed only by
+        # accident (`nan <= tol` is False) and report "G2 manufactured mass:
+        # clipping created nan m^3", which names the wrong defect. Measured at
+        # cfl=2.5 on a 60 m bed step (audit Part VI N-8). Production runs at
+        # cfl=0.35, three orders from this, so the check is effectively free.
+        if not np.isfinite(h_new).all():
+            raise FloatingPointError(
+                f"the solve diverged: non-finite depth at step {step}, "
+                f"t = {t:.3f} s, dt = {dt:.4f} s. This is a CFL/stability "
+                f"failure, not a clipping-tolerance breach — do not raise the "
+                f"clipping tolerance to get past it.")
+
         np.maximum(max_h[sy, sx], h_new, out=max_h[sy, sx])
         arr_w = arrival_time[sy, sx]
         arr_w[(h_new >= arrival_depth_m) & np.isnan(arr_w)] = t
+        # ── Q becomes a MEASUREMENT (audit SS38.4) ───────────────────────────
+        # The rate at which the upstream control volume loses water. For a
+        # conservative scheme this equals the integral of the face fluxes across
+        # that volume's boundary (divergence theorem), and once the barrier
+        # holds (validity gate G4) the only place that boundary is open is the
+        # opening itself -- so this IS the breach discharge, not a proxy for it.
+        # The bed-lowering re-attribution inside the volume is subtracted, or
+        # eroding the breach would register as an inflow.
+        #
+        # ponytail: control-volume form rather than summing `F_h` over the
+        # opening's downstream faces. It needs no `_rhs` signature change and no
+        # window-to-global index mapping, and is exact for this scheme. Swap to
+        # explicit face fluxes if the opening ever needs a PER-FACE breakdown.
+        if cv is not None:
+            _cv_now = float(h[cv].sum() * cell_area)
+            _q = (_cv_prev + _cv_lowering_acc - _cv_now) / dt if dt > 0 else 0.0
+            _cv_prev, _cv_lowering_acc = _cv_now, 0.0
+            # The first step runs on a sub-second dt while the initial condition
+            # settles, so dividing its storage change by that dt reports a
+            # meaningless spike (measured 9.1e5 m3/s against a 9.2e2 m3/s mean).
+            # It is a startup artefact of the differencing, not discharge.
+            if step == 0:
+                _q = 0.0
+            _inv_now, _wid_now = (breach_opening.state_at(t)
+                                  if breach_opening is not None else (float("nan"), 0.0))
+            q_t.append(float(t)); q_meas.append(float(_q))
+            q_invert.append(float(_inv_now)); q_width.append(float(_wid_now))
+
         t += dt
         step += 1
 
@@ -800,12 +1193,66 @@ def run_2d_swe_simulation(
             logger.info("  t=%6.0f s (%5.1f min)  max_h=%5.2f m  wet=%d  dt=%.2f s",
                         t, t / 60.0, float(h.max()), int((h > arrival_depth_m).sum()), dt)
 
+        # ── Has the flood stopped? ───────────────────────────────────────────
+        # Three conditions, all required. Supply first: a domain can be very
+        # still while a hydrograph is about to deliver its peak, so "nothing is
+        # moving" alone is not enough.
+        if stop_when_quiescent:
+            # "Still supplying" means water is yet to arrive, not merely that
+            # some is arriving right now. A hydrograph sitting at zero before a
+            # later pulse would otherwise let the run stop before the flood
+            # even started -- pinned by test_quiescence_stop.py.
+            still_supplying = False
+            for _ix, _iy, _mask, _t_s, _Q_m3s, _v_ms, _dir in _boundaries:
+                _future = np.asarray(_Q_m3s, dtype=float)[np.asarray(_t_s, dtype=float) >= t]
+                if float(np.interp(t, _t_s, _Q_m3s)) > 0.0 or (
+                        _future.size and float(_future.max()) > 0.0):
+                    still_supplying = True
+                    break
+            if breach_opening is not None and not still_supplying:
+                # The opening is still a source while it is widening or while
+                # measured discharge has not died away.
+                if t < float(breach_opening.trigger_s) + float(breach_opening.formation_s):
+                    still_supplying = True
+                elif q_meas and abs(float(q_meas[-1])) > 1.0:
+                    still_supplying = True
+
+            wet_now = h > arrival_depth_m
+            if wet_now.any():
+                spd = np.hypot(_desingularise(h, hu), _desingularise(h, hv))
+                max_speed = float(spd[wet_now].max())
+            else:
+                max_speed = 0.0
+
+            if still_supplying or max_speed > quiescent_speed_ms:
+                _quiet_s = 0.0
+            else:
+                _quiet_s += dt
+                if _quiet_s >= quiescent_hold_s:
+                    _stopped_early = True
+                    logger.info(
+                        "  quiescent: no supply and max speed %.4f m/s < %.3f "
+                        "for %.0f s -> stopping at t=%.0f s (%.1f min); cap was "
+                        "%.0f s", max_speed, quiescent_speed_ms, _quiet_s, t,
+                        t / 60.0, total_duration_s)
+                    if not saved_times or saved_times[-1] < t:
+                        saved_times.append(float(t)); saved_h.append(h.copy())
+                        saved_u.append(_desingularise(h, hu))
+                        saved_v.append(_desingularise(h, hv))
+                    break
+
     res = SimulationResult(
         times_s=saved_times, depth_grids=saved_h, u_grids=saved_u, v_grids=saved_v,
         max_depth_grid=max_h, arrival_time_s_grid=arrival_time,
         dx_m=dx_m, dy_m=dy_m, elevation_grid=z, scenario_name=scenario_name,
+        initial_depth_grid=initial_depth_grid,
         volume_injected_m3=vol_injected, volume_outflow_m3=vol_outflow,
         volume_clipped_m3=abs(vol_clipped), volume_initial_m3=vol_initial,
+        volume_outflow_gross_m3=vol_outflow_gross,
+        volume_bed_lowering_m3=vol_bed_lowering,
+        end_time_s=float(t), stopped_early=bool(_stopped_early),
+        breach_q_t_s=q_t, breach_q_m3s=q_meas,
+        breach_invert_m=q_invert, breach_width_m=q_width,
     )
     mc = res.mass_closure()
     logger.info("Simulation complete: %d steps in %.2f s  max_depth=%.2f m",

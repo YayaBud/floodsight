@@ -1,5 +1,10 @@
 """
-MacDonald & Langemeier (1984) breach parameter model.
+MacDonald & Langridge-Monopolis (1984) breach parameter model.
+
+NAME: the second author is Langridge-Monopolis, not "Langemeier". The wrong
+name was carried in this module's title, in its `method=` string and in
+`m3_breach/__init__.py`'s reference list until 2026-09-13, verified against the
+HEC-RAS 1D Technical Reference, *Estimating Breach Parameters*.
 
 Equations
 ---------
@@ -23,8 +28,14 @@ a trapezoidal dam of crest width W_c and face slopes Z_u:1 and Z_d:1,
 
     W_mean = W_c + (Z_u + Z_d) * H_d / 2
 
-t_f: not given by this method -> use Froehlich's t_f formula as the estimate,
-the same substitution this module already relied on.
+t_f: M-LM DO define a formation time, contrary to what this module asserted
+until 2026-09-13. It is
+
+    t_f = 0.0179 * V_eroded^0.364            [hours]
+
+and it is used. Froehlich's t_f was standing in for it, which made two of the
+three ensemble arms report the same formation time and collapsed part of the
+spread the ensemble exists to represent.
 
 Why this replaced a weir back-calculation
 -----------------------------------------
@@ -52,7 +63,7 @@ from __future__ import annotations
 
 import numpy as np
 
-from . import DamGeometry, BreachParams
+from . import DamGeometry, BreachParams, require_implemented_mechanism
 
 _G = 9.81
 
@@ -67,6 +78,13 @@ _SIDE_SLOPE = 0.5
 
 
 def compute(dam: DamGeometry) -> BreachParams:
+    """Return MacDonald & Langridge-Monopolis (1984) breach parameters.
+
+    Callers must have gated the mechanism; this checks anyway, because
+    froehlich.py and von_thun.py both do and an unimplemented mechanism
+    reaching only this one of the three would be silent.
+    """
+    require_implemented_mechanism(dam.failure_mechanism)
     Hw = dam.height_m
     Vw = dam.volume_m3
 
@@ -83,12 +101,13 @@ def compute(dam: DamGeometry) -> BreachParams:
     w_mean = _CREST_WIDTH_M + (_SLOPE_UPSTREAM + _SLOPE_DOWNSTREAM) * Hd / 2.0
     B_avg = V_eroded / (Hd * w_mean)
 
-    # Froehlich t_f as stand-in (method does not define its own)
-    t_f = 63.2 * np.sqrt(Vw / (_G * Hw ** 2))
-    t_f_h = t_f / 3600.0
+    # M-LM's OWN formation time, in hours, from the eroded embankment volume.
+    # This replaced a Froehlich t_f stand-in on 2026-09-13; for a 58 m / 2.7e7 m^3
+    # dam it moves t_f from 0.502 h to 1.779 h.
+    t_f_h = 0.0179 * (V_eroded ** 0.364)
 
     return BreachParams(
-        method="MacdonaldLangemeier1984",
+        method="MacDonaldLangridgeMonopolis1984",
         breach_width_m=float(B_avg),
         side_slope_hv=float(_SIDE_SLOPE),
         formation_time_h=float(t_f_h),

@@ -1,0 +1,262 @@
+{
+ "schema_version": 1,
+ "scenario_key": "annamayya",
+ "classification": "OBSERVED",
+ "records": [
+  {
+   "id": "EVD-23",
+   "event_id": "mandapalli",
+   "node_id": "mandapalli",
+   "name": "Mandapalli",
+   "t_s": 0.0,
+   "t_uncertainty_s": 300.0,
+   "obs_arrival_min_range": [
+    -5.0,
+    5.0
+   ],
+   "obs_depth_m_range": [
+    3.5,
+    6.5
+   ],
+   "obs_window_ist": [
+    "2021-11-19T06:25:00+05:30",
+    "2021-11-19T06:35:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "Eye-witness logs / Paleswara Swamy Temple survey (EVD-23)",
+   "source_hash": "d77b561c2a80311e751d9f878b1d827ee420a191910381370ab94594ff8c8384",
+   "lat": 14.248,
+   "lon": 79.0412,
+   "coord_note": "EVD-23's own cited position. It is 61 m from the mapped Cheyyeru at a drainage-relative height of -0.26 m, i.e. in the channel. For an ARRIVAL check that is defensible -- the wave passes down the channel -- but the same point is NOT defensible as the settlement centroid, and the population layer flags it coord_classification UNVERIFIED with an unadopted 3.35 km candidate. Do not reconcile the two by moving this one."
+  },
+  {
+   "id": "EVD-24",
+   "event_id": "pulapathur",
+   "node_id": "pulapathur",
+   "name": "Pulapathur",
+   "t_s": 750.0,
+   "t_uncertainty_s": 450.0,
+   "obs_arrival_min_range": [
+    5.0,
+    20.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T06:35:00+05:30",
+    "2021-11-19T06:50:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "AP Govt Disaster Management Summary / Casualty Register Kadapa (EVD-24)",
+   "source_hash": "9ab4de8ef5f0cd8c90b7a128892373303dd5d3eeb82c9552cf7e5dcca651e8eb",
+   "lat": 14.2473,
+   "lon": 79.0445,
+   "coord_note": "EVD-24 cited position."
+  },
+  {
+   "id": "EVD-25",
+   "event_id": "gundlur",
+   "node_id": "gundlur",
+   "name": "Gundlur",
+   "t_s": 3300.0,
+   "t_uncertainty_s": 600.0,
+   "obs_arrival_min_range": [
+    45.0,
+    65.0
+   ],
+   "obs_depth_m_range": [
+    2.0,
+    4.0
+   ],
+   "obs_window_ist": [
+    "2021-11-19T07:15:00+05:30",
+    "2021-11-19T07:35:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "Village Administrative Officer Log / Revenue Department Records (EVD-25)",
+   "source_hash": "0c74a11155a70ad0e5d88ea1239cdf079035d01d408f5c52a47884ce04afba23",
+   "lat": 14.2522,
+   "lon": 79.114,
+   "coord_note": "EVD-25 cited position."
+  },
+  {
+   "id": "EVD-26",
+   "event_id": "nandalur",
+   "node_id": "nandalur",
+   "name": "Nandalur railway bridge",
+   "t_s": 5400.0,
+   "t_uncertainty_s": 900.0,
+   "obs_arrival_min_range": [
+    75.0,
+    105.0
+   ],
+   "obs_depth_m_range": [
+    1.5,
+    3.5
+   ],
+   "obs_window_ist": [
+    "2021-11-19T07:45:00+05:30",
+    "2021-11-19T08:15:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "South Central Railway Emergency Bulletin / Track Washout Log (EVD-26)",
+   "source_hash": "7875e8a1bade8a8b7183d0aa8917323a6f685c14b0eb1d59cd83fdff80e076c5",
+   "lat": 14.258,
+   "lon": 79.12,
+   "coord_note": "THE IN-CHANNEL POINT IS CORRECT HERE, and only here. EVD-26 is a RAILWAY BRIDGE WASHOUT, which happens at the river, not at the town centre. The population layer's Nandalur was moved to the OSM village node (79.1080/14.2704) because a SETTLEMENT cannot sit in the channel; this record keeps 79.1200/14.2580 because the BRIDGE does. They are two different things and must not be unified."
+  },
+  {
+   "id": "EVD-28",
+   "event_id": "downstream_farfield",
+   "node_id": "pennar_confluence",
+   "name": "Cheyyeru-Pennar confluence (Lebaka to Penagaluru reach)",
+   "t_s": 12600.0,
+   "t_uncertainty_s": 5400.0,
+   "obs_arrival_min_range": [
+    120.0,
+    300.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T08:30:00+05:30",
+    "2021-11-19T11:30:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "Mandalam Revenue Reports (EVD-28)",
+   "source_hash": "254808ce896247739810feeb3b7dc6e9658cd345de087e785823245ff17b9fef",
+   "lat": 14.4311,
+   "lon": 79.1699,
+   "coord_note": "EVD-28's far-field reach. This is the strongest long-range check available and it only became testable when the domain was widened to (78.96, 13.85, 79.42, 14.50) -- the previous bbox ended 7.9 km short of it."
+  }
+ ],
+ "pre_origin_records": [
+  {
+   "id": "EVD-04",
+   "event_id": "pincha_failure",
+   "node_id": "pincha_ring_bund",
+   "name": "Pincha ring-bund washout (upstream feeder)",
+   "t_s": -10800.0,
+   "t_uncertainty_s": 1800.0,
+   "obs_arrival_min_range": [
+    -210.0,
+    -150.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T03:00:00+05:30",
+    "2021-11-19T04:00:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "District Collectorate Situation Log (EVD-04)",
+   "source_hash": "de6ad37d9e0a81d0edd49be8bec146eb11c0b7fd7d03e8a33f8a77e094774c94",
+   "not_evaluable_reason": "t_s < 0: this is the PRE-WASHOUT OVERTOPPING discharge. A forced-hydrograph run whose t=0 is the washout does not model that flow, so scoring this record would manufacture a verdict."
+  },
+  {
+   "id": "EVD-16",
+   "event_id": "overtopping_initiation",
+   "node_id": "annamayya_dam",
+   "name": "Annamayya overtopping initiation (water first exceeds +206.0 m crest)",
+   "t_s": -2700.0,
+   "t_uncertainty_s": 900.0,
+   "obs_arrival_min_range": [
+    -60.0,
+    -30.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T05:30:00+05:30",
+    "2021-11-19T06:00:00+05:30"
+   ],
+   "evidence_class": "OFFICIAL_ESTIMATE",
+   "source": "District Collectorate Reports / Eye-witnesses (EVD-16)",
+   "source_hash": "2441c391e4e0093cc115d8d6ca99f56a428bc7c2e9404ee18a467dbcad268a7b",
+   "not_evaluable_reason": "t_s < 0: this is the PRE-WASHOUT OVERTOPPING discharge. A forced-hydrograph run whose t=0 is the washout does not model that flow, so scoring this record would manufacture a verdict."
+  },
+  {
+   "id": "EVD-21",
+   "event_id": "gorge_exit_overtopping_flow",
+   "node_id": "cheyyeru_gorge",
+   "name": "Cheyyeru gorge exit — arrival of pre-washout overtopping discharge",
+   "t_s": -600.0,
+   "t_uncertainty_s": 300.0,
+   "obs_arrival_min_range": [
+    -15.0,
+    -5.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T06:15:00+05:30",
+    "2021-11-19T06:25:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "Field witness reports / Local police log (EVD-21)",
+   "source_hash": "baf0fd06645969dd229866348a1e435c6be956c2e5273c5822b9517b778c5c31",
+   "not_evaluable_reason": "t_s < 0: this is the PRE-WASHOUT OVERTOPPING discharge. A forced-hydrograph run whose t=0 is the washout does not model that flow, so scoring this record would manufacture a verdict."
+  },
+  {
+   "id": "EVD-22",
+   "event_id": "togurupeta_overtopping_flow",
+   "node_id": "togurupeta",
+   "name": "Togurupeta hit — pre-washout overtopping discharge",
+   "t_s": -600.0,
+   "t_uncertainty_s": 300.0,
+   "obs_arrival_min_range": [
+    -15.0,
+    -5.0
+   ],
+   "obs_depth_m_range": [
+    4.0,
+    8.0
+   ],
+   "obs_window_ist": [
+    "2021-11-19T06:15:00+05:30",
+    "2021-11-19T06:25:00+05:30"
+   ],
+   "evidence_class": "OBSERVED",
+   "source": "AP Disaster Management / Media Surveys, Indian Express Nov 2021 (EVD-22)",
+   "source_hash": "39f25546d9dd083beea1066e70ee7483efc360019404c762220a9cd49e21739f",
+   "not_evaluable_reason": "t_s < 0: this is the PRE-WASHOUT OVERTOPPING discharge. A forced-hydrograph run whose t=0 is the washout does not model that flow, so scoring this record would manufacture a verdict."
+  }
+ ],
+ "unpositioned_records": [
+  {
+   "id": "EVD-17",
+   "event_id": "washout",
+   "node_id": "annamayya_dam",
+   "name": "Annamayya dam full washout / collapse (T=0)",
+   "t_s": 0.0,
+   "t_uncertainty_s": 900.0,
+   "obs_arrival_min_range": [
+    -15.0,
+    15.0
+   ],
+   "obs_depth_m_range": null,
+   "obs_window_ist": [
+    "2021-11-19T06:15:00+05:30",
+    "2021-11-19T06:30:00+05:30"
+   ],
+   "evidence_class": "OFFICIAL_ESTIMATE",
+   "source": "MHA National Situation Report D692 (EVD-17)",
+   "source_hash": "02555aa42657a51f3b03d56ec52620c16ae02d5c8e9c4f60989a7a7540a7b708",
+   "not_evaluable_reason": "no sourced coordinate for this node_id; a position was NOT invented for it."
+  }
+ ],
+ "source_hash": "05d847bdd94ddbdd392984acb7eec70c80c0d6c773fb0d0fa8eab365f5e682b9",
+ "event_clock": {
+  "origin_iso": "2021-11-19T06:30:00+05:30",
+  "origin_anchor": "dam_failure_washout",
+  "origin_label": "Annamayya Dam full washout/collapse (MHA-reported point time)",
+  "classification": "OFFICIAL_ESTIMATE",
+  "source": "MHA National Situation Report D692 (EVD-17)",
+  "uncertainty_s": 900
+ },
+ "acquisition_proof": {
+  "kind": "DOCUMENTARY",
+  "not_instrumental": true,
+  "statement": "These are DOCUMENTARY records -- district collectorate situation logs, a railway emergency bulletin, revenue and casualty registers, eye-witness surveys. They are NOT instrument observations and NOT remote sensing. No satellite observed this flood: Sentinel-1 path 92 acquired 16 Nov and 28 Nov 2021 and the event sits in the 12-day gap; Sentinel-2 passed 4 h after the breach into 98.7 % cloud. Treat an arrival MATCH as agreement with a written record, not with a measurement.",
+  "evidence_file": "data/evidence/annamayya_event_evidence.json",
+  "evidence_file_sha256": "05d847bdd94ddbdd392984acb7eec70c80c0d6c773fb0d0fa8eab365f5e682b9",
+  "transcribed_by": "scripts/author_arrival_manifest.py",
+  "relative_minutes_recomputed_from_t_s": true,
+  "legacy_block_not_used_reason": "compare_arrivals.py's legacy HISTORICAL_ARRIVALS block has correct IST windows but its relative minutes are anchored to the superseded 05:45 T=0 and are 45 min off."
+ }
+}

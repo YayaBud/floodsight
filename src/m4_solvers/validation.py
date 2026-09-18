@@ -309,22 +309,6 @@ def mass_balance(
     }
 
 
-def run_all(elevation_grid: np.ndarray | None = None,
-            dx_m: float = 30.0, dy_m: float = 30.0) -> dict:
-    """Run every benchmark and return a JSON-serialisable report."""
-    report: dict = {"benchmarks": []}
-
-    ritter = run_ritter_benchmark()
-    report["benchmarks"].append(asdict(ritter))
-
-    if elevation_grid is not None:
-        lake = run_lake_at_rest_benchmark(elevation_grid, dx_m, dy_m)
-        report["benchmarks"].append(asdict(lake))
-
-    report["all_passed"] = all(b["passed"] for b in report["benchmarks"])
-    return report
-
-
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     r = run_ritter_benchmark()

@@ -1,0 +1,58 @@
+{
+ "run_type": "FORCED_HYDROGRAPH_INUNDATION",
+ "not_a_reservoir_drainage_run": true,
+ "why": "Copernicus GLO-30 here is a DSM captured with the reservoir full: the DEM at the dam is a flat 192.50 m water plane against a published 206.0 m crest, 740.23 km2 of the domain lies below that crest, and the valley is 25.1 km wide there. The impoundment cannot be emplaced or confined, so it is not drained through a breach here -- the released water is prescribed and routed.",
+ "t0_ist": "2021-11-19T06:30:00+05:30",
+ "sources": {
+  "gross_storage_mcm": {
+   "value": 63.429632000000005,
+   "classification": "OFFICIAL_ESTIMATE",
+   "source": "Annamayya gross capacity 2.24 TMC / 63.43 MCM -- National Register of Large Dams (CWC) / AP Irrigation (annamayya_gross_volume_mcm)"
+  },
+  "pincha_surge_peak_m3s": {
+   "value": 3964.4,
+   "value_cfs": 140000.0,
+   "range_cfs": [
+    120000.0,
+    160000.0
+   ],
+   "classification": "OFFICIAL_ESTIMATE",
+   "source": "AP Irrigation Official Flood Report (Nov 2021), EVD-05",
+   "usage": "1D channel routing inflow -- THE Stage-1 forcing"
+  },
+  "peak_total_inflow_annamayya_m3s": {
+   "mha_official": 6412.0,
+   "cwc_appraisal": 9065.0,
+   "iisc_reconstruction": 12740.0,
+   "classification": "OFFICIAL_ESTIMATE",
+   "source": "MHA Report D692 vs CWC Technical Appraisal (2021) vs IISc (2023), EVD-15 -- range preserved, not collapsed",
+   "usage": "Inflow hydrograph ensemble bounds AT ANNAMAYYA. This is the routing's OUTPUT to be checked against, never its input.",
+   "arm_in_use": "iisc_reconstruction",
+   "arm_note": "IISc 12,740 m3/s is the UPPER envelope of the three. It is deliberately conservative and over-predicts by design. Label it 'IISc upper arm' wherever it appears; it is NOT the best estimate. User decision, 2026-09-13."
+  },
+  "spillway_operating_discharge_m3s": {
+   "value": 4135.8,
+   "value_cfs": 146056.0,
+   "operating_gates": 4,
+   "jammed_gates": [
+    4
+   ],
+   "classification": "OFFICIAL_ESTIMATE",
+   "source": "MHA National Situation Report D692 (EVD-12/14)"
+  },
+  "outflow_capacity_m3s": {
+   "value": 6144.7456,
+   "classification": "UNMATCHED_IN_EVIDENCE_FILE",
+   "source": "Annamayya rated discharge capacity 2.17 lakh cusec",
+   "note": "2.17 lakh cusec matches NEITHER of the evidence file's two spillway figures -- operating 146,056 cfs nor design 285,000 cfs. Retained because nothing in this script reads it, and flagged so it is not cited. Resolve or delete it; do not quote it."
+  }
+ },
+ "released_volume_m3": 101472989.89746977,
+ "peak_q_m3s": 9355.856443727389,
+ "end_time_s": 86400.0,
+ "stopped_early": false,
+ "outflow_m3": 328001.8725733214,
+ "outflow_gross_m3": 328001.8725733214,
+ "flooded_km2_over_0p3m": 202.061288453481,
+ "max_depth_m": 12.532808946460287
+}

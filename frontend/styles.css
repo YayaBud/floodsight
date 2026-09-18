@@ -2490,6 +2490,31 @@ body.hide-markings .village-mark.is-rank1 .village-dot {
   border-radius: 4px;
 }
 
+/* NOT REACHED — deliberately neutral, never green.
+   This replaced a green "SAFE" badge. The front is ~3.3x too slow against the
+   arrival gate and the domain barely drains, so a settlement this run never
+   wetted has not been shown to be safe; it has been shown not to be reached in
+   this run. Grey states that. Green would claim more than the model supports. */
+.village-mark.is-dry .village-dot {
+  background: #64748B;
+  border-color: rgba(255, 255, 255, 0.65);
+  box-shadow: 0 0 6px rgba(100, 116, 139, 0.55);
+}
+.village-mark.is-dry .village-badge {
+  border-color: rgba(100, 116, 139, 0.42);
+  background: rgba(15, 20, 28, 0.78);
+}
+.village-mark.is-dry .village-status {
+  background: rgba(100, 116, 139, 0.22);
+  color: #94A3B8;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  letter-spacing: .03em;
+}
+
 .village-mark.is-isolated .village-dot {
   background: #EF4444;
   box-shadow: 0 0 10px #EF4444;
@@ -2848,3 +2873,16 @@ body.show-all-shelter-labels .shelter-badge {
 }
 
 
+
+/* Caveat shown while the reported-extent layer is on. It sits under the
+   toolbar rather than in a tooltip so the "level reported, shoreline is DEM"
+   qualifier is visible for as long as the layer is. */
+.wse-note {
+  margin: 0;
+  padding: 6px 14px;
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: #c9a227;
+  background: rgba(201, 162, 39, 0.09);
+  border-top: 1px solid rgba(201, 162, 39, 0.28);
+}

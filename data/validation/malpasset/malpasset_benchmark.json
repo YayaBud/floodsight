@@ -8,26 +8,36 @@
     "initial_stage_m": 100.0,
     "thalweg_bed_m": 33.5
   },
-  "description": "The canonical dry-bed hydrodynamic dam break benchmark. Zero rain in the valley. Validated against actual recorded transformer destruction times and police surveyed high-water marks.",
+  "description": "The canonical dry-bed hydrodynamic dam break benchmark. Zero rain in the valley. The observations below are the recorded electrical-transformer destruction times and the police-surveyed high-water marks.",
+  "simulation_status": {
+    "has_been_run": false,
+    "reason": "malpasset fails validate_geometry at every coarsening tested (1, 2, 4, 8) with 'upstream/downstream seeds lack separated connected components'. It has never been simulated by this project.",
+    "note": "This file previously carried a `simulated_s` / `simulated_min` / `simulated_wse_m` value beside every observation, and the frontend plotted them as a simulated-vs-measured agreement chart. No code in this repository produced any of those numbers. They were removed on 2026-09-13 rather than relabelled (audit Part VI §58, FS-46). Do not reintroduce a simulated series here: it must come from a run, written by the pipeline, or not at all.",
+    "what_would_make_it_real": "A geometry manifest whose upstream and downstream seeds resolve as separated components on the Malpasset DEM, then a normal pipeline run whose measured output is compared against the observations below."
+  },
+  "observation_provenance": {
+    "wave_arrival_times": "Electrical transformer destruction times, EDF post-event investigation; times relative to dam failure.",
+    "high_water_marks": "Police-surveyed high-water marks along the Reyran valley, 1959 post-event survey."
+  },
   "wave_arrival_times": [
-    { "station": "Transformer A", "distance_km": 1.4, "measured_s": 100, "measured_min": 1.67, "simulated_s": 105, "simulated_min": 1.75 },
-    { "station": "Transformer B", "distance_km": 5.5, "measured_s": 1204, "measured_min": 20.07, "simulated_s": 1180, "simulated_min": 19.67 },
-    { "station": "Transformer C", "distance_km": 6.9, "measured_s": 1420, "measured_min": 23.67, "simulated_s": 1395, "simulated_min": 23.25 }
+    { "station": "Transformer A", "distance_km": 1.4, "measured_s": 100, "measured_min": 1.67 },
+    { "station": "Transformer B", "distance_km": 5.5, "measured_s": 1204, "measured_min": 20.07 },
+    { "station": "Transformer C", "distance_km": 6.9, "measured_s": 1420, "measured_min": 23.67 }
   ],
   "high_water_marks": [
-    { "point": "P1", "distance_m": 422, "measured_wse_m": 80.3, "simulated_wse_m": 81.2 },
-    { "point": "P2", "distance_m": 1000, "measured_wse_m": 71.8, "simulated_wse_m": 70.9 },
-    { "point": "P3", "distance_m": 1420, "measured_wse_m": 61.2, "simulated_wse_m": 61.5 },
-    { "point": "P4", "distance_m": 2100, "measured_wse_m": 53.4, "simulated_wse_m": 54.0 },
-    { "point": "P5", "distance_m": 2800, "measured_wse_m": 46.5, "simulated_wse_m": 45.8 },
-    { "point": "P6", "distance_m": 3500, "measured_wse_m": 40.1, "simulated_wse_m": 39.7 },
-    { "point": "P7", "distance_m": 4200, "measured_wse_m": 34.6, "simulated_wse_m": 35.1 },
-    { "point": "P8", "distance_m": 4900, "measured_wse_m": 30.2, "simulated_wse_m": 30.8 },
-    { "point": "P9", "distance_m": 5500, "measured_wse_m": 26.8, "simulated_wse_m": 26.4 },
-    { "point": "P10", "distance_m": 6200, "measured_wse_m": 23.5, "simulated_wse_m": 23.9 },
-    { "point": "P11", "distance_m": 6900, "measured_wse_m": 20.8, "simulated_wse_m": 21.2 },
-    { "point": "P12", "distance_m": 7600, "measured_wse_m": 18.2, "simulated_wse_m": 17.8 },
-    { "point": "P13", "distance_m": 8300, "measured_wse_m": 15.6, "simulated_wse_m": 15.2 },
-    { "point": "P14", "distance_m": 9000, "measured_wse_m": 13.1, "simulated_wse_m": 12.9 }
+    { "point": "P1", "distance_m": 422, "measured_wse_m": 80.3 },
+    { "point": "P2", "distance_m": 1000, "measured_wse_m": 71.8 },
+    { "point": "P3", "distance_m": 1420, "measured_wse_m": 61.2 },
+    { "point": "P4", "distance_m": 2100, "measured_wse_m": 53.4 },
+    { "point": "P5", "distance_m": 2800, "measured_wse_m": 46.5 },
+    { "point": "P6", "distance_m": 3500, "measured_wse_m": 40.1 },
+    { "point": "P7", "distance_m": 4200, "measured_wse_m": 34.6 },
+    { "point": "P8", "distance_m": 4900, "measured_wse_m": 30.2 },
+    { "point": "P9", "distance_m": 5500, "measured_wse_m": 26.8 },
+    { "point": "P10", "distance_m": 6200, "measured_wse_m": 23.5 },
+    { "point": "P11", "distance_m": 6900, "measured_wse_m": 20.8 },
+    { "point": "P12", "distance_m": 7600, "measured_wse_m": 18.2 },
+    { "point": "P13", "distance_m": 8300, "measured_wse_m": 15.6 },
+    { "point": "P14", "distance_m": 9000, "measured_wse_m": 13.1 }
   ]
 }

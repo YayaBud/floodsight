@@ -122,8 +122,13 @@ def compute_village_exposure(
     -------
     GeoDataFrame, one row per village, with ``pop_at_risk``, ``buildings_flooded``,
     ``hospitals_flooded``, ``schools_flooded``, ``loss_inr``, ``max_depth_m``,
-    ``mean_depth_m``, ``flooded_area_frac``, ``inundated`` and
-    ``pop_provenance``.
+    ``mean_depth_m``, ``flooded_area_frac``, ``inundated``, ``pop_provenance``
+    and ``exposure_status``. ``exposure_status`` is ``"MASK_FAILED"`` when the
+    raster mask operation for that village raised (e.g. the polygon lies
+    entirely outside the raster bounds) — that row's depth-derived fields are
+    explicit zeros rather than a value indistinguishable from a genuinely dry
+    village, and it is still included in the output so it doesn't silently
+    vanish from the map/list. All other rows are ``"OK"``.
     """
     results = []
 
@@ -152,11 +157,15 @@ def compute_village_exposure(
                 geom = [village.geometry.__geo_interface__]
 
                 # ── Depth statistics inside the village polygon ──────────────
+                mask_failed = False
                 try:
                     clipped, _ = rasterio.mask.mask(flood_src, geom, crop=True,
                                                     nodata=0.0, filled=True)
                     depth = np.nan_to_num(clipped[0].astype(float), nan=0.0)
-                except Exception:
+                except Exception as exc:
+                    mask_failed = True
+                    logger.warning("Raster mask failed for %s: %s",
+                                    village.get("village_name", "?"), exc)
                     depth = np.zeros((1, 1))
 
                 wet = depth >= depth_threshold_m
@@ -241,6 +250,18 @@ def compute_village_exposure(
                             hospitals_flooded = int(((am == "hospital") & hit).sum())
                             schools_flooded   = int(((am == "school") & hit).sum())
 
+                # A failed flood-raster mask makes `depth`/`wet` a fake all-dry
+                # [[0.0]] array, but `pop_at_risk` can still come from a GHS-POP
+                # zonal sum against a SEPARATE raster mask that did not fail —
+                # so it is not automatically zero. Force every depth-derived
+                # metric to an explicit 0 rather than trust the fake-dry array.
+                if mask_failed:
+                    pop_at_risk = 0
+                    buildings_flooded = 0
+                    hospitals_flooded = 0
+                    schools_flooded = 0
+                    loss_inr = 0.0
+
                 results.append({
                     "village_id":        village.get("village_id", village.get("shrid", "")),
                     "village_name":      village.get("village_name", ""),
@@ -252,6 +273,7 @@ def compute_village_exposure(
                     "hospitals_flooded": hospitals_flooded,
                     "schools_flooded":   schools_flooded,
                     "loss_inr":          round(loss_inr),
+                    "exposure_status":   "MASK_FAILED" if mask_failed else "OK",
                     "max_depth_m":       round(max_depth, 2),
                     "mean_depth_m":      round(mean_depth, 2),
                     "flooded_area_frac": round(area_frac, 4),

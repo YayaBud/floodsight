@@ -11,7 +11,7 @@ import geopandas as gpd
 from shapely.geometry import Polygon
 
 from src.m2_geometry.dem_utils import prepare_custom_dem
-from src.m3_breach import DamGeometry
+from src.m3_breach import DamGeometry, FailureMechanism
 from src.m3_breach.ensemble import build_ensemble
 from src.m4_solvers.roughness import map_lulc_to_manning, ESA_WORLDCOVER_MANNING
 from src.m5_exposure.exposure import load_custom_population_csv, compute_village_exposure
@@ -47,7 +47,7 @@ def test_cwc_dam_engineering_override():
         height_m=70.0,
         volume_m3=25e6,
         dam_height_m=80.0,
-        failure_mode="overtopping",
+        failure_mechanism=FailureMechanism.OVERTOPPING_EROSION,
     )
     ens_emp = build_ensemble(dam_empirical)
     unconstrained_width = ens_emp.central.breach_width_m
@@ -58,10 +58,9 @@ def test_cwc_dam_engineering_override():
         height_m=70.0,
         volume_m3=25e6,
         dam_height_m=80.0,
-        failure_mode="overtopping",
+        failure_mechanism=FailureMechanism.OVERTOPPING_EROSION,
         crest_length_m=40.0,
         dam_type="concrete",
-        spillway_capacity_m3s=500.0,
     )
     ens_eng = build_ensemble(dam_engineered)
     

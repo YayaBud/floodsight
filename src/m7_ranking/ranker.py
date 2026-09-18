@@ -85,16 +85,24 @@ def rank_villages(
     ----------
     exposure_gdf   : From M5 — contains pop_at_risk, hospitals_flooded,
                      schools_flooded, loss_inr per village.
-    isolation_gdf  : From M6 — contains isolation_time_min, evacuation_window_min.
+    isolation_gdf  : From M6 — contains isolation_time_min, evacuation_window_min,
+                     and (since FS-24) a real per-village ``n_road_exits`` column
+                     that takes priority over the ``n_road_exits`` dict parameter.
     weights        : RankWeights dataclass.
-    n_road_exits   : Optional dict mapping village_id to exit road count.
+    n_road_exits   : Optional dict mapping village_id to exit road count. Used
+                     only as a fallback when ``isolation_gdf`` has no
+                     ``n_road_exits`` column.
 
     Returns
     -------
     GeoDataFrame sorted by priority_score descending, with columns:
-        priority_rank, priority_score, score_lo, score_hi,
+        priority_rank, priority_score, score_sensitivity_lo, score_sensitivity_hi,
         village_name, pop_at_risk, isolation_time_min, evacuation_window_min,
         hospitals_flooded, schools_flooded, loss_inr
+
+    ``score_sensitivity_lo``/``score_sensitivity_hi`` are a fixed +-15%
+    sensitivity band, not per-arm ensemble spread — see the comment above
+    where they are computed.
     """
     if len(exposure_gdf) == 0:
         logger.warning("No villages to rank — returning an empty frame.")
@@ -105,7 +113,7 @@ def rank_villages(
 
     # Merge on village_id
     iso_cols = [c for c in ["village_id", "isolation_time_min", "water_arrival_min",
-                            "evacuation_window_min", "road_nodes_found"]
+                            "evacuation_window_min", "road_nodes_found", "n_road_exits"]
                 if c in isolation_gdf.columns]
     merged = exposure_gdf.merge(isolation_gdf[iso_cols], on="village_id", how="left")
 
@@ -124,11 +132,15 @@ def rank_villages(
         merged["hospitals_flooded"] + merged["schools_flooded"]
     )
 
-    # Egress score: fewer exits → higher urgency
-    if n_road_exits:
+    # Egress score: fewer exits → higher urgency. Real per-village exit counts
+    # from M6 (FS-24) take priority over the caller-supplied dict, which is
+    # kept only as a fallback for back-compat.
+    if "n_road_exits" in merged.columns:
+        merged["n_exits"] = merged["n_road_exits"].fillna(1)
+    elif n_road_exits:
         merged["n_exits"] = merged["village_id"].map(n_road_exits).fillna(1)
     else:
-        merged["n_exits"] = 1   # conservative default
+        merged["n_exits"] = 1   # conservative default — no exit data available
     merged["egress_score"] = _score_egress(merged["n_exits"])
 
     # Composite score
@@ -139,17 +151,18 @@ def rank_villages(
         weights.facilities * merged["fac_score"]
     ).round(4)
 
-    # Simplified uncertainty band: ±15% of score for pessimistic/optimistic
-    # (In the full pipeline this would be computed separately per ensemble arm)
-    merged["score_hi"] = (merged["priority_score"] * 1.15).clip(upper=1.0).round(4)
-    merged["score_lo"] = (merged["priority_score"] * 0.85).clip(lower=0.0).round(4)
+    # Fixed ±15% sensitivity band — NOT a per-arm ensemble spread. Per-arm ranking
+    # (computing this score separately for the pessimistic/optimistic breach arms)
+    # does not exist yet. Do not read this as uncertainty from the ensemble.
+    merged["score_sensitivity_hi"] = (merged["priority_score"] * 1.15).clip(upper=1.0).round(4)
+    merged["score_sensitivity_lo"] = (merged["priority_score"] * 0.85).clip(lower=0.0).round(4)
 
     # Sort and rank
     merged = merged.sort_values("priority_score", ascending=False).reset_index(drop=True)
     merged["priority_rank"] = merged.index + 1
 
     output_cols = [
-        "priority_rank", "priority_score", "score_lo", "score_hi",
+        "priority_rank", "priority_score", "score_sensitivity_lo", "score_sensitivity_hi",
         "village_id", "village_name", "geometry",
         "pop_total", "pop_at_risk", "pop_provenance",
         "isolation_time_min", "evacuation_window_min", "water_arrival_min",

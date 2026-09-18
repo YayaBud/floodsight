@@ -138,7 +138,7 @@
       "classification": "OFFICIAL_ESTIMATE",
       "source": "District Collectorate Records / MHA Report D692",
       "confidence": "High",
-      "usage": "Simulation clock T=0"
+      "usage": "Retained for the underlying three sourced candidate times; superseded as T=0 by event_clock.origin_iso below, which resolves the three by using the MHA point value for the washout/dam-break-origin event specifically (see 2026-09-11 event-clock decision)."
     },
     "eroded_embankment_length_m": {
       "value": 336.0,
@@ -166,5 +166,127 @@
     ],
     "breach_invert_elevation_m": 180.0,
     "breach_side_slope_hv": 1.0
+  },
+  "event_clock": {
+    "_decision_record": "2026-09-11: T=0 resolved by the user as the dam failure/washout event (EVD-17), using the MHA D692 point value 06:30 IST, NOT the earlier overtopping-initiation window (EVD-16, ~05:30-06:00) previously hardcoded in src/scenarios.py as 05:45. The 06:15-06:30 EVD-17 range is retained as the failure event's own uncertainty band. Overtopping initiation is kept as its own separate, earlier timeline event rather than being collapsed into T=0. Pincha's sourced 'T-150 min' label in EVD-04/pincha_failure_time is INVALID under this anchor (03:30 to 06:30 is -180 min, not -150) and must not be used for arithmetic; it was computed against the old 05:45-ish anchor family and is superseded by the recomputed t_s values below, derived directly from each event's own historical clock time.",
+    "origin_iso": "2021-11-19T06:30:00+05:30",
+    "origin_anchor": "dam_failure_washout",
+    "origin_label": "Annamayya Dam full washout/collapse (MHA-reported point time)",
+    "classification": "OFFICIAL_ESTIMATE",
+    "source": "MHA National Situation Report D692 (EVD-17)",
+    "uncertainty_s": 900,
+    "uncertainty_note": "EVD-17 states a 06:15-06:30 window for full washout; the MHA point value (06:30, the late edge) is used as origin_iso, with the 15-minute window before it carried as uncertainty_s.",
+    "timeline_events": [
+      {
+        "id": "pincha_failure",
+        "t_s": -10800.0,
+        "t_uncertainty_s": 1800,
+        "label": "Pincha ring-bund washout (upstream feeder)",
+        "classification": "OBSERVED",
+        "source": "District Collectorate Situation Log (EVD-04)",
+        "node_id": "pincha_ring_bund",
+        "historical_time_ist": "2021-11-19T03:30:00+05:30",
+        "historical_range_ist": ["2021-11-19T03:00:00+05:30", "2021-11-19T04:00:00+05:30"]
+      },
+      {
+        "id": "overtopping_initiation",
+        "t_s": -2700.0,
+        "t_uncertainty_s": 900,
+        "label": "Annamayya overtopping initiation (water first exceeds +206.0 m crest)",
+        "classification": "OFFICIAL_ESTIMATE",
+        "source": "District Collectorate Reports / Eye-witnesses (EVD-16)",
+        "node_id": "annamayya_dam",
+        "historical_range_ist": ["2021-11-19T05:30:00+05:30", "2021-11-19T06:00:00+05:30"],
+        "note": "Midpoint of the sourced range used as the point t_s; the full range is carried in t_uncertainty_s (900 s = 15 min each side of the midpoint)."
+      },
+      {
+        "id": "gorge_exit_overtopping_flow",
+        "t_s": -600.0,
+        "t_uncertainty_s": 300,
+        "label": "Cheyyeru gorge exit — arrival of pre-washout overtopping discharge",
+        "classification": "OBSERVED",
+        "source": "Field witness reports / Local police log (EVD-21)",
+        "node_id": "cheyyeru_gorge",
+        "historical_range_ist": ["2021-11-19T06:15:00+05:30", "2021-11-19T06:25:00+05:30"],
+        "note": "This arrival precedes the T=0 washout event. It is the overtopping-phase discharge (crest flow before the embankment fully eroded away), a physically distinct and earlier pulse than the post-washout breach wave that reaches the same reach afterward — not measurement error. See event_clock._decision_record."
+      },
+      {
+        "id": "togurupeta_overtopping_flow",
+        "t_s": -600.0,
+        "t_uncertainty_s": 300,
+        "label": "Togurupeta hit — pre-washout overtopping discharge",
+        "classification": "OBSERVED",
+        "source": "AP Disaster Management / Media Surveys, Indian Express Nov 2021 (EVD-22)",
+        "node_id": "togurupeta",
+        "historical_range_ist": ["2021-11-19T06:15:00+05:30", "2021-11-19T06:25:00+05:30"],
+        "depth_range_m": [4.0, 8.0],
+        "note": "Same pre-washout overtopping-flow interpretation as gorge_exit_overtopping_flow."
+      },
+      {
+        "id": "washout",
+        "t_s": 0.0,
+        "t_uncertainty_s": 900,
+        "label": "Annamayya dam full washout / collapse (T=0)",
+        "classification": "OFFICIAL_ESTIMATE",
+        "source": "MHA National Situation Report D692 (EVD-17)",
+        "node_id": "annamayya_dam",
+        "historical_time_ist": "2021-11-19T06:30:00+05:30",
+        "historical_range_ist": ["2021-11-19T06:15:00+05:30", "2021-11-19T06:30:00+05:30"]
+      },
+      {
+        "id": "mandapalli",
+        "t_s": 0.0,
+        "t_uncertainty_s": 300,
+        "label": "Mandapalli hit — breach-wave arrival",
+        "classification": "OBSERVED",
+        "source": "Eye-witness logs / Paleswara Swamy Temple survey (EVD-23)",
+        "node_id": "mandapalli",
+        "historical_range_ist": ["2021-11-19T06:25:00+05:30", "2021-11-19T06:35:00+05:30"],
+        "depth_range_m": [3.5, 6.5],
+        "note": "Range straddles T=0; recorded as a point at the T=0 edge of its own window since the wave is expected to arrive at or shortly after washout, not before."
+      },
+      {
+        "id": "pulapathur",
+        "t_s": 750.0,
+        "t_uncertainty_s": 450,
+        "label": "Pulapathur hit — breach-wave arrival, >30 fatalities",
+        "classification": "OBSERVED",
+        "source": "AP Govt Disaster Management Summary / Casualty Register Kadapa (EVD-24)",
+        "node_id": "pulapathur",
+        "historical_range_ist": ["2021-11-19T06:35:00+05:30", "2021-11-19T06:50:00+05:30"]
+      },
+      {
+        "id": "gundlur",
+        "t_s": 3300.0,
+        "t_uncertainty_s": 600,
+        "label": "Gundlur inundation",
+        "classification": "OBSERVED",
+        "source": "Village Administrative Officer Log / Revenue Department Records (EVD-25)",
+        "node_id": "gundlur",
+        "historical_range_ist": ["2021-11-19T07:15:00+05:30", "2021-11-19T07:35:00+05:30"],
+        "depth_range_m": [2.0, 4.0]
+      },
+      {
+        "id": "nandalur",
+        "t_s": 5400.0,
+        "t_uncertainty_s": 900,
+        "label": "Nandalur arrival & bridge washout",
+        "classification": "OBSERVED",
+        "source": "South Central Railway Emergency Bulletin / Track Washout Log (EVD-26)",
+        "node_id": "nandalur",
+        "historical_range_ist": ["2021-11-19T07:45:00+05:30", "2021-11-19T08:15:00+05:30"],
+        "depth_range_m": [1.5, 3.5]
+      },
+      {
+        "id": "downstream_farfield",
+        "t_s": 12600.0,
+        "t_uncertainty_s": 5400,
+        "label": "Downstream corridor reach, Lebaka to Penagaluru (Pennar confluence)",
+        "classification": "OBSERVED",
+        "source": "Mandalam Revenue Reports (EVD-28)",
+        "node_id": "pennar_confluence",
+        "historical_range_ist": ["2021-11-19T08:30:00+05:30", "2021-11-19T11:30:00+05:30"]
+      }
+    ]
   }
 }

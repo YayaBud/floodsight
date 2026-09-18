@@ -15,15 +15,17 @@ Endpoints:
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import locale
+import os
+import subprocess
+import threading
 import uuid
 from pathlib import Path
 from typing import Optional
 
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -33,6 +35,8 @@ import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from run_pipeline import execute_full_simulation
+from src.run_manifest import (ManifestError, is_valid, latest_valid, load_manifest,
+                              new_manifest, transition, write_manifest, resolve_artifact)
 
 logger = logging.getLogger("floodsight.api")
 logging.basicConfig(level=logging.INFO)
@@ -62,93 +66,25 @@ app = FastAPI(
 )
 
 _JOBS: dict[str, dict] = {}
+_WORKERS: dict[str, subprocess.Popen] = {}
+_WORKER_LOCK = threading.RLock()
+_MAX_WORKERS = 1
 
 BASE_DIR = Path(__file__).resolve().parents[2]
 DATA_DIR = BASE_DIR / "data"
 FRONT_DIR = BASE_DIR / "frontend"
 
 
-def _detect_scenario_key_and_name(p: Path):
-    name = p.name.lower()
-    sn_file = p / "snapshots_index.json"
-    res_file = p / "results.geojson"
-    
-    # 1. Direct name match
-    if "south_lhonak" in name:
-        return "south_lhonak", "South Lhonak GLOF & Chungthang Dam"
-    if "derna" in name:
-        return "derna", "Derna Dams (Abu Mansour + Al-Bilad)"
-    if "rishi" in name:
-        return "rishiganga", "Rishi Ganga Natural Lake"
-    if "annamayya" in name:
-        return "annamayya", "Annamayya Dam (Cheyyeru River)"
-    if "phutkal" in name:
-        return "phutkal", "Phutkal River Landslide Dam"
-    if "ivanovo" in name:
-        return "ivanovo", "Ivanovo Dam (Bulgaria)"
-    if "malpasset" in name:
-        return "malpasset", "Malpasset Arch Dam (France)"
-    
-    # 2. Check preview_bounds in snapshots_index.json
-    if sn_file.exists():
-        try:
-            sn_data = _read_json_file(sn_file)
-            if sn_data and len(sn_data) > 0:
-                bounds = sn_data[0].get("preview_bounds", [])
-                if bounds and len(bounds) > 0:
-                    lon, lat = bounds[0][0], bounds[0][1]
-                    if 78.5 <= lon <= 79.4 and 14.0 <= lat <= 14.6:
-                        return "annamayya", "Annamayya Dam (Cheyyeru River)"
-                    if 79.4 <= lon <= 80.2 and 30.2 <= lat <= 30.8:
-                        return "rishiganga", "Rishi Ganga Natural Lake"
-                    if 76.5 <= lon <= 77.4 and 33.1 <= lat <= 33.7:
-                        return "phutkal", "Phutkal River Landslide Dam"
-                    if 22.0 <= lon <= 23.0 and 32.4 <= lat <= 33.0:
-                        return "derna", "Derna Dams (Abu Mansour + Al-Bilad)"
-                    if 25.5 <= lon <= 26.1 and 41.6 <= lat <= 42.2:
-                        return "ivanovo", "Ivanovo Dam (Bulgaria)"
-                    if 6.4 <= lon <= 7.0 and 43.3 <= lat <= 43.8:
-                        return "malpasset", "Malpasset Arch Dam (France)"
-                    if 88.0 <= lon <= 88.8 and 27.4 <= lat <= 28.2:
-                        return "south_lhonak", "South Lhonak GLOF & Chungthang Dam"
-        except Exception:
-            pass
-
-    # 3. Check results.geojson
-    if res_file.exists():
-        try:
-            res_data = _read_json_file(res_file)
-            feats = res_data.get("features", [])
-            if feats:
-                geom = feats[0].get("geometry", {})
-                coords = geom.get("coordinates", [])
-                pt = None
-                if geom.get("type") == "Point": pt = coords
-                elif geom.get("type") == "Polygon" and coords: pt = coords[0][0]
-                elif geom.get("type") == "MultiPolygon" and coords: pt = coords[0][0][0]
-                if pt:
-                    lon, lat = pt[0], pt[1]
-                    if 78.5 <= lon <= 79.4 and 14.0 <= lat <= 14.6:
-                        return "annamayya", "Annamayya Dam (Cheyyeru River)"
-                    if 79.4 <= lon <= 80.2 and 30.2 <= lat <= 30.8:
-                        return "rishiganga", "Rishi Ganga Natural Lake"
-                    if 76.5 <= lon <= 77.4 and 33.1 <= lat <= 33.7:
-                        return "phutkal", "Phutkal River Landslide Dam"
-                    if 22.0 <= lon <= 23.0 and 32.4 <= lat <= 33.0:
-                        return "derna", "Derna Dams (Abu Mansour + Al-Bilad)"
-                    if 25.5 <= lon <= 26.1 and 41.6 <= lat <= 42.2:
-                        return "ivanovo", "Ivanovo Dam (Bulgaria)"
-                    if 6.4 <= lon <= 7.0 and 43.3 <= lat <= 43.8:
-                        return "malpasset", "Malpasset Arch Dam (France)"
-                    if 88.0 <= lon <= 88.8 and 27.4 <= lat <= 28.2:
-                        return "south_lhonak", "South Lhonak GLOF & Chungthang Dam"
-        except Exception:
-            pass
-    return "phutkal", f"Scenario {p.name}"
+# `_detect_scenario_key_and_name` was deleted (FS-41). It guessed a scenario
+# from a run directory name, then from preview bounding boxes, and finally
+# returned "phutkal" for anything it could not identify -- labelling an
+# unknown run as a real event. It had zero callers; `_rehydrate_saved_scenarios`
+# below reads the run manifest, which is the only identification that is
+# actually evidence.
 
 
 def _rehydrate_saved_scenarios():
-    """Scan data/scenarios on disk and populate _JOBS with completed runs so past simulations survive restarts."""
+    """Rehydrate only completed, valid manifests; legacy archives stay untrusted."""
     scenarios_dir = DATA_DIR / "scenarios"
     if not scenarios_dir.exists():
         return
@@ -158,84 +94,33 @@ def _rehydrate_saved_scenarios():
         if not p.is_dir():
             continue
         job_id = p.name
-        if job_id in _JOBS:
+        if job_id in _JOBS or not (p / "manifest.json").is_file():
             continue
-        res_file = p / "results.geojson"
-        if not res_file.exists():
-            continue
-
         try:
-            hyd_file = p / "hydrograph.json"
-            hyd = _read_json_file(hyd_file) if hyd_file.exists() else {}
-
-            exports_dir = p / "exports"
-            shp_path = None
-            kml_path = None
-            cap_path = None
-            if exports_dir.exists():
-                for f in exports_dir.iterdir():
-                    if f.suffix == ".shp" and not shp_path:
-                        shp_path = str(f)
-                    elif f.suffix == ".kml" and not kml_path:
-                        kml_path = str(f)
-                    elif f.suffix == ".xml" and not cap_path:
-                        cap_path = str(f)
-
-            max_depth_tif = p / "max_depth.tif"
-            snapshots_idx = p / "snapshots_index.json"
-            roads_timeline = p / "roads_timeline.geojson"
-            arrival_tif = p / "arrival_time.tif"
-            lake_form = p / "lake_formation.json"
-
-            tot_par = 0
-            tot_bld = 0
-            tot_loss = 0.0
-            try:
-                res_data = _read_json_file(res_file)
-                for feat in res_data.get("features", []):
-                    props = feat.get("properties", {})
-                    tot_par += int(props.get("pop_at_risk") or 0)
-                    tot_bld += int(props.get("buildings_flooded") or 0)
-                    tot_loss += float(props.get("loss_inr") or 0.0)
-            except Exception:
-                pass
-
-            s_key, s_name = _detect_scenario_key_and_name(p)
-
-            _JOBS[job_id] = {
-                "status": "done",
-                "job_id": job_id,
-                "dam_name": s_name,
-                "scenario_key": s_key,
-                "result_path": str(res_file),
-                "hydrograph": hyd,
-                "exports": {
-                    "shp": shp_path,
-                    "kml": kml_path,
-                    "cap": cap_path,
-                    "tif": str(max_depth_tif) if max_depth_tif.exists() else None,
-                },
-                "metrics": {
-                    "total_par": tot_par,
-                    "total_buildings": tot_bld,
-                    "total_loss_inr": tot_loss,
-                },
-                "snapshots_index": str(snapshots_idx) if snapshots_idx.exists() else None,
-                "lake_formation": str(lake_form) if lake_form.exists() else None,
-                "roads_timeline": str(roads_timeline) if roads_timeline.exists() else None,
-                "arrival_time_tif": str(arrival_tif) if arrival_tif.exists() else None,
-                "mtime": p.stat().st_mtime,
-                "progress": {
-                    "stage": "done",
-                    "label": "Complete",
-                    "frac": 1.0,
-                    "detail": "Loaded from archive",
-                    "eta_s": 0,
-                },
-            }
+            manifest = load_manifest(p / "manifest.json")
+            if not is_valid(manifest, run_root=scenarios_dir):
+                continue
+            result = manifest.get("pipeline_result", {})
+            # A rehydrated run had NO hydrograph: `get_hydrograph` returns
+            # `job["hydrograph"]`, an in-memory key only the live job path ever
+            # set, so every run restored from disk served `{}` and the UI drew an
+            # empty chart. The file is on disk and the manifest registers it.
+            hydro = {}
+            _hp = result.get("hydrograph_json")
+            if _hp and Path(_hp).exists():
+                try:
+                    hydro = json.loads(Path(_hp).read_text(encoding="utf-8"))
+                except (OSError, ValueError):
+                    hydro = {}
+            _JOBS[job_id] = {"status": "done", "job_id": job_id, "hydrograph": hydro,
+                             "manifest": manifest, "scenario_key": manifest.get("scenario_key"),
+                             "dam_name": manifest.get("request", {}).get("dam_name"),
+                             "result_path": result.get("results_geojson"),
+                             "snapshots_index": result.get("snapshots_index"),
+                             "metrics": manifest.get("metrics", {}), "progress": {"stage": "done", "frac": 1.0}}
             count += 1
-        except Exception as exc:
-            logger.debug("Could not rehydrate scenario %s: %s", job_id, exc)
+        except ManifestError:
+            continue
 
     logger.info("Rehydrated %d saved simulation scenarios into memory", count)
 
@@ -260,62 +145,40 @@ class RunRequest(BaseModel):
     custom_dem_path: Optional[str] = None
     crest_length_m: Optional[float] = None
     dam_type: Optional[str] = None
-    spillway_capacity_m3s: Optional[float] = None
     lulc_raster_path: Optional[str] = None
     population_csv: Optional[str] = None
 
 
-def _async_job_runner(job_id: str, req: RunRequest):
+def _reconcile_job(job_id: str) -> dict | None:
+    """Bring _JOBS[job_id] up to date from its manifest before serving it.
+
+    A run's manifest is written by a separate subprocess (src.api.worker), so
+    _JOBS (in-memory, this process) can be stale relative to it. This is called
+    on every read rather than polled in the background, so there is no separate
+    task lifecycle to manage and no risk of a missed poll tick.
+    """
+    job = _JOBS.get(job_id)
+    if not job:
+        return None
+    if job.get("status") in {"done", "error", "cancelled"} and job.get("manifest"):
+        return job  # already reconciled to a terminal state
+    manifest_path = job.get("manifest_path")
+    if not manifest_path:
+        return job
     try:
-        _JOBS[job_id]["status"] = "computing_hydrodynamics"
-        out_dir = DATA_DIR / "scenarios" / job_id
-
-        def _on_progress(p: dict) -> None:
-            frac = p.get("frac") or 0.0
-            elapsed = p.get("elapsed_s") or 0.0
-            eta = round(elapsed * (1.0 - frac) / frac, 1) if frac > 0.02 else None
-            _JOBS[job_id]["progress"] = {**p, "eta_s": eta}
-
-        result = execute_full_simulation(
-            dam_name=req.dam_name,
-            scenario_key=req.scenario_key,
-            wse_m=req.wse_m,
-            failure_mode=req.failure_mode,
-            reservoir_fill=req.reservoir_level_fraction,
-            out_dir=out_dir,
-            total_duration_s=req.duration_s,
-            coarsen=req.coarsen,
-            progress_cb=_on_progress,
-            custom_dem_path=req.custom_dem_path,
-            crest_length_m=req.crest_length_m,
-            dam_type=req.dam_type,
-            spillway_capacity_m3s=req.spillway_capacity_m3s,
-            lulc_raster_path=req.lulc_raster_path,
-            population_csv=req.population_csv,
-        )
-        _JOBS[job_id]["status"] = "computing_exposure"
-
-        hyd = _read_json_file(result["hydrograph_json"])
-
-        _JOBS[job_id]["progress"] = {
-            "stage": "done", "label": "Complete", "frac": 1.0,
-            "detail": "", "eta_s": 0,
-        }
-        _JOBS[job_id].update({
+        manifest = load_manifest(manifest_path)
+    except ManifestError:
+        return job
+    job["manifest"] = manifest
+    status = manifest.get("status")
+    if status == "completed" and is_valid(manifest, run_root=DATA_DIR / "scenarios"):
+        result = manifest.get("pipeline_result", {}) or {}
+        job.update({
             "status": "done",
-            "result_path": result["results_geojson"],
-            "hydrograph": hyd,
-            "exports": {
-                "shp": result["shp"],
-                "kml": result["kml"],
-                "cap": result["cap"],
-                "tif": result["max_depth_tif"],
-            },
-            "metrics": {
-                "total_par": result["total_par"],
-                "total_buildings": result["total_buildings"],
-                "total_loss_inr": result["total_loss_inr"],
-            },
+            "result_path": result.get("results_geojson"),
+            "hydrograph": _read_json_file(result["hydrograph_json"]) if result.get("hydrograph_json") and Path(result["hydrograph_json"]).exists() else {},
+            "exports": {"shp": result.get("shp"), "kml": result.get("kml"), "cap": result.get("cap"), "tif": result.get("max_depth_tif")},
+            "metrics": {"total_par": result.get("total_par"), "total_buildings": result.get("total_buildings"), "total_loss_inr": result.get("total_loss_inr")},
             "snapshots_index": result.get("snapshots_index"),
             "lake_formation": result.get("lake_formation"),
             "validation_agreement": result.get("validation_agreement"),
@@ -327,28 +190,98 @@ def _async_job_runner(job_id: str, req: RunRequest):
             "cell_size_m": result.get("cell_size_m"),
             "coarsen": result.get("coarsen"),
         })
-        logger.info("Job %s completed successfully.", job_id)
-    except Exception as exc:
-        logger.exception("Job %s failed with error: %s", job_id, exc)
-        _JOBS[job_id]["status"] = "error"
-        _JOBS[job_id]["error"] = str(exc)
+    elif status == "completed":
+        # Pipeline finished but is_valid() says no (e.g. hash mismatch, missing
+        # artifact) — this is a real failure state, not a transient one.
+        job["status"] = "error"
+        job["error"] = "run completed but failed manifest validation"
+    elif status == "failed":
+        job["status"] = "error"
+        job["error"] = "; ".join(manifest.get("validity", {}).get("reasons", [])) or "run failed"
+    elif status in {"cancelled", "interrupted"}:
+        job["status"] = "cancelled"
+    # else status is "queued" or "running" — leave _JOBS status as-is, caller polls again later
+    return job
 
 
 @app.post("/api/run")
-async def run_simulation_endpoint(req: RunRequest, background_tasks: BackgroundTasks):
-    job_id = str(uuid.uuid4())[:8]
-    _JOBS[job_id] = {
-        "status": "queued",
-        "dam_name": req.dam_name,
-        "scenario_key": req.scenario_key,
-    }
-    background_tasks.add_task(_async_job_runner, job_id, req)
+async def run_simulation_endpoint(req: RunRequest):
+    from src.scenarios import get_scenario_manifest
+    try:
+        resolved = get_scenario_manifest(req.scenario_key)
+    except Exception as exc:
+        raise HTTPException(status_code=422, detail=f"unknown or unavailable scenario: {exc}")
+    if not all(map(lambda x: isinstance(x, (int, float)) and x == x and abs(x) != float("inf"), (req.wse_m, req.duration_s, req.reservoir_level_fraction))):
+        raise HTTPException(status_code=422, detail="numeric request values must be finite")
+    if not (0 < req.reservoir_level_fraction <= 1 and 0 < req.duration_s <= 86400 and isinstance(req.coarsen, int) and 1 <= req.coarsen <= 32):
+        raise HTTPException(status_code=422, detail="request values out of range")
+    if req.failure_mode not in {"overtopping", "piping", "instantaneous", "breach"}:
+        raise HTTPException(status_code=422, detail="unsupported failure_mode")
+    for value in (req.crest_length_m,):
+        if value is not None and (not isinstance(value, (int, float)) or value <= 0 or not (value == value)):
+            raise HTTPException(status_code=422, detail="engineering dimensions must be positive finite values")
+    analyst_root = (DATA_DIR / "analyst_inputs").resolve()
+    for field in ("custom_dem_path", "lulc_raster_path", "population_csv"):
+        supplied = getattr(req, field)
+        if supplied:
+            candidate = Path(supplied).resolve()
+            if analyst_root not in candidate.parents or not candidate.is_file():
+                raise HTTPException(status_code=422, detail=f"{field} must be an existing file under data/analyst_inputs")
+    with _WORKER_LOCK:
+        if sum(1 for p in _WORKERS.values() if p.poll() is None) >= _MAX_WORKERS:
+            raise HTTPException(status_code=429, detail="simulation worker queue is full")
+    job_id = uuid.uuid4().hex
+    request_data = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    manifest = new_manifest(req.scenario_key, resolved_scenario=resolved, request=request_data)
+    manifest["run_id"] = job_id
+    manifest_path = write_manifest(manifest, DATA_DIR / "scenarios")
+    _JOBS[job_id] = {"status": "queued", "job_id": job_id, "dam_name": req.dam_name,
+                     "scenario_key": req.scenario_key, "manifest_path": str(manifest_path)}
+    creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
+    proc = subprocess.Popen([sys.executable, "-m", "src.api.worker", "--manifest", str(manifest_path)],
+                            cwd=str(BASE_DIR), creationflags=creationflags,
+                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    with _WORKER_LOCK: _WORKERS[job_id] = proc
     return {"job_id": job_id, "status": "queued"}
+
+
+@app.get("/api/manifest/{job_id}")
+async def get_manifest(job_id: str):
+    job = _reconcile_job(job_id)
+    path = job.get("manifest_path") if job else str(DATA_DIR / "scenarios" / job_id / "manifest.json")
+    try:
+        manifest = load_manifest(path)
+    except ManifestError:
+        raise HTTPException(status_code=404, detail="Manifest not found")
+    # Do not expose local paths or input internals through the API.
+    safe = dict(manifest)
+    safe.pop("request", None); safe.pop("inputs", None); safe.pop("pipeline_result", None)
+    for entry in safe.get("artifacts", {}).values(): entry.pop("path", None)
+    return safe
+
+
+@app.post("/api/cancel/{job_id}")
+async def cancel_simulation(job_id: str):
+    job = _reconcile_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    with _WORKER_LOCK:
+        proc = _WORKERS.get(job_id)
+        if proc and proc.poll() is None: proc.terminate()
+    try:
+        mp = Path(job["manifest_path"])
+        manifest = load_manifest(mp)
+        if manifest["status"] in {"queued", "running"}:
+            transition(manifest, "cancelled"); write_manifest(manifest, DATA_DIR / "scenarios")
+    except (KeyError, ManifestError):
+        pass
+    job["status"] = "cancelled"
+    return {"job_id": job_id, "status": "cancelled"}
 
 
 @app.get("/api/status/{job_id}")
 async def get_status(job_id: str):
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Job not found")
     # Expose selected fields; omit large internal paths but include cell_size_m
@@ -360,8 +293,8 @@ async def get_status(job_id: str):
 
 @app.get("/api/results/{job_id}")
 async def get_results(job_id: str):
-    job = _JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Results not ready")
     path = job.get("result_path")
     if not path or not Path(path).exists():
@@ -371,16 +304,16 @@ async def get_results(job_id: str):
 
 @app.get("/api/hydrograph/{job_id}")
 async def get_hydrograph(job_id: str):
-    job = _JOBS.get(job_id)
-    if not job:
+    job = _reconcile_job(job_id)
+    if not job or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Job not found")
     return job.get("hydrograph", {})
 
 
 @app.get("/api/export/{job_id}/{fmt}")
 async def download_export(job_id: str, fmt: str):
-    job = _JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Exports not ready")
     exports = job.get("exports", {})
     path = exports.get(fmt)
@@ -392,21 +325,27 @@ async def download_export(job_id: str, fmt: str):
 @app.get("/api/snapshots/{job_id}")
 async def get_snapshots(job_id: str):
     """Return the depth-snapshot frame index for the time-scrubber."""
-    job = _JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Snapshots not ready")
     idx_path = job.get("snapshots_index")
     if not idx_path or not Path(idx_path).exists():
         raise HTTPException(status_code=404, detail="Snapshot index missing")
     frames = _read_json_file(idx_path)
-    return {"job_id": job_id, "frame_count": len(frames), "frames": frames}
+    safe_frames = []
+    for i, frame in enumerate(frames):
+        if not isinstance(frame, dict): continue
+        item = {k: frame[k] for k in ("frame_idx", "t_s", "t_min", "event_time_iso", "stage", "phase_title", "preview_bounds", "vector_url", "raster_url", "bytes", "sha256", "provenance") if k in frame}
+        item.setdefault("frame_idx", i)
+        safe_frames.append(item)
+    return {"job_id": job_id, "frame_count": len(safe_frames), "frames": safe_frames}
 
 
 @app.get("/api/snapshots/{job_id}/frame/{frame_idx}")
 async def get_snapshot_frame(job_id: str, frame_idx: int):
     """Return one GeoJSON frame by index."""
-    job = _JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Snapshots not ready")
     idx_path = job.get("snapshots_index")
     if not idx_path or not Path(idx_path).exists():
@@ -414,17 +353,15 @@ async def get_snapshot_frame(job_id: str, frame_idx: int):
     frames = _read_json_file(idx_path)
     if frame_idx < 0 or frame_idx >= len(frames):
         raise HTTPException(status_code=404, detail=f"Frame {frame_idx} out of range")
-    frame_path = frames[frame_idx]["path"]
-    if not Path(frame_path).exists():
-        raise HTTPException(status_code=404, detail="Frame file missing")
+    frame_path = _registered_frame_path(job, frames[frame_idx].get("path", ""))
     return _read_json_file(frame_path)
 
 
 @app.get("/api/snapshots/{job_id}/frame/{frame_idx}/raster")
 async def get_snapshot_raster(job_id: str, frame_idx: int):
     """Return the smooth RGBA preview texture for one real depth frame."""
-    job = _JOBS.get(job_id)
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Snapshots not ready")
     idx_path = job.get("snapshots_index")
     if not idx_path or not Path(idx_path).exists():
@@ -433,15 +370,20 @@ async def get_snapshot_raster(job_id: str, frame_idx: int):
     if frame_idx < 0 or frame_idx >= len(frames):
         raise HTTPException(status_code=404, detail=f"Frame {frame_idx} out of range")
     path = frames[frame_idx].get("preview_path")
-    if not path or not Path(path).exists():
+    if not path:
         raise HTTPException(status_code=404, detail="Snapshot raster missing")
-    return FileResponse(path, media_type="image/png")
+    path = _registered_frame_path(job, path)
+    return FileResponse(
+        path,
+        media_type="image/png",
+        headers={"Cache-Control": "public, max-age=86400, immutable"},
+    )
 
 
 @app.get("/api/ritter/{job_id}")
 async def get_ritter(job_id: str):
     """Return Ritter analytical validation data."""
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="Job not ready")
     idx_path = job.get("snapshots_index")
@@ -451,6 +393,20 @@ async def get_ritter(job_id: str):
     if not ritter_path.exists():
         raise HTTPException(status_code=404, detail="Ritter validation file not found")
     return _read_json_file(ritter_path)
+
+
+@app.get("/api/solver-comparison/{job_id}")
+async def get_solver_comparison(job_id: str):
+    """Return 1D SWE-SPH vs 2D FV thalweg scenario comparison data."""
+    job = _job_or_404(job_id)
+    idx_path = job.get("snapshots_index")
+    parent = Path(idx_path).parent if idx_path else (Path(job.get("result_path")).parent if job.get("result_path") else None)
+    if not parent:
+        raise HTTPException(status_code=404, detail="Result path unknown")
+    comp_path = parent / "solver_comparison.json"
+    if not comp_path.exists():
+        raise HTTPException(status_code=404, detail="Solver comparison file not found")
+    return _read_json_file(comp_path)
 
 
 @app.get("/api/lake_formation/{job_id}")
@@ -470,28 +426,21 @@ async def get_lake_formation(job_id: str):
 
 @app.get("/api/scenarios/metadata")
 async def get_scenarios_metadata():
-    """Return all scenario definitions with cascading dams and triggers."""
+    """Return keyed canonical scenario manifests."""
     from src.data_fetcher import SCENARIOS
-    return SCENARIOS
+    from src.scenarios import get_scenario_manifest
+    return {key: get_scenario_manifest(key) for key in SCENARIOS}
 
 
 @app.get("/api/scenarios/{scenario_key}/latest_job")
 async def get_latest_scenario_job(scenario_key: str):
-    """Return the best pre-computed or latest simulation run for a given scenario key."""
-    matching = [j for j in _JOBS.values() if j.get("scenario_key") == scenario_key and j.get("status") == "done"]
-    if not matching:
-        _rehydrate_saved_scenarios()
-        matching = [j for j in _JOBS.values() if j.get("scenario_key") == scenario_key and j.get("status") == "done"]
-
-    if not matching:
+    """Return only the latest valid manifest-backed run."""
+    manifest = latest_valid(DATA_DIR / "scenarios", scenario_key)
+    if not manifest:
         raise HTTPException(status_code=404, detail=f"No completed simulation found for scenario {scenario_key}")
-
-    # Honest selection: pick the most recent run based on modification timestamp
-    matching.sort(key=lambda j: j.get("mtime", 0.0), reverse=True)
-    latest_job = matching[0]
-
-    jid = latest_job["job_id"]
-    sn_path = latest_job.get("snapshots_index")
+    jid = manifest["run_id"]
+    result = manifest.get("pipeline_result", {})
+    sn_path = result.get("snapshots_index")
     frame_count = 0
     if sn_path and Path(sn_path).exists():
         try:
@@ -500,25 +449,25 @@ async def get_latest_scenario_job(scenario_key: str):
         except Exception:
             pass
 
-    has_lake = bool(latest_job.get("lake_formation") and Path(latest_job["lake_formation"]).exists())
-    has_roads = bool(latest_job.get("roads_timeline") and Path(latest_job["roads_timeline"]).exists())
+    has_lake = bool(result.get("lake_formation") and Path(result["lake_formation"]).exists())
+    has_roads = bool(result.get("roads_timeline") and Path(result["roads_timeline"]).exists())
 
     return {
         "status": "ok",
         "job_id": jid,
         "scenario_key": scenario_key,
-        "dam_name": latest_job.get("dam_name"),
+        "dam_name": manifest.get("request", {}).get("dam_name"),
         "frame_count": frame_count,
         "has_lake_formation": has_lake,
         "has_roads_timeline": has_roads,
-        "metrics": latest_job.get("metrics", {}),
+        "metrics": manifest.get("metrics", {}),
     }
 
 
 @app.get("/api/roads/{job_id}")
 async def get_roads_timeline(job_id: str):
     """Return roads_timeline.geojson — per-link cut_time_min for the road status layer."""
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="Roads timeline not ready")
     path = job.get("roads_timeline")
@@ -530,7 +479,7 @@ async def get_roads_timeline(job_id: str):
 @app.get("/api/arrival/{job_id}")
 async def get_arrival_time_raster(job_id: str):
     """Return the arrival-time GeoTIFF (values in minutes, nodata where never wet)."""
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="Arrival time raster not ready")
     path = job.get("arrival_time_tif")
@@ -542,7 +491,7 @@ async def get_arrival_time_raster(job_id: str):
 @app.get("/api/envelope/{job_id}")
 async def get_envelope_raster(job_id: str):
     """Return the ensemble extent envelope GeoTIFF."""
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="Envelope raster not ready")
     path = job.get("envelope_tif")
@@ -554,7 +503,7 @@ async def get_envelope_raster(job_id: str):
 @app.get("/api/envelope_geojson/{job_id}")
 async def get_envelope_geojson(job_id: str):
     """Return the ensemble extent envelope GeoJSON."""
-    job = _JOBS.get(job_id)
+    job = _reconcile_job(job_id)
     if not job or job.get("status") != "done":
         raise HTTPException(status_code=404, detail="Envelope GeoJSON not ready")
     path = job.get("envelope_geojson")
@@ -569,50 +518,8 @@ async def get_envelope_geojson(job_id: str):
 # and the API keeps them different.
 
 def _job_or_404(job_id: str) -> dict:
-    job = _JOBS.get(job_id)
-    if not job:
-        scenario_dir = DATA_DIR / "scenarios" / job_id
-        if scenario_dir.exists() and (scenario_dir / "results.geojson").exists():
-            from src import m10_validation as m10
-            scen_key = "ivanovo"
-            val_agree = scenario_dir / "validation_agreement.geojson"
-            obs_ext = scenario_dir / "observed_extent.geojson"
-            val_roads = scenario_dir / "validation_roads.geojson"
-            max_depth = scenario_dir / "max_depth.tif"
-            obs_data = None
-            if max_depth.exists():
-                for k in ["ivanovo", "derna", "malpasset"]:
-                    if m10.available(k):
-                        try:
-                            cmp = m10.compare_extent(max_depth, k)
-                            if cmp.overlapped:
-                                scen_key = k
-                                obs_data = {
-                                    "available": True,
-                                    "scenario": k,
-                                    "overlapped": True,
-                                    "threshold_m": 0.3,
-                                    "extent": cmp.skill.as_dict(),
-                                    "areas": cmp.areas_km2(),
-                                    **(m10.describe(k) or {}),
-                                }
-                                break
-                        except Exception:
-                            pass
-            job = {
-                "status": "done",
-                "scenario_key": scen_key,
-                "result_path": str(scenario_dir / "results.geojson"),
-                "snapshots_index": str(scenario_dir / "snapshots_index.json") if (scenario_dir / "snapshots_index.json").exists() else None,
-                "lake_formation": str(scenario_dir / "lake_formation.json") if (scenario_dir / "lake_formation.json").exists() else None,
-                "validation_agreement": str(val_agree) if val_agree.exists() else None,
-                "observed_extent": str(obs_ext) if obs_ext.exists() else None,
-                "validation_roads": str(val_roads) if val_roads.exists() else None,
-                "roads_timeline": str(scenario_dir / "roads_timeline.geojson") if (scenario_dir / "roads_timeline.geojson").exists() else None,
-                "observed": obs_data,
-            }
-            _JOBS[job_id] = job
-    if not job or job.get("status") != "done":
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done" or not job.get("manifest") or not is_valid(job["manifest"], run_root=DATA_DIR / "scenarios"):
         raise HTTPException(status_code=404, detail="Job not ready")
     return job
 
@@ -621,6 +528,66 @@ def _geojson_or_404(path: Optional[str], what: str) -> dict:
     if not path or not Path(path).exists():
         raise HTTPException(status_code=404, detail=f"{what} not available for this run")
     return _read_json_file(path)
+
+
+def _registered_frame_path(job: dict, value: str | Path) -> Path:
+    """Resolve a frame only when the manifest vouches for it.
+
+    Two ways it can be vouched for. Either the file is itself a registered
+    artifact whose content hash the manifest carries, or it is listed inside
+    `snapshots_index` -- which IS a registered, hash-verified artifact, so the
+    set of paths it names is covered by that same hash. The per-frame GeoJSON
+    and preview PNGs are never registered individually (a run has dozens), and
+    requiring it made every frame 404 and the flood animation dead in the UI
+    while the index itself served fine.
+
+    The index-vouched path is still constrained to the run's own directory, so
+    a tampered index cannot be used to read arbitrary files.
+    """
+    manifest = job.get("manifest")
+    if not manifest or not is_valid(manifest, run_root=DATA_DIR / "scenarios"):
+        raise HTTPException(status_code=404, detail="Run is not valid")
+    candidate = Path(value).resolve()
+
+    for name, entry in (manifest.get("artifacts") or {}).items():
+        try:
+            resolved = resolve_artifact(manifest, name, run_root=DATA_DIR / "scenarios")
+        except ManifestError:
+            continue
+        if resolved == candidate:
+            return resolved
+
+    # Vouched for by the hash-verified snapshot index.
+    try:
+        idx_path = resolve_artifact(manifest, "snapshots_index",
+                                    run_root=DATA_DIR / "scenarios")
+    except ManifestError:
+        idx_path = None
+    if idx_path is not None and idx_path.exists():
+        run_dir = idx_path.parent.resolve()
+        try:
+            candidate.relative_to(run_dir)          # no traversal outside the run
+        except ValueError:
+            raise HTTPException(status_code=404,
+                                detail="Frame artifact is not registered")
+        try:
+            listed = json.loads(idx_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            listed = []
+        for frame in listed:
+            if not isinstance(frame, dict):
+                continue
+            for key in ("path", "preview_path"):
+                raw = frame.get(key)
+                if not raw:
+                    continue
+                named = Path(raw)
+                if not named.is_absolute():
+                    named = run_dir / named
+                if named.resolve() == candidate and candidate.exists():
+                    return candidate
+
+    raise HTTPException(status_code=404, detail="Frame artifact is not registered")
 
 
 @app.get("/api/validation/{job_id}")
@@ -661,6 +628,19 @@ async def get_validation_roads(job_id: str):
     return _geojson_or_404(job.get("validation_roads"), "Road validation")
 
 
+@app.get("/api/validation/{job_id}/arrivals")
+async def get_validation_arrivals(job_id: str):
+    """Historical arrival time and peak depth validation comparison."""
+    job = _job_or_404(job_id)
+    idx_path = job.get("snapshots_index")
+    if not idx_path:
+        raise HTTPException(status_code=404, detail="Result path unknown")
+    arr_path = Path(idx_path).parent / "validation_arrivals.json"
+    if not arr_path.exists():
+        raise HTTPException(status_code=404, detail="Arrival validation file not found")
+    return _read_json_file(arr_path)
+
+
 @app.get("/api/observed/scenarios")
 async def list_observed_scenarios():
     """Which scenarios have an observed outcome on disk, for the UI to advertise."""
@@ -678,11 +658,32 @@ _LAYER_FILES = {
     "villages":   ("admin", "{k}_villages.geojson"),
     "facilities": ("admin", "{k}_facilities.geojson"),
     "buildings":  ("buildings", "{k}_buildings.geojson"),
+    # Terrain-derived flood corridor (HAND by stage). Deliberately its OWN kind
+    # and NOT served through "observed": it is not an observation, and routing it
+    # there would relabel terrain analysis as ground truth. The file carries
+    # metadata.not_observed and metadata.reason_not_observed; the UI must show
+    # them alongside the layer.
+    #
+    # No longer drawn on the map -- "observed_wse" below replaced it there, because
+    # HAND's 2/5/10 m stages are round numbers nobody chose and the terrain is the
+    # same DEM the solver runs on. Still served, because scripts/corridor_coverage.py
+    # is a legitimate "did the front stall" diagnostic against it.
+    "corridor":   ("admin", "{k}_corridor.geojson"),
+    # Flood extent whose WATER LEVEL is observed: reported high-water depths from
+    # data/observations/<k>/arrivals.json added to the sampled channel bed, then
+    # interpolated along the stem and intersected with the DEM. Also its OWN kind
+    # and also NOT "observed" -- the level is reported but the shoreline is still
+    # our GLO-30, so it is not independent ground truth and carries no CSI.
+    # Built by scripts/observed_wse_extent.py.
+    "observed_wse": ("admin", "{k}_observed_wse.geojson"),
 }
 
 
 @app.get("/api/layers/{scenario_key}/{kind}")
-async def get_context_layer(scenario_key: str, kind: str):
+async def get_context_layer(scenario_key: str, kind: str,
+                            start_date: Optional[str] = Query(default=None),
+                            end_date: Optional[str] = Query(default=None),
+                            bbox: Optional[str] = Query(default=None)):
     """
     Serve a cached context layer for a scenario.
 
@@ -704,23 +705,16 @@ async def get_context_layer(scenario_key: str, kind: str):
             raise HTTPException(status_code=500, detail=str(exc))
 
     if kind == "sar":
-        from src.gee_satellite import GEESatelliteAnalyzer
-        sc = SCENARIOS.get(scenario_key)
-        if not sc:
-            raise HTTPException(status_code=404, detail="Scenario not found")
-        sar_path = DATA_DIR / "satellite" / f"{scenario_key}_sentinel1_sar.geojson"
-        if sar_path.exists():
-            return _read_json_file(sar_path)
-        analyzer = GEESatelliteAnalyzer()
-        data = analyzer.fetch_sentinel1_flood_extent(
-            bbox=sc["bbox"],
-            start_date="2021-11-18",
-            end_date="2021-11-20",
-        )
-        sar_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(sar_path, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2)
-        return data
+        from src.observation_manifest import validated_observation
+        if not (start_date and end_date and bbox):
+            return {"type": "FeatureCollection", "features": [], "metadata": {
+                "available": False, "scenario_key": scenario_key, "kind": "sar",
+                "classification": "NOT_AVAILABLE", "reason": "acquisition dates and bbox are required"}}
+        try:
+            coords = tuple(float(v.strip()) for v in bbox.split(","))
+        except (TypeError, ValueError):
+            coords = ()
+        return validated_observation(scenario_key, "sar", coords, start_date, end_date)
 
     if kind not in _LAYER_FILES:
         raise HTTPException(status_code=404, detail=f"Unknown layer '{kind}'")
@@ -729,9 +723,23 @@ async def get_context_layer(scenario_key: str, kind: str):
     path = DATA_DIR / subdir / pattern.format(k=scenario_key)
     if not path.exists():
         # Genuinely absent (not every AOI has buildings or facilities). An empty
-        # collection is the honest answer: the layer exists and holds nothing.
-        return {"type": "FeatureCollection", "features": []}
-    return _read_json_file(path)
+        # collection is the honest answer: the layer exists and holds nothing —
+        # but the caller must be able to tell this apart from a layer that WAS
+        # fetched and confirmed empty, so both carry an explicit classification.
+        return {
+            "type": "FeatureCollection", "features": [],
+            "metadata": {"classification": "NOT_AVAILABLE",
+                         "reason": f"no {kind} layer has been fetched for this scenario"},
+        }
+    data = _read_json_file(path)
+    n_features = len(data.get("features", [])) if isinstance(data, dict) else 0
+    data.setdefault("metadata", {})
+    if n_features == 0:
+        data["metadata"]["classification"] = "NOT_AVAILABLE"
+        data["metadata"]["reason"] = f"{kind} layer was fetched for this scenario and confirmed empty"
+    else:
+        data["metadata"]["classification"] = "AVAILABLE"
+    return data
 
 
 @app.get("/api/benchmarks/malpasset")

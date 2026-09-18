@@ -35,10 +35,10 @@ def test_utm_zone_detection():
 
 def test_breach_params_positive():
     """All breach parameter outputs must be positive (no NaN, no negative)."""
-    from src.m3_breach import DamGeometry
+    from src.m3_breach import DamGeometry, FailureMechanism
     from src.m3_breach import froehlich, von_thun, macdonald
 
-    dam = DamGeometry(height_m=25.0, volume_m3=80e6, dam_height_m=28.0, failure_mode="overtopping")
+    dam = DamGeometry(height_m=25.0, volume_m3=80e6, dam_height_m=28.0, failure_mechanism=FailureMechanism.OVERTOPPING_EROSION)
     for module in [froehlich, von_thun, macdonald]:
         p = module.compute(dam)
         assert p.breach_width_m    > 0, f"{p.method}: breach_width_m <= 0"

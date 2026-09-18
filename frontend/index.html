@@ -44,13 +44,30 @@
         <span>Markings</span>
       </button>
 
-      <button class="btn btn-quiet" type="button" id="btn-toggle-sar"
-              onclick="toggleGeeSarLayer()" title="Toggle Google Earth Engine Sentinel-1 SAR Radar Flood Trace" aria-pressed="false">
+      <!-- The "SAR (GEE)" toggle was removed (PS deliverable iv). Its map source
+           was a permanently EMPTY FeatureCollection: nothing ever populated it,
+           and the five ~1 KB "*_sentinel1_sar.geojson" files it appeared to
+           correspond to were hand-authored, not Sentinel-1 products, and have
+           been deleted. src/gee_satellite.py is a real Earth Engine framework
+           with its own tests but it is imported by nothing except those tests,
+           so no GEE query runs in this build. A control that advertises a
+           satellite layer and can only ever show an empty one is worse than no
+           control. Restore this when gee_satellite is actually wired into the
+           pipeline and a real product reaches the map. -->
+
+      <!-- Flood extent reconstructed from REPORTED high-water depths. Off by
+           default and disabled when the scenario has no reported depths, so the
+           control can never imply "no flooding here". What is and is not evidence
+           in it is in the title and is spelled out in #wse-note when the layer is
+           switched on. Replaced the HAND corridor that used to sit here: its
+           2/5/10 m stages were round numbers nobody chose. -->
+      <button class="btn btn-quiet" type="button" id="btn-toggle-wse"
+              onclick="toggleWse()" aria-pressed="false" disabled
+              title="Extent from REPORTED high-water depths — level observed, shoreline from DEM">
         <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
-          <circle cx="8" cy="8" r="6" stroke-dasharray="2 2"/>
-          <path d="M4 8a4 4 0 0 1 8 0" stroke-linecap="round"/>
+          <path d="M2 11c2-3 4-3 6 0s4 3 6 0M2 6c2-3 4-3 6 0s4 3 6 0" stroke-linecap="round"/>
         </svg>
-        <span>SAR (GEE)</span>
+        <span>Reported extent</span>
       </button>
 
       <button class="btn btn-quiet is-active" type="button" id="btn-toggle-shelters"
@@ -79,6 +96,7 @@
         </div>
       </div>
     </div>
+    <p id="wse-note" class="wse-note" hidden></p>
   </section>
 
   <!-- Transparent overlay grid. Four regions in four named cells; the centre
@@ -154,9 +172,16 @@
             <option value="rishiganga" selected>Rishi Ganga natural lake — Uttarakhand, 2021</option>
             <option value="phutkal">Phutkal landslide dam — Ladakh, 2015</option>
             <option value="south_lhonak">South Lhonak GLOF & Chungthang dam — Sikkim, 2023</option>
+            <!-- OUT-OF-SCOPE-NON-INDIAN: commented out 2026-09-13 with their SCENARIOS entries in
+                 src/data_fetcher.py. The backend no longer knows these keys, so
+                 offering them here would produce a run that fails at fetch.
+                 The Malpasset BENCHMARK panel below is unaffected — it reads
+                 /api/benchmarks/malpasset, which serves a file and never
+                 touches SCENARIOS.
             <option value="derna">Derna dams — Libya, 2023 (Copernicus EMSR696 observed)</option>
             <option value="ivanovo">Ivanovo dam collapse — Bulgaria, 2012 (GFD satellite observed)</option>
             <option value="malpasset">Malpasset arch dam — France, 1959 (Dry-bed field benchmark)</option>
+            -->
             <option value="annamayya">Annamayya dam breach — Andhra Pradesh, 2021 (Cheyyeru flash flood)</option>
           </select>
         </div>
@@ -205,15 +230,18 @@
         </div>
 
         <div class="field-row">
-          <div class="field">
-            <label for="wse-input">Water level <span class="hint">m</span></label>
-            <input id="wse-input" type="number" value="3650" min="0" step="0.5" />
-          </div>
+          <!-- "Water level" was removed: run_pipeline overwrote the submitted
+               wse_m from the scenario's own geometry/cascade config before
+               first use, so the box never changed a single number. The level
+               the engine actually uses is reported in the run manifest. -->
           <div class="field">
             <label for="failure-mode">How it fails</label>
             <select id="failure-mode">
               <option value="overtopping" selected>Overtopping</option>
-              <option value="piping">Piping</option>
+              <!-- "Piping" was removed: the piping branch and the overtopping
+                   branch produce bit-identical breach growth in this build, so
+                   offering the choice asserted a distinction the model does not
+                   make. Restore it when an erosion-based piping model exists. -->
             </select>
           </div>
         </div>
@@ -408,7 +436,6 @@
           <p class="legend-label" style="margin-top:8px;">Satellite Ground Truth</p>
           <ul class="legend-keys">
             <li><i class="k-line" style="background:#06b6d4;height:3px;"></i>Observed extent</li>
-            <li><i class="k-line" style="background:#818cf8;border:1px dashed #6366f1;height:3px;"></i>Sentinel-1 SAR (GEE)</li>
           </ul>
           <p class="legend-label" style="margin-top:8px;">Safe Havens &amp; Shelters</p>
           <ul class="legend-keys">
@@ -552,8 +579,12 @@
 <div id="tab-compare-panel" class="page hidden">
   <div class="page-head">
     <h2>Solvers</h2>
-    <p>FloodSight runs a well-balanced 2D finite-volume shallow-water solver, checked against
-       five benchmarks. Two other arms exist in the repository; their real wiring status is below.</p>
+    <p>FloodSight runs a 2D finite-volume shallow-water solver. It is checked against the Ritter
+       analytical dam-break solution and a mass-closure ledger. Its lake-at-rest benchmark is
+       currently passing on a configuration where the lake drains off the domain edge, and a
+       lake bounded by dry terrain does <em>not</em> stay at rest &mdash; so treat depths near a
+       standing pool as provisional. Two other solver arms exist in the repository; their real
+       wiring status is below.</p>
   </div>
   <div class="page-grid">
     <article class="card page-card">
@@ -571,26 +602,35 @@
     </article>
 
     <article class="card page-card">
-      <p class="card-kicker card-kicker-off">In the repo, not called</p>
-      <h3>SWE-SPH, 1D</h3>
+      <p class="card-kicker card-kicker-off">Benchmark only</p>
+      <h3>SWE-SPH, 1D (PS i)</h3>
       <p>Depth-averaged smoothed-particle hydrodynamics, self-contained in
-         <code>sph_swe.py</code> with no PySPH dependency. Intended to run the Ritter
-         benchmark so its output is comparable to the finite-volume result.</p>
+         <code>sph_swe.py</code>. It runs the analytical Ritter benchmark, and that result is
+         real. The per-scenario thalweg comparison against 2D FV is <strong>not run</strong>:
+         the two arms are not given the same event (the 2D arm no longer takes a forcing
+         hydrograph at all &mdash; discharge is measured at the breach opening, not prescribed),
+         they average depth over different spatial support, and the 2D arm reports a run maximum
+         against the SPH arm&rsquo;s final instant. An RMSE between those is not a
+         solver-agreement number, so none is shown.</p>
       <dl class="spec">
-        <div><dt>Type</dt><dd>SWE-SPH, 1D</dd></div>
-        <div><dt>Status</dt><dd>Not yet wired</dd></div>
+        <div><dt>Type</dt><dd>SWE-SPH, 1D Monaghan</dd></div>
+        <div><dt>Ritter benchmark</dt><dd>run live</dd></div>
+        <div><dt>Scenario comparison</dt><dd>not run &mdash; see above</dd></div>
       </dl>
       <div id="ritter-sph-chart" class="mini-chart"></div>
     </article>
 
     <article class="card page-card">
-      <p class="card-kicker card-kicker-off">Precomputed benchmark</p>
+      <p class="card-kicker card-kicker-off">Not run in this build</p>
       <h3>Delft3D-FLOW</h3>
-      <p>Structured finite-difference solver, Deltares, GPLv3. A pre-built benchmark case
-         only &mdash; running Delft3D live inside a 36-hour build is a known way to fail.</p>
+      <p>Structured finite-difference solver, Deltares, GPLv3. <strong>Delft3D has never been
+         run in this project.</strong> A &ldquo;Ritter RMSE 0.14 m&rdquo; was previously shown
+         here; no code in this repository produced that number and no run is on record behind
+         it, so it has been removed rather than relabelled. The card is kept to name the solver
+         as future work, not to report a result.</p>
       <dl class="spec">
-        <div><dt>Ritter RMSE</dt><dd>0.14 m, precomputed</dd></div>
-        <div><dt>Domain</dt><dd>Test channel only</dd></div>
+        <div><dt>Status</dt><dd>not run in this build</dd></div>
+        <div><dt>Result shown</dt><dd>none</dd></div>
       </dl>
     </article>
   </div>
@@ -600,6 +640,13 @@
     <p>The exact 1892 dam-break solution on a flat frictionless bed. Matching it proves the
        numerics before any real terrain run.</p>
     <div id="ritter-combined-chart" class="big-chart"></div>
+  </section>
+
+  <section class="page-section" id="scenario-solver-section" style="margin-top: 24px;">
+    <p class="card-kicker" style="color: var(--accent); font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px;">Scenario Profile Comparison (SIH26161 Deliverable i)</p>
+    <h3>Thalweg Profile: 1D SWE-SPH vs 2D Finite-Volume SWE</h3>
+    <p>Honest longitudinal channel-routed comparison along the Cheyyeru valley corridor extracted from DEM elevation, driven by the real physical breach hydrograph with identical Manning roughness.</p>
+    <div id="scenario-solver-comparison-chart" class="big-chart"></div>
   </section>
 
   <section class="page-section" style="margin-top: 24px;">
@@ -697,8 +744,11 @@
     <article class="card page-card">
       <h3>Honest limits</h3>
       <ul>
+        <!-- OUT-OF-SCOPE-NON-INDIAN: Derna is out of scope, so this caveat no longer applies to any
+             selectable scenario. Restore it with the scenario.
         <li>Derna 2023 was a compound event. Rain drove part of the observed flood and
             FloodSight routes only the dam break, so its score cannot reach 1.</li>
+        -->
         <li>Roughness is inferred from population density, not land cover.</li>
         <li>Only the middle breach estimate is carried through to roads and people.</li>
       </ul>
@@ -727,6 +777,9 @@
     });
   })();
 </script>
+<!-- Loaded before map.js: it owns the settlement badge rule and is asserted on
+     directly by tests/test_village_status.mjs. -->
+<script src="village_status.js"></script>
 <script src="debug.js"></script>
 <script src="spine.js"></script>
 <script src="map.js"></script>
