@@ -2381,7 +2381,7 @@ if __name__ == "__main__":
     out_dir = args.out_dir or f"data/scenarios/{args.scenario}_real"
     duration_s = args.duration or (20000.0 if args.scenario == "annamayya" else 7200.0)
 
-    execute_full_simulation(
+    result = execute_full_simulation(
         dam_name=dam_name, scenario_key=args.scenario, wse_m=wse_m,
         failure_mode=args.failure_mode, reservoir_fill=args.reservoir_fill,
         out_dir=out_dir, total_duration_s=duration_s,
@@ -2390,3 +2390,26 @@ if __name__ == "__main__":
         dam_type=args.dam_type,
         lulc_raster_path=args.lulc_path, population_csv=args.population_csv,
     )
+
+    # Persist the run's own verdict. The CLI used to DISCARD this return value
+    # entirely, so gates G1-G5 -- the whole point of the validity machinery --
+    # were computed and thrown away on every command-line run, and only the API
+    # worker path ever recorded them. A gate whose result nobody can read is
+    # indistinguishable from no gate.
+    prov_path = Path(out_dir) / "run_provenance.json"
+    prov_path.write_text(json.dumps(result, indent=2, default=str), encoding="utf-8")
+
+    v = (result or {}).get("validity", {})
+    logger.info("=" * 60)
+    logger.info("VALIDITY: %s", "VALID" if v.get("valid") else "NOT VALID")
+    for _g in ("gate_g1_volume_provenance", "gate_g2_manufactured_mass",
+               "gate_g3_reachable_outlet", "gate_g4_impoundment_retention",
+               "gate_g5_release_occurred"):
+        _b = v.get(_g)
+        if isinstance(_b, dict):
+            logger.info("  %-34s %s", _g.split("_", 2)[1].upper() + ":",
+                        "pass" if _b.get("ok") else "FAIL")
+    for _r in v.get("reasons", []):
+        logger.info("  reason: %s", _r)
+    logger.info("  written to %s", prov_path)
+    logger.info("=" * 60)
