@@ -2,9 +2,9 @@
 
 **GENERATED FILE. Do not hand-edit — run `python scripts/gen_atlas.py`.**
 
-- generated: 2026-09-18 16:09
-- git HEAD: `dbb5d8f`
-- newest source in tree: `scripts/new_dam.py` (2026-09-18 16:08)
+- generated: 2026-09-19 10:28
+- git HEAD: `d64648d`
+- newest source in tree: `tests/test_scenario_geometry_is_resolvable.py` (2026-09-19 10:28)
 
 If *newest source* is later than *generated*, this atlas is stale — regenerate
 before trusting it to navigate.
@@ -17,50 +17,50 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 
 ## `run_pipeline.py` — Orchestrator — the production call path, top to bottom
 
-- **`run_pipeline.py`** — 2392 lines — FloodSight
+- **`run_pipeline.py`** — 2591 lines — FloodSight
     - `def _depth_to_geojson` ~89 — Convert a depth snapshot to clean, continuous GeoJSON depth-class polygons using rasterio vector
     - `def _solve_envelope_arm` ~156 — Run one non-central breach arm and return ONLY its maximum-depth grid
     - `def gate_g1` ~200 — G1 -- volume provenance
     - `def gate_g2` ~215 — G2 -- manufactured mass
     - `def execute_full_simulation` ~229
         _32 sections:_
-        - ~251 · Progress reporting
-        - ~286 · M1/M2: terrain
-        - ~364 · Geometry hard gate (Stage B)
-        - ~394 · P2 (audit SS37, defect C3): put the barrier in the terrain the solver
-        - ~587 · The river as a hydraulic pathway
-        - ~611 · Give the domain an outlet
-        - ~653 · P2 Gate 1: DEM-confinement diagnostic, every scenario
-        - ~699 · P2 Gate 2 (Stage C): stage-storage reconciliation, cascade scenarios only
-        - ~751 · M3: breach hydrograph (cascade-aware)
-        - ~873 · standard single-structure breach (no upstream cascade)
-        - ~910 · M3: breach ensemble
-        - ~955 · M4: 2D shallow water
-        - ~1044 · Channel roughness, from the mapped river
-        - ~1070 · Stage F Part 1: real t=0 initial condition for the 2D solver
-        - ~1128 · Stage F Part 2: momentum for the injected inflow
-        - ~1208 · P3 (audit SS38, defects C2 + C1): cut the opening, delete the injection
-        - ~1463 · The MEASURED breach discharge, written beside the routed arms
-        - ~1508 · P4 (audit SS39): consequence is flood depth, not total water depth
-        - ~1550 · M4 SPH Scenario Comparison (SIH26161 deliverable i)
-        - ~1596 · Stage 1: Pre-Breach Lake Formation & Impoundment Rise
-        - ~1739 · M5: exposure
-        - ~1777 · M6: road isolation
-        - ~1787 · Road timeline (the differentiator made visible)
-        - ~1799 · Arrival-time raster
-        - ~1823 · M7: ranking
-        - ~1836 · Provenance stamping
-        - ~1857 · M8: exports
-        - ~1870 · M10: score against the observed outcome, when one exists
-        - ~1929 · Validation: the solver is actually run against Ritter
-        - ~1988 · Validity gate for the manifest system (P0-1)
-        - ~2066 · P1 gates G1-G3: three checks that can actually FAIL
-        - ~2214 · Flow-regime gate
+        - ~293 · Progress reporting
+        - ~328 · M1/M2: terrain
+        - ~406 · Geometry hard gate (Stage B)
+        - ~457 · P2 (audit SS37, defect C3): put the barrier in the terrain the solver
+        - ~650 · The river as a hydraulic pathway
+        - ~674 · Give the domain an outlet
+        - ~716 · P2 Gate 1: DEM-confinement diagnostic, every scenario
+        - ~762 · P2 Gate 2 (Stage C): stage-storage reconciliation, cascade scenarios only
+        - ~814 · M3: breach hydrograph (cascade-aware)
+        - ~936 · standard single-structure breach (no upstream cascade)
+        - ~973 · M3: breach ensemble
+        - ~1018 · M4: 2D shallow water
+        - ~1107 · Channel roughness, from the mapped river
+        - ~1133 · Stage F Part 1: real t=0 initial condition for the 2D solver
+        - ~1215 · Stage F Part 2: momentum for the injected inflow
+        - ~1295 · P3 (audit SS38, defects C2 + C1): cut the opening, delete the injection
+        - ~1550 · The MEASURED breach discharge, written beside the routed arms
+        - ~1595 · P4 (audit SS39): consequence is flood depth, not total water depth
+        - ~1637 · M4 SPH Scenario Comparison (SIH26161 deliverable i)
+        - ~1683 · Stage 1: Pre-Breach Lake Formation & Impoundment Rise
+        - ~1900 · M5: exposure
+        - ~1938 · M6: road isolation
+        - ~1948 · Road timeline (the differentiator made visible)
+        - ~1960 · Arrival-time raster
+        - ~1984 · M7: ranking
+        - ~1997 · Provenance stamping
+        - ~2018 · M8: exports
+        - ~2031 · M10: score against the observed outcome, when one exists
+        - ~2090 · Validation: the solver is actually run against Ritter
+        - ~2149 · Validity gate for the manifest system (P0-1)
+        - ~2234 · P1 gates G1-G3: three checks that can actually FAIL
+        - ~2382 · Flow-regime gate
 
 ## `src/m2_geometry` — Terrain, geometry gate, barrier emplacement, outlets
 
 - **`src/m2_geometry/__init__.py`** — 5 lines
-- **`src/m2_geometry/dem_utils.py`** — 962 lines — M2 — DEM Utilities ================== Load and preprocess a FABDEM GeoTIFF for FloodSight
+- **`src/m2_geometry/dem_utils.py`** — 972 lines — M2 — DEM Utilities ================== Load and preprocess a FABDEM GeoTIFF for FloodSight
     - `def load_and_reproject` ~59 — Reproject DEM to local UTM and write to out_path
     - `def prepare_custom_dem` ~103 — Load an arbitrary user-supplied DEM GeoTIFF (e.g
     - `def snap_to_thalweg` ~135 — Move a point to the lowest cell within ``search_radius_m`` of it
@@ -69,19 +69,23 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def open_river_outlets` ~318 — Give the domain an outlet where the mapped river leaves the data footprint
     - `def condition_flowline` ~468 — Make the mapped river a hydraulically continuous path by removing the adverse bed rises a 30 m D
     - `def compute_hydro_surfaces` ~682 — Compute Flow Accumulation and Height Above Nearest Drainage (HAND) from a conditioned DEM
-    - `def carve_breach_geometry` ~761 — Physically carve a 3D breach corridor across an earthen dam embankment
-    - `def condition_gorge_thalweg` ~850 — Ensure narrow gorge thalweg points are not blocked by cell coarsening averaging
-    - `def escape_head_4connected` ~891 — Head above the release cell at which it first connects to the DEM edge
-- **`src/m2_geometry/fill.py`** — 338 lines — M2 — DEM Fill & Stage-Storage Curve ===================================== Given a conditioned DEM (UTM, bare-e
+    - `def carve_breach_geometry` ~771 — Physically carve a 3D breach corridor across an earthen dam embankment
+    - `def condition_gorge_thalweg` ~860 — Ensure narrow gorge thalweg points are not blocked by cell coarsening averaging
+    - `def escape_head_4connected` ~901 — Head above the release cell at which it first connects to the DEM edge
+- **`src/m2_geometry/fill.py`** — 545 lines — M2 — DEM Fill & Stage-Storage Curve ===================================== Given a conditioned DEM (UTM, bare-e
     - `class ImpoundmentGeometry` ~35 — Geometric properties derived from DEM fill analysis
     - `def build_stage_storage` ~49 — Build the stage-storage curve and impoundment geometry
     - `def compute_lake_depth_grids` ~229 — Generate 2D depth grids showing the progressive filling and upstream expansion of the natural la
+    - `def _pool_machinery` ~340 — Barrier-emplaced grid, seed cell, pixel area and a connected-pool probe
+    - `def equal_volume_levels` ~379 — Levels whose impounded volumes are as equally spaced as terrain allows
+    - `def lake_formation_levels` ~432 — Equal-VOLUME levels for a pre-breach lake-formation animation
+    - `def level_for_volume_fraction` ~469 — Water level that impounds ``fraction`` of the full pool's VOLUME
 - **`src/m2_geometry/seed_walk.py`** — 47 lines — Shared river-walk used to find a seed point clear of a barrier
     - `def walk_seed` ~16 — Nearest river point clear of `barrier_clear`, walked from the breach point
-- **`src/m2_geometry/validation.py`** — 276 lines — Fail-closed physical geometry checks for the hydraulic coupling boundary
+- **`src/m2_geometry/validation.py`** — 327 lines — Fail-closed physical geometry checks for the hydraulic coupling boundary
     - `class GeometryValidationError` ~20 — Raised when geometry cannot support a hydraulic run
-    - `class ImpoundmentDoesNotHoldError` ~24 — The geometry is structurally valid but the pool will not stay put
-    - `def validate_geometry` ~61 — Validate canonical scenario geometry and prepare raster coupling masks
+    - `class ImpoundmentDoesNotHoldError` ~34 — The geometry is structurally valid but the pool will not stay put
+    - `def validate_geometry` ~68 — Validate canonical scenario geometry and prepare raster coupling masks
 
 ## `src/m3_breach` — Breach growth, reservoir routing, flow-regime gate
 
@@ -135,7 +139,7 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def run_swe_sph_1d` ~134 — Advance 1D SWE-SPH particles
     - `def ritter_dam_break_sph` ~247 — Set up and run the classical dam break with SWE-SPH
     - `def run_scenario_thalweg_sph` ~274 — Simulate 1D longitudinal SPH propagation down the scenario thalweg corridor driven by the physic
-- **`src/m4_solvers/swe_2d.py`** — 1264 lines — FloodSight
+- **`src/m4_solvers/swe_2d.py`** — 1272 lines — FloodSight
     - `def _active_window` ~86 — Row/col slices of the box holding every wet cell, plus `halo`
     - `class InflowBoundary` ~186 — One inflow point for the multi-inflow interface (Part 3)
     - `class BreachOpening` ~203 — A hole cut in the emplaced barrier, widening and deepening with time
@@ -229,62 +233,64 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 ## `src/api` — FastAPI service and job worker
 
 - **`src/api/__init__.py`** — 0 lines
-- **`src/api/main.py`** — 772 lines — FloodSight
-    - `def _rehydrate_saved_scenarios` ~86 — Rehydrate only completed, valid manifests; legacy archives stay untrusted
-    - `def startup_event` ~129
-    - `class RunRequest` ~137
-    - `def _reconcile_job` ~152 — Bring _JOBS[job_id] up to date from its manifest before serving it
-    - `def run_simulation_endpoint` ~208
-    - `def get_manifest` ~249
-    - `def cancel_simulation` ~264
-    - `def get_status` ~283
-    - `def get_results` ~295
-    - `def get_hydrograph` ~306
-    - `def download_export` ~314
-    - `def get_snapshots` ~326 — Return the depth-snapshot frame index for the time-scrubber
-    - `def get_snapshot_frame` ~345 — Return one GeoJSON frame by index
-    - `def get_snapshot_raster` ~361 — Return the smooth RGBA preview texture for one real depth frame
-    - `def get_ritter` ~384 — Return Ritter analytical validation data
-    - `def get_solver_comparison` ~399 — Return 1D SWE-SPH vs 2D FV thalweg scenario comparison data
-    - `def get_lake_formation` ~413 — Return pre-breach lake formation metadata for this job
-    - `def get_scenarios_metadata` ~428 — Return keyed canonical scenario manifests
-    - `def get_latest_scenario_job` ~436 — Return only the latest valid manifest-backed run
-    - `def get_roads_timeline` ~468 — Return roads_timeline.geojson
-    - `def get_arrival_time_raster` ~480 — Return the arrival-time GeoTIFF (values in minutes, nodata where never wet)
-    - `def get_envelope_raster` ~492 — Return the ensemble extent envelope GeoTIFF
-    - `def get_envelope_geojson` ~504 — Return the ensemble extent envelope GeoJSON
-    - `def _registered_frame_path` ~533 — Resolve a frame only when the manifest vouches for it
-    - `def get_validation` ~594 — Skill scores against the observed flood, when one exists for this scenario
-    - `def get_validation_agreement` ~611 — Hit / miss / false-alarm polygons for the simulated-vs-observed overlay
-    - `def get_observed_extent` ~618 — The observed flood extent itself, as delineated by the source agency
-    - `def get_validation_roads` ~625 — Observed road links tagged with the model's verdict for each
-    - `def get_validation_arrivals` ~632 — Historical arrival time and peak depth validation comparison
-    - `def list_observed_scenarios` ~645 — Which scenarios have an observed outcome on disk, for the UI to advertise
-    - `def get_context_layer` ~683 — Serve a cached context layer for a scenario
-    - `def get_malpasset_benchmark` ~746 — Canonical dry-bed dam break benchmark data for Malpasset (1959)
+- **`src/api/main.py`** — 883 lines — FloodSight
+    - `def _job_fields_from_result` ~86 — The artifact keys a completed job serves, derived from one place
+    - `def _rehydrate_saved_scenarios` ~124 — Rehydrate only completed, valid manifests; legacy archives stay untrusted
+    - `def startup_event` ~176
+    - `class RunRequest` ~184
+    - `def _reconcile_job` ~240 — Bring _JOBS[job_id] up to date from its manifest before serving it
+    - `def run_simulation_endpoint` ~293
+    - `def get_manifest` ~357
+    - `def cancel_simulation` ~375
+    - `def get_status` ~394
+    - `def get_results` ~406
+    - `def get_hydrograph` ~417
+    - `def download_export` ~425
+    - `def get_snapshots` ~437 — Return the depth-snapshot frame index for the time-scrubber
+    - `def get_snapshot_frame` ~456 — Return one GeoJSON frame by index
+    - `def get_snapshot_raster` ~472 — Return the smooth RGBA preview texture for one real depth frame
+    - `def get_ritter` ~495 — Return Ritter analytical validation data
+    - `def get_solver_comparison` ~510 — Return 1D SWE-SPH vs 2D FV thalweg scenario comparison data
+    - `def get_lake_formation` ~524 — Return pre-breach lake formation metadata for this job
+    - `def get_scenarios_metadata` ~539 — Return keyed canonical scenario manifests
+    - `def get_latest_scenario_job` ~547 — Return only the latest valid manifest-backed run
+    - `def get_roads_timeline` ~579 — Return roads_timeline.geojson
+    - `def get_arrival_time_raster` ~591 — Return the arrival-time GeoTIFF (values in minutes, nodata where never wet)
+    - `def get_envelope_raster` ~603 — Return the ensemble extent envelope GeoTIFF
+    - `def get_envelope_geojson` ~615 — Return the ensemble extent envelope GeoJSON
+    - `def _registered_frame_path` ~644 — Resolve a frame only when the manifest vouches for it
+    - `def get_validation` ~705 — Skill scores against the observed flood, when one exists for this scenario
+    - `def get_validation_agreement` ~722 — Hit / miss / false-alarm polygons for the simulated-vs-observed overlay
+    - `def get_observed_extent` ~729 — The observed flood extent itself, as delineated by the source agency
+    - `def get_validation_roads` ~736 — Observed road links tagged with the model's verdict for each
+    - `def get_validation_arrivals` ~743 — Historical arrival time and peak depth validation comparison
+    - `def list_observed_scenarios` ~756 — Which scenarios have an observed outcome on disk, for the UI to advertise
+    - `def get_context_layer` ~794 — Serve a cached context layer for a scenario
+    - `def get_malpasset_benchmark` ~857 — Canonical dry-bed dam break benchmark data for Malpasset (1959)
 - **`src/api/routes/__init__.py`** — 0 lines
-- **`src/api/worker.py`** — 72 lines — Bounded subprocess entrypoint for one FloodSight simulation
+- **`src/api/worker.py`** — 140 lines — Bounded subprocess entrypoint for one FloodSight simulation
     - `def run_manifest_file` ~11
-    - `def main` ~65
+    - `def main` ~133
 
 ## `src` — Shared: scenarios, provenance, manifests, raster helpers
 
 - **`src/__init__.py`** — 0 lines
-- **`src/data_fetcher.py`** — 1303 lines — FloodSight — Dataset Fetcher ============================ Fetches the real open datasets the pipeline runs on
+- **`src/data_fetcher.py`** — 1328 lines — FloodSight — Dataset Fetcher ============================ Fetches the real open datasets the pipeline runs on
     - `def _load_external_scenarios` ~605 — Merge `data/scenarios_def/<key>.json` definitions into SCENARIOS
-    - `def fetch_dem` ~659 — Fetch Copernicus GLO-30 for the scenario bbox and reproject to local UTM
-    - `def _bbox_stamp_ok` ~740 — Is this cached OSM layer the one the CURRENT scenario bbox asks for? These caches key on FILENAM
-    - `def _load_labelled` ~770 — Serve a cached OSM layer, LABELLED with whether it matches this bbox
-    - `def generate_synthetic_dem` ~833 — Analytic stand-in terrain, for running the demo with no network
-    - `def get_dem` ~870 — Real DEM, falling back to synthetic only when explicitly permitted
-    - `def fetch_population` ~935 — Clip GHS-POP to the scenario DEM grid, conserving population counts
-    - `def _osm_features` ~1042 — Query OSM features; distinguish empty result from network failure
-    - `def download_osm_road_network` ~1098 — Download and cache the drivable road network
-    - `def build_villages` ~1127 — Build village polygons from real OSM ``place`` nodes
-    - `def build_rivers` ~1189 — River and stream centrelines from OSM
-    - `def build_facilities` ~1225 — Hospitals, clinics and schools from OSM
-    - `def build_buildings` ~1258 — OSM building footprints
-    - `def prepare_all` ~1281 — Fetch every layer for one scenario, or for all of them
+    - `def scenario_key_for` ~646 — Map a geometry-MANIFEST key to the SCENARIO key it belongs to
+    - `def fetch_dem` ~684 — Fetch Copernicus GLO-30 for the scenario bbox and reproject to local UTM
+    - `def _bbox_stamp_ok` ~765 — Is this cached OSM layer the one the CURRENT scenario bbox asks for? These caches key on FILENAM
+    - `def _load_labelled` ~795 — Serve a cached OSM layer, LABELLED with whether it matches this bbox
+    - `def generate_synthetic_dem` ~858 — Analytic stand-in terrain, for running the demo with no network
+    - `def get_dem` ~895 — Real DEM, falling back to synthetic only when explicitly permitted
+    - `def fetch_population` ~960 — Clip GHS-POP to the scenario DEM grid, conserving population counts
+    - `def _osm_features` ~1067 — Query OSM features; distinguish empty result from network failure
+    - `def download_osm_road_network` ~1123 — Download and cache the drivable road network
+    - `def build_villages` ~1152 — Build village polygons from real OSM ``place`` nodes
+    - `def build_rivers` ~1214 — River and stream centrelines from OSM
+    - `def build_facilities` ~1250 — Hospitals, clinics and schools from OSM
+    - `def build_buildings` ~1283 — OSM building footprints
+    - `def prepare_all` ~1306 — Fetch every layer for one scenario, or for all of them
 - **`src/gee_satellite.py`** — 161 lines — FloodSight
     - `class GEESatelliteAnalyzer` ~50 — Google Earth Engine Sentinel-1 SAR and Sentinel-2 Optical flood analysis engine
 - **`src/observation_manifest.py`** — 114 lines — Fail-closed validation for scenario-keyed observed products
@@ -323,9 +329,9 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 
 - **`scripts/author_arrival_manifest.py`** — 207 lines — Author data/observations/annamayya/arrivals.json from the evidence file
     - `def main` ~98
-- **`scripts/author_crest_elevations.py`** — 226 lines — Author the required `crest_elev_m` field onto each geometry manifest
-    - `def derive_crest` ~99 — Return the crest block for one scenario, or None if it cannot be sourced
-    - `def main` ~195
+- **`scripts/author_crest_elevations.py`** — 227 lines — Author the required `crest_elev_m` field onto each geometry manifest
+    - `def derive_crest` ~99 — Return the crest block for one manifest, or None if it cannot be sourced
+    - `def main` ~196
 - **`scripts/check_prewet.py`** — 53 lines — Which validation points were ALREADY wet before the dam broke? The wet-channel run starts from an 18 h spin-up
 - **`scripts/corridor_coverage.py`** — 180 lines — How much of the reconstructed flood corridor did a run actually wet? python scripts/corridor_coverage.py data/
     - `def corridor_bands` ~52
@@ -333,7 +339,21 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def main` ~91
 - **`scripts/diagnostics/check_all_rasters.py`** — 48 lines
 - **`scripts/diagnostics/check_breach_location.py`** — 60 lines
+- **`scripts/diagnostics/check_conveyance.py`** — 228 lines — Can the Cheyyeru, as this model represents it, move water fast enough? Terrain + Manning only
+    - `def manning_normal` ~89 — Normal depth and velocity for a wide rectangular channel
+    - `def reach_profile` ~97 — Bed elevation along `line`, clipped to the reach at or below the crest
+    - `def analyse` ~116
+    - `def self_check` ~164 — The claims this diagnostic is cited for must actually hold
+    - `def main` ~208
 - **`scripts/diagnostics/check_depth_data.py`** — 40 lines
+- **`scripts/diagnostics/check_geometry_gates.py`** — 150 lines — One command for "where does every dam actually stand"
+    - `def check` ~82
+    - `def main` ~138
+- **`scripts/diagnostics/check_sourced_consistency.py`** — 279 lines — Cross-check each scenario's three sourced impoundment numbers against terrain
+    - `def _probe_factory` ~65 — Volume and along-river extent of the upstream pool at a given level
+    - `def check` ~105
+    - `def check_cascade_datum` ~180 — Compare a cascade reservoir's declared elevations against its own terrain
+    - `def main` ~263
 - **`scripts/gen_atlas.py`** — 262 lines — Generate ATLAS.md — the "which file do I edit" map — from the source tree
     - `def build` ~189
     - `def main` ~253
@@ -348,18 +368,17 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def hillshade` ~30 — Standard Horn hillshade, 0-1
     - `def render` ~76
     - `def main` ~220
-- **`scripts/make_lake_formation.py`** — 580 lines — Build the pre-breach lake-formation animation for one scenario
-    - `def equal_volume_levels` ~89 — Levels whose impounded volumes are as equally spaced as the terrain allows
-    - `def _priority_flood` ~152 — Grow from `seed` in ascending elevation, stopping at `level` or `max_cells`
-    - `def hypsometric_frames` ~207
-    - `def dem_fill_frames` ~264
-    - `def phutkal_times` ~314 — Sourced duration, assumed constant inflow
-    - `def annamayya_routed_rise` ~338 — Pre-breach (t <= 0) reservoir elevation, routed from the Pincha surge
-    - `def annamayya_times` ~346 — Routed where a routing exists; level-indexed where none does
-    - `def write_run` ~383
-    - `def self_check` ~426 — The smallest set of assertions that fails if the frame logic breaks
-    - `def build` ~473
-    - `def main` ~548
+- **`scripts/make_lake_formation.py`** — 538 lines — Build the pre-breach lake-formation animation for one scenario
+    - `def _priority_flood` ~110 — Grow from `seed` in ascending elevation, stopping at `level` or `max_cells`
+    - `def hypsometric_frames` ~165
+    - `def dem_fill_frames` ~222
+    - `def phutkal_times` ~272 — Sourced duration, assumed constant inflow
+    - `def annamayya_routed_rise` ~296 — Pre-breach (t <= 0) reservoir elevation, routed from the Pincha surge
+    - `def annamayya_times` ~304 — Routed where a routing exists; level-indexed where none does
+    - `def write_run` ~341
+    - `def self_check` ~384 — The smallest set of assertions that fails if the frame logic breaks
+    - `def build` ~431
+    - `def main` ~506
 - **`scripts/new_dam.py`** — 221 lines — Register a new dam or river blockage as a scenario — the plug-in path
     - `def write_definition` ~72
     - `def fetch_inputs` ~101
@@ -392,6 +411,18 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def main` ~879
         _1 sections:_
         - ~1140 · M8 exports: .shp / .kml
+- **`scripts/solver_comparison.py`** — 720 lines — Standalone comparison attempt between the two M4 solver arms on phutkal_real
+    - `def load_hydrograph` ~119
+    - `def resample_hydrograph` ~139 — Uniform-grid resample that preserves the integral rather than trusting any single raw instantane
+    - `def load_raster_times` ~164
+    - `def build_stem_and_breach` ~188
+    - `def local_bed_slope` ~216
+    - `def find_wet_reach_limit` ~231 — Furthest downstream chainage where max_depth.tif ever showed water
+    - `def build_stations` ~255
+    - `def sample_2d_swath` ~278
+    - `def build_comparison` ~299
+    - `def run_checks` ~623
+    - `def main` ~670
 
 ## `tests` — Executable knowledge — what is pinned
 
@@ -473,6 +504,14 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_cwc_dam_engineering_override` ~43 — Verify that providing engineering specs (crest length, dam type) clamps breach geometry
     - `def test_lulc_to_manning_mapping` ~73 — Verify that ESA WorldCover land cover codes convert to exact physical roughness values
     - `def test_custom_population_csv_override` ~89 — Verify that surveyed local headcounts (e.g
+- **`tests/test_hand_numpy2_shim.py`** — 79 lines — HAND and flow accumulation must survive NumPy 2's removal of `np.in1d`
+    - `def test_hand_and_accumulation_are_produced` ~45
+    - `def test_shim_preserves_in1d_ravel_semantics` ~67 — `in1d` ravels its first argument; `isin` does not
+- **`tests/test_job_rehydration_is_complete.py`** — 122 lines — A run restored from disk must serve every artifact a live run serves
+    - `def test_field_map_covers_every_artifact_key` ~61
+    - `def test_both_paths_use_the_shared_field_map` ~67 — Neither path may hand-roll its own subset again
+    - `def test_rehydrated_job_carries_the_artifact_keys` ~76 — The real thing: rehydrate from disk and check nothing is dropped
+    - `def test_a_rehydrated_job_actually_serves_its_registered_artifacts` ~90 — End to end: if the manifest registers a file that exists, serve it
 - **`tests/test_lake_at_rest_bounded.py`** — 178 lines — The lake-at-rest benchmark does not test a lake that stays in the domain
     - `def test_the_shipped_benchmark_lake_now_stays_in_the_domain` ~72 — Inverted 2026-09-13 — and the reason is the most useful thing this file found
     - `def test_a_bounded_lake_stays_at_rest` ~103 — FIXED 2026-09-13
@@ -483,6 +522,13 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_scenario_cascade_and_lake_metadata` ~53 — Verify scenarios have lake formation, cascading structures, and solver parameters
     - `def test_gee_sentinel1_sar_analyzer` ~84 — Verify GEE Sentinel-1 SAR analysis generates valid GeoJSON footprints
     - `def test_api_scenarios_metadata_and_sar_layer` ~99 — Test API endpoint responses for scenario metadata and SAR layer
+- **`tests/test_lake_formation_levels.py`** — 150 lines — Lake-formation frames are spaced by VOLUME, and one implementation does it
+    - `def test_probe_agrees_with_compute_lake_depth_grids` ~42 — `_pool_machinery` duplicates three lines of barrier emplacement
+    - `def test_frames_are_evenly_spaced_in_volume_not_height` ~73
+    - `def test_no_frame_is_empty` ~104 — Two of the pipeline's four old frames held 0.00 MCM
+    - `def test_sills_are_reported_not_smoothed` ~116 — A pool topping a sill is a real feature; it must be reported
+    - `def test_degenerate_input_raises_rather_than_returning_nothing` ~130
+    - `def test_equal_volume_levels_is_pure_and_shared` ~138 — The solver takes a callable, so both backends can drive it
 - **`tests/test_mass_gates.py`** — 160 lines — P1 — the three mass gates, and the escape-head search behind G3
     - `def test_the_gates_under_test_are_the_pipeline_s_own` ~41 — Guards the import above
     - `def test_g1_fails_on_the_certified_double_counted_run` ~52 — The P1 acceptance test, stated in the audit SS36
@@ -525,6 +571,10 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_settled_water_stops_long_before_the_cap` ~31
     - `def test_it_does_not_stop_while_water_is_still_arriving` ~51 — Supply is checked first: a still domain with a hydrograph yet to deliver must keep running, or a
     - `def test_without_the_flag_the_cap_is_still_honoured` ~72 — Default behaviour is unchanged: run the full window, stopped_early False
+- **`tests/test_refusal_carries_diagnostics.py`** — 94 lines — The seed-separation refusal must carry the numbers that explain it
+    - `def test_message_is_still_only_the_message` ~58 — Passing a result dict must not leak into str(exc) as a tuple
+    - `def test_refusal_carries_the_discriminating_numbers` ~68
+    - `def test_passing_geometry_does_not_raise` ~89 — Guard the other direction: the diagnostics must not turn a pass into a failure
 - **`tests/test_reservoir_cascade_continuity.py`** — 205 lines — Stage A — reservoir/state continuity tests for src/m3_breach/cascade.py
     - `def test_no_reinitialization_continuous_across_trigger` ~23 — Requirement 1: one array holds storage/elevation across the whole run
     - `def test_insufficient_forcing_no_failure` ~63 — Requirement 2: scaled-down inflow never lifts z to z_crest_m -> breach discharge zero for the wh
@@ -534,6 +584,10 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_storage_never_exceeds_inflow_bound` ~145 — Requirement 6: at every timestep, v_res[i+1] <= v_res[i] + q_inflow[i]*dt_s
     - `def test_no_manufactured_mass_when_outflow_capacity_exceeds_storage` ~161 — Requirement 7: when spillway+breach capacity far exceeds remaining storage, outflow must be capp
     - `def test_full_run_mass_closure` ~192 — Requirement 8: full-run mass ledger closes to within 1e-6 relative (machine precision, since req
+- **`tests/test_reservoir_fill_is_volume.py`** — 109 lines — `reservoir_fill` is a VOLUME fraction, and the initial condition must honour it
+    - `def test_volume_fraction_level_holds_that_fraction_of_volume` ~53
+    - `def test_stage_and_volume_fractions_actually_differ` ~71 — If these ever coincide the fixture has stopped exercising the defect
+    - `def test_degenerate_fractions_are_clamped` ~95
 - **`tests/test_ritter.py`** — 115 lines — Property tests for the Ritter ANALYTICAL solution and the breach ensemble
     - `def test_ritter_wave_front_speed` ~19 — Wave front must travel at x = 2*c0*t (Ritter 1892)
     - `def test_ritter_upstream_undisturbed` ~32 — Upstream of the rarefaction the depth must equal h1
@@ -553,13 +607,21 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_regime_status_classifies_against_the_clear_water_solver` ~199
     - `def test_debris_flow_names_the_state_variables_swe_does_not_carry` ~208
     - `def test_unknown_regime_is_refused_rather_than_defaulted` ~214
-- **`tests/test_run_lifecycle.py`** — 187 lines — Integration regression for FS-01/FS-02/FS-04/FS-45
+- **`tests/test_run_lifecycle.py`** — 210 lines — Integration regression for FS-01/FS-02/FS-04/FS-45
     - `def test_pipeline_emits_validity_and_manifest_lifecycle_completes` ~53
-    - `def test_crest_gate_rejects_wse_above_dem_barrier` ~160 — FS-04: a scenario whose asserted WSE exceeds the DEM barrier must fail physics validity rather t
+    - `def test_crest_gate_rejects_wse_above_dem_barrier` ~183 — FS-04: a scenario whose asserted WSE exceeds the DEM barrier must fail physics validity rather t
 - **`tests/test_run_manifest.py`** — 43 lines
     - `def test_manifest_atomic_and_hash_gate` ~22
     - `def test_paths_transitions_and_latest_are_strict` ~31
     - `def test_manifestless_archive_is_not_authoritative` ~40
+- **`tests/test_scenario_geometry_is_resolvable.py`** — 93 lines — Every scenario must resolve to geometry, or say why it cannot — not crash
+    - `def test_scenario_has_geometry_under_its_own_key_or_per_structure` ~33
+    - `def test_south_lhonak_is_the_per_structure_case` ~42 — Guard the compound-event shape explicitly
+    - `def test_south_lhonak_dem_is_present` ~56 — memory.md recorded 'no manifest under its own key and no DEM' on 2026-09-12
+    - `def test_scenario_key_for_is_identity_for_single_structure_events` ~62 — Every scenario key maps to itself
+    - `def test_scenario_key_for_maps_south_lhonak_structures` ~68
+    - `def test_scenario_key_for_leaves_unmatched_keys_alone` ~73 — derna / ivanovo / malpasset have no SCENARIOS entry and must keep failing for that reason rather
+    - `def test_scenario_key_for_prefers_the_longest_prefix` ~80 — A shorter scenario key must not capture a longer one's structure
 - **`tests/test_snapshot_frame_serving.py`** — 91 lines — Snapshot frames must be servable, and only from inside their own run
     - `def test_a_frame_listed_in_the_index_resolves` ~50
     - `def test_a_path_outside_the_run_directory_is_refused` ~60 — A tampered index must not become an arbitrary-file read
@@ -640,12 +702,20 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
     - `def test_f3_on_real_conditioned_terrain` ~103 — The same property on the array the solver actually integrates
     - `def test_f1_a_bounded_lake_stays_at_rest` ~173
     - `def test_f1_on_real_conditioned_terrain` ~180 — The end-to-end property on a real DEM patch, walled so it cannot drain
+- **`tests/test_wse_m_is_refused.py`** — 158 lines — `wse_m` must be REFUSED — never honoured, and never silently discarded
+    - `def test_supplying_a_water_level_raises` ~44 — Any supplied level is refused, including ones that look plausible
+    - `def test_refusal_happens_before_any_work` ~56 — The guard must fire before the run creates its output directory
+    - `def test_none_is_the_accepted_value` ~69 — `None` must be the signature default, so no caller has to know to pass it
+    - `def test_cli_does_not_manufacture_a_level` ~76 — `--wse` must default to None and must not fall back to the scenario's own
+    - `def test_request_model_defaults_to_none` ~89 — A fictional default is what put a wrong level into every manifest
+    - `def test_api_refuses_a_supplied_water_level` ~97
+    - `def test_api_does_not_reject_a_request_that_omits_it` ~106 — Omitting the field must not trip the refusal
 
 ## `frontend` — Browser UI
 
 - **`frontend/charts.js`** — 542 lines
 - **`frontend/debug.js`** — 270 lines
-- **`frontend/map.js`** — 4176 lines
+- **`frontend/map.js`** — 4267 lines
 - **`frontend/maplibre-gl.js`** — 59 lines
 - **`frontend/plotly-2.32.0.min.js`** — 8 lines
 - **`frontend/spine.js`** — 546 lines
@@ -655,4 +725,4 @@ line. Semantics — routing, invariants, traps — are in `INVARIANTS.md`.
 
 ---
 
-_104 files indexed._
+_115 files indexed._

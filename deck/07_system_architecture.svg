@@ -1,0 +1,623 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2400 1350" width="2400" height="1350" role="img" aria-label="FloodSight System Architecture 16:9 Flowchart">
+  <defs>
+    <!-- Filters -->
+    <filter id="card-shadow" x="-5%" y="-4%" width="110%" height="114%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="2.5" stdDeviation="3.5" flood-color="#0F172A" flood-opacity="0.06"/>
+    </filter>
+    <filter id="focus-shadow" x="-6%" y="-5%" width="112%" height="116%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-color="#7C3AED" flood-opacity="0.18"/>
+    </filter>
+    <filter id="hero-shadow" x="-5%" y="-4%" width="110%" height="116%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="5" stdDeviation="7" flood-color="#15803D" flood-opacity="0.25"/>
+    </filter>
+    <filter id="abort-shadow" x="-6%" y="-5%" width="112%" height="116%" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#DC2626" flood-opacity="0.18"/>
+    </filter>
+
+    <!-- Gradients -->
+    <linearGradient id="bg-canvas" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F8FAFC"/>
+      <stop offset="60%" stop-color="#F1F5F9"/>
+      <stop offset="100%" stop-color="#E2E8F0"/>
+    </linearGradient>
+
+    <linearGradient id="hero-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#15803D"/>
+      <stop offset="100%" stop-color="#0F5132"/>
+    </linearGradient>
+
+    <linearGradient id="solver-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FAF5FF"/>
+      <stop offset="100%" stop-color="#F3E8FF"/>
+    </linearGradient>
+
+    <!-- Arrow markers -->
+    <marker id="arrow-blue" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#0284C7"/>
+    </marker>
+    <marker id="arrow-green" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#059669"/>
+    </marker>
+    <marker id="arrow-amber" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#D97706"/>
+    </marker>
+    <marker id="arrow-purple" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#7C3AED"/>
+    </marker>
+    <marker id="arrow-rose" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#E11D48"/>
+    </marker>
+    <marker id="arrow-slate" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#64748B"/>
+    </marker>
+    <marker id="arrow-red" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 1.5 L 8 5 L 0 8.5 z" fill="#DC2626"/>
+    </marker>
+  </defs>
+  <rect x="0" y="0" width="2400" height="1350" fill="url(#bg-canvas)"/>
+  <!-- ==================== HEADER BAR ==================== -->
+  <g id="header-bar">
+    <rect x="36" y="16" width="6" height="54" rx="3" fill="#2563EB"/>
+    <text x="52" y="42" font-family="Segoe UI, Inter, Calibri, sans-serif" font-size="26" font-weight="800" fill="#0F172A" letter-spacing="-0.02em">FloodSight · End-to-End System Architecture</text>
+    <text x="52" y="64" font-family="Segoe UI, Inter, Calibri, sans-serif" font-size="13.5" font-weight="500" fill="#64748B">Every block maps directly to a concrete, tested function or class in the source tree · Referenced in ATLAS.md (commit d903da9)</text>
+    <g id="legend" transform="translate(1560, 20)">
+      <rect x="0" y="0" width="804" height="46" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="url(#card-shadow)"/>
+      <rect x="18" y="15" width="16" height="16" rx="4" fill="#EFF6FF" stroke="#2563EB" stroke-width="2"/>
+      <text x="42" y="28" font-family="Segoe UI, Inter, sans-serif" font-size="12.5" font-weight="600" fill="#1E293B">Implemented &amp; Tested</text>
+      <rect x="208" y="15" width="16" height="16" rx="4" fill="#F8FAFC" stroke="#94A3B8" stroke-width="2" stroke-dasharray="4 3"/>
+      <text x="232" y="28" font-family="Segoe UI, Inter, sans-serif" font-size="12.5" font-weight="600" fill="#64748B">Exists, Unwired</text>
+      <rect x="364" y="15" width="16" height="16" rx="4" fill="#FEF2F2" stroke="#DC2626" stroke-width="2"/>
+      <text x="388" y="28" font-family="Segoe UI, Inter, sans-serif" font-size="12.5" font-weight="600" fill="#DC2626">Fails-Closed Safety Gate</text>
+      <rect x="568" y="11" width="220" height="24" rx="12" fill="#DCFCE7" stroke="#16A34A" stroke-width="1.2"/>
+      <text x="678" y="27" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="700" fill="#15803D" text-anchor="middle">5-Tier Epistemic Provenance</text>
+    </g>
+  </g>
+  <!-- ================= STAGE 1 COLUMN ================= -->
+  <g id="stage-col-1">
+    <rect x="36" y="82" width="442" height="1184" rx="14" fill="#F8FAFC" stroke="#BAE6FD" stroke-width="1.8"/>
+    <rect x="36" y="82" width="442" height="6" rx="3" fill="#0284C7"/>
+    <rect x="52" y="96" width="80" height="22" rx="11" fill="#E0F2FE"/>
+    <text x="92" y="111" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="700" fill="#0369A1" text-anchor="middle">M1</text>
+    <text x="140" y="113" font-family="Segoe UI, Inter, sans-serif" font-size="15" font-weight="800" fill="#0F172A" letter-spacing="0.03em">DATA INGESTION</text>
+    <text x="52" y="132" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="500" fill="#64748B">Autonomous open data fetch from coordinate / BBox</text>
+    <line x1="52" y1="142" x2="462" y2="142" stroke="#BAE6FD" stroke-width="1"/>
+    </g>
+  <!-- ================= STAGE 2 COLUMN ================= -->
+  <g id="stage-col-2">
+    <rect x="498" y="82" width="442" height="1184" rx="14" fill="#F8FAFC" stroke="#BBF7D0" stroke-width="1.8"/>
+    <rect x="498" y="82" width="442" height="6" rx="3" fill="#059669"/>
+    <rect x="514" y="96" width="80" height="22" rx="11" fill="#D1FAE5"/>
+    <text x="554" y="111" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="700" fill="#047857" text-anchor="middle">M2</text>
+    <text x="602" y="113" font-family="Segoe UI, Inter, sans-serif" font-size="15" font-weight="800" fill="#0F172A" letter-spacing="0.03em">TERRAIN &amp; GEOMETRY</text>
+    <text x="514" y="132" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="500" fill="#64748B">DEM conditioning, seeded fill &amp; hard safety gate</text>
+    <line x1="514" y1="142" x2="924" y2="142" stroke="#BBF7D0" stroke-width="1"/>
+    </g>
+  <!-- ================= STAGE 3 COLUMN ================= -->
+  <g id="stage-col-3">
+    <rect x="960" y="82" width="442" height="1184" rx="14" fill="#F8FAFC" stroke="#FDE68A" stroke-width="1.8"/>
+    <rect x="960" y="82" width="442" height="6" rx="3" fill="#D97706"/>
+    <rect x="976" y="96" width="80" height="22" rx="11" fill="#FEF3C7"/>
+    <text x="1016" y="111" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="700" fill="#B45309" text-anchor="middle">M3</text>
+    <text x="1064" y="113" font-family="Segoe UI, Inter, sans-serif" font-size="15" font-weight="800" fill="#0F172A" letter-spacing="0.03em">BREACH &amp; CASCADE</text>
+    <text x="976" y="132" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="500" fill="#64748B">3-arm ensemble, weir kernel &amp; dynamic trigger</text>
+    <line x1="976" y1="142" x2="1386" y2="142" stroke="#FDE68A" stroke-width="1"/>
+    </g>
+  <!-- ================= STAGE 4 COLUMN ================= -->
+  <g id="stage-col-4">
+    <rect x="1422" y="82" width="452" height="1184" rx="14" fill="#F8FAFC" stroke="#DDD6FE" stroke-width="1.8"/>
+    <rect x="1422" y="82" width="452" height="6" rx="3" fill="#7C3AED"/>
+    <rect x="1438" y="96" width="80" height="22" rx="11" fill="#EDE9FE"/>
+    <text x="1478" y="111" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="700" fill="#6D28D9" text-anchor="middle">M4</text>
+    <text x="1526" y="113" font-family="Segoe UI, Inter, sans-serif" font-size="15" font-weight="800" fill="#0F172A" letter-spacing="0.03em">2D HYDRODYNAMICS</text>
+    <text x="1438" y="132" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="500" fill="#64748B">Audusse SWE solver, active-window &amp; SPH arm</text>
+    <line x1="1438" y1="142" x2="1858" y2="142" stroke="#DDD6FE" stroke-width="1"/>
+    </g>
+  <!-- ================= STAGE 5 COLUMN ================= -->
+  <g id="stage-col-5">
+    <rect x="1894" y="82" width="470" height="1184" rx="14" fill="#F8FAFC" stroke="#FECDD3" stroke-width="1.8"/>
+    <rect x="1894" y="82" width="470" height="6" rx="3" fill="#E11D48"/>
+    <rect x="1910" y="96" width="80" height="22" rx="11" fill="#FFE4E6"/>
+    <text x="1950" y="111" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="700" fill="#BE123C" text-anchor="middle">M5-M10</text>
+    <text x="1998" y="113" font-family="Segoe UI, Inter, sans-serif" font-size="15" font-weight="800" fill="#0F172A" letter-spacing="0.03em">CONSEQUENCE &amp; DECISION</text>
+    <text x="1910" y="132" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="500" fill="#64748B">Road isolation cuts, ranking &amp; validation metrics</text>
+    <line x1="1910" y1="142" x2="2348" y2="142" stroke="#FECDD3" stroke-width="1"/>
+    </g>
+    <g transform="translate(52, 148)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">1. Hazard Ingest Initiator</text>
+      <rect x="349.5" y="12" width="46.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="372.75" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">INPUT</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">River coordinate (lat, lon) or lake bounding box</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Auto-loads calibrated scenario specifications</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">SCENARIOS[key] · run_pipeline.py</text>
+    </g>
+    <line x1="257.0" y1="258" x2="257.0" y2="278" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 278)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">2. Copernicus GLO-30 DEM</text>
+      <rect x="317.0" y="12" width="79.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="356.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">30m RASTER</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">30 m global elevation raster auto-fetched</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Reprojected to local UTM, voids walled off</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">fetch_dem · dem_utils.load_and_reproject</text>
+    </g>
+    <line x1="257.0" y1="388" x2="257.0" y2="408" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 408)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">3. Drivable Road Graph</text>
+      <rect x="310.5" y="12" width="85.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="353.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">OSMNX GRAPH</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">OpenStreetMap road network via OSMnx</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Pruned to drivable ways with speed limits</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">download_osm_road_network · isolation.py</text>
+    </g>
+    <line x1="257.0" y1="518" x2="257.0" y2="538" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 538)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">4. River Hydrologic Network</text>
+      <rect x="336.5" y="12" width="59.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="366.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">VECTORS</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Mapped river centrelines from OSM waterways</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Extracts hydraulic flowpaths and reach lengths</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">build_rivers · dem_utils.py</text>
+    </g>
+    <line x1="257.0" y1="648" x2="257.0" y2="668" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 668)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">5. Population Distribution Grid</text>
+      <rect x="323.5" y="12" width="72.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="359.75" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">100m GRID</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">GHS-POP 100 m human settlement grid</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Resampled conserving exact headcount mass</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">fetch_population · exposure.py</text>
+    </g>
+    <line x1="257.0" y1="778" x2="257.0" y2="798" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 798)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#0284C7" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#0284C7"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">6. Settlement &amp; Facility Vectors</text>
+      <rect x="343.0" y="12" width="53.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="369.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">ASSETS</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">OSM place nodes (villages/towns) &amp; structures</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Hospital, school, and bridge vulnerable assets</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">build_villages · build_facilities</text>
+    </g>
+    <line x1="257.0" y1="908" x2="257.0" y2="928" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <g transform="translate(52, 928)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5 4" filter="url(#card-shadow)"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#64748B">7. Satellite SAR &amp; Optical Ingest</text>
+      <rect x="330.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="363.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">OPTIONAL</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Sentinel-1 SAR backscatter + Sentinel-2 NDWI</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Google Earth Engine pre/post event imagery</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F8FAFC"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#94A3B8" text-anchor="middle">gee_satellite.py · unwired (no account needed)</text>
+    </g>
+    <line x1="257.0" y1="1038" x2="257.0" y2="1058" stroke="#0284C7" stroke-width="1.8" marker-end="url(#arrow-blue)"/>
+    <!-- Col 1 output summary -->
+    <g transform="translate(52, 1062)">
+      <rect x="0" y="0" width="410" height="94" rx="10" fill="#E0F2FE" stroke="#0284C7" stroke-width="2" filter="url(#card-shadow)"/>
+      <circle cx="30" cy="30" r="15" fill="#0284C7"/>
+      <polyline points="24,30 29,35 36,26" fill="none" stroke="#FFFFFF" stroke-width="2.5"/>
+      <text x="54" y="27" font-family="Segoe UI, Inter, sans-serif" font-size="14.5" font-weight="800" fill="#0369A1">Standardized Spatial Foundation</text>
+      <text x="54" y="46" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#0284C7">Rasters &amp; vectors clipped to local UTM study area</text>
+      <rect x="54" y="58" width="338" height="22" rx="4" fill="#BAE6FD"/>
+      <text x="223.0" y="73" font-family="Consolas, monospace" font-size="11" font-weight="700" fill="#0369A1" text-anchor="middle">AOI Footprint Verified &amp; Hydro-Conditioned</text>
+    </g>
+    <g transform="translate(514, 148)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">1. DEM Conditioning</text>
+      <rect x="317.0" y="12" width="79.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="356.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">BOUNDARIES</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Replace no-data and implausibly low cells</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Inserts impermeable bounding wall around AOI</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">dem_utils.condition_dem</text>
+    </g>
+    <line x1="719.0" y1="256" x2="719.0" y2="276" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+    <g transform="translate(514, 276)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">2. Flowline Carving</text>
+      <rect x="336.5" y="12" width="59.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="366.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">THALWEG</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Carve adverse bed rises along mapped thalweg</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Ensures continuous hydraulic slope to outlet</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">dem_utils.condition_flowline</text>
+    </g>
+    <line x1="719.0" y1="384" x2="719.0" y2="404" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+    <g transform="translate(514, 404)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">3. Domain Boundary Outlets</text>
+      <rect x="343.0" y="12" width="53.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="369.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">OUTLET</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Opens discharge exit cells at domain edge</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Prevents false artificial backwater ponding</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">dem_utils.open_river_outlets</text>
+    </g>
+    <line x1="719.0" y1="512" x2="719.0" y2="532" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+    <g transform="translate(514, 532)">
+      <rect x="0" y="0" width="410" height="112" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="112" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">4. Seeded Pool Fill &amp; Hypsometry</text>
+      <rect x="284.5" y="12" width="111.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="340.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">V(h) &amp; A(h)</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Upstream 4-connected component flood fill</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Computes stage-storage V(h) and area A(h) curves</text>
+      <rect x="18" y="86" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="99" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">fill.build_stage_storage · fill.py</text>
+    </g>
+    <line x1="719.0" y1="644" x2="719.0" y2="664" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+    <g transform="translate(514, 664)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">5. Barrier Crest &amp; Escape Head</text>
+      <rect x="336.5" y="12" width="59.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="366.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">BARRIER</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Emplaces physical barrier at crest elevation</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Checks 4-connected escape head above release</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">crest_elev_m · escape_head_4connected</text>
+    </g>
+    <line x1="719.0" y1="772" x2="719.0" y2="792" stroke="#059669" stroke-width="1.8" marker-end="url(#arrow-green)"/>
+    <!-- Hard Gate Diamond -->
+    <g id="gate-geometry">
+      <polygon points="719.0,800 920,853.0 719.0,906 518,853.0" fill="#FFFFFF" stroke="#059669" stroke-width="2.5" filter="url(#card-shadow)"/>
+      <rect x="659.0" y="818.0" width="120" height="20" rx="10" fill="#D1FAE5"/>
+      <text x="719.0" y="832.0" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="800" fill="#047857" text-anchor="middle">HARD SAFETY GATE</text>
+      <text x="719.0" y="855.0" font-family="Segoe UI, Inter, sans-serif" font-size="14.5" font-weight="800" fill="#0F172A" text-anchor="middle">Does terrain hold water?</text>
+      <text x="719.0" y="875.0" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#059669" text-anchor="middle">validation.validate_geometry</text>
+    </g>
+    <line x1="719.0" y1="906" x2="719.0" y2="944" stroke="#DC2626" stroke-width="1.8" marker-end="url(#arrow-red)"/>
+    <rect x="679.0" y="916" width="80" height="20" rx="4" fill="#FEE2E2"/>
+    <text x="719.0" y="930" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" font-weight="800" fill="#DC2626" text-anchor="middle">NO / FAIL</text>
+    <g transform="translate(514, 944)">
+      <rect x="0" y="0" width="410" height="118" rx="10" fill="#FEF2F2" stroke="#DC2626" stroke-width="2" filter="url(#abort-shadow)"/>
+      <circle cx="28" cy="28" r="14" fill="#DC2626"/>
+      <line x1="22" y1="22" x2="34" y2="34" stroke="#FFFFFF" stroke-width="2.5"/>
+      <line x1="34" y1="22" x2="22" y2="34" stroke="#FFFFFF" stroke-width="2.5"/>
+      <text x="52" y="25" font-family="Segoe UI, Inter, sans-serif" font-size="14.5" font-weight="800" fill="#B91C1C">FAIL-CLOSED: RUN ABORTED</text>
+      <text x="52" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" fill="#7F1D1D">Refuses to publish flood map for unconfined</text>
+      <text x="52" y="62" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" fill="#7F1D1D">impoundment. No silent fallback or guessing.</text>
+      <rect x="52" y="91" width="342" height="19" rx="4" fill="#FEE2E2"/>
+      <text x="225.0" y="104" font-family="Consolas, monospace" font-size="10.5" font-weight="700" fill="#991B1B" text-anchor="middle">raise ImpoundmentDoesNotHoldError</text>
+    </g>
+    <!-- Gate PASS transition to Col 3 -->
+    <line x1="920" y1="853.0" x2="976" y2="853.0" stroke="#059669" stroke-width="2.8" marker-end="url(#arrow-green)"/>
+    <rect x="926" y="829.0" width="58" height="20" rx="4" fill="#DCFCE7" stroke="#16A34A" stroke-width="1"/>
+    <text x="955" y="843.0" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="800" fill="#15803D" text-anchor="middle">YES / PASS</text>
+    <!-- Col 2 Validated Summary -->
+    <g transform="translate(514, 1082)">
+      <rect x="0" y="0" width="410" height="94" rx="10" fill="#ECFDF5" stroke="#059669" stroke-width="2" filter="url(#card-shadow)"/>
+      <circle cx="30" cy="30" r="15" fill="#059669"/>
+      <polyline points="24,30 29,35 36,26" fill="none" stroke="#FFFFFF" stroke-width="2.5"/>
+      <text x="54" y="27" font-family="Segoe UI, Inter, sans-serif" font-size="14.5" font-weight="800" fill="#065F46">Geometry Validated</text>
+      <text x="54" y="46" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#047857">Physical barrier &amp; stage-storage curve verified</text>
+      <rect x="54" y="58" width="338" height="22" rx="4" fill="#A7F3D0"/>
+      <text x="223.0" y="73" font-family="Consolas, monospace" font-size="11" font-weight="700" fill="#065F46" text-anchor="middle">Confinement Mass Verified &gt; 99.9%</text>
+    </g>
+    <g transform="translate(976, 148)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">1. Failure Mechanism Dispatch</text>
+      <rect x="330.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="363.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">DISPATCH</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Overtopping or internal piping failure mode</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Config-driven physical mechanism validation</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">FailureMechanism · require_implemented_mechanism</text>
+    </g>
+    <line x1="1181.0" y1="256" x2="1181.0" y2="276" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <g transform="translate(976, 276)">
+      <rect x="0" y="0" width="410" height="110" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">2. 3-Arm Confidence Ensemble</text>
+      <rect x="330.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="363.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">ENSEMBLE</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Froehlich + Von Thun + MacDonald run together</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Yields pessimistic, central &amp; optimistic bounds</text>
+      <rect x="18" y="84" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">ensemble.build_ensemble · ensemble.py</text>
+    </g>
+    <line x1="1181.0" y1="386" x2="1181.0" y2="406" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <g transform="translate(976, 406)">
+      <rect x="0" y="0" width="410" height="114" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="114" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">3. DAMBRK Trapezoidal Kernel</text>
+      <rect x="304.0" y="12" width="92.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="350.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">WEIR PHYSICS</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Q = 1.7 B H^1.5 + 1.35 Z H^2.5 breach outflow</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Coupled to pool depletion: time-varying width &amp; invert</text>
+      <rect x="18" y="88" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="101" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">trapezoidal_breach_discharge · breach_kernel.py</text>
+    </g>
+    <line x1="1181.0" y1="520" x2="1181.0" y2="540" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <g transform="translate(976, 540)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">4. Reservoir Inflow Integration</text>
+      <rect x="310.5" y="12" width="85.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="353.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">INTEGRATION</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Continuous volume balance: dV/dt = Q_in - Q_out</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Models pre-breach reservoir rise toward crest</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">simulate_reservoir_cascade · cascade.py</text>
+    </g>
+    <line x1="1181.0" y1="648" x2="1181.0" y2="668" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <!-- Trigger Diamond -->
+    <g id="diamond-trigger">
+      <polygon points="1181.0,676 1378,728.0 1181.0,780 984,728.0" fill="#FFFFFF" stroke="#D97706" stroke-width="2.5" filter="url(#card-shadow)"/>
+      <text x="1181.0" y="712.0" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="800" fill="#B45309" text-anchor="middle">DYNAMIC TIMESTEP TRIGGER</text>
+      <text x="1181.0" y="733.0" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="800" fill="#0F172A" text-anchor="middle">Water level over crest?</text>
+      <text x="1181.0" y="752.0" font-family="Consolas, monospace" font-size="11.5" font-weight="700" fill="#D97706" text-anchor="middle">cascade._check_trigger</text>
+    </g>
+    <!-- Trigger Loop Back -->
+    <polyline points="984,728.0 966,728.0 966,594 974,594" fill="none" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#arrow-slate)"/>
+    <rect x="964" y="688.0" width="116" height="18" rx="4" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+    <text x="1022" y="701.0" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#64748B" text-anchor="middle">NO: re-test next dt</text>
+    <line x1="1181.0" y1="780" x2="1181.0" y2="818" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <rect x="1141.0" y="790" width="80" height="20" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1"/>
+    <text x="1181.0" y="804" font-family="Segoe UI, Inter, sans-serif" font-size="11" font-weight="800" fill="#B45309" text-anchor="middle">YES: BREACH</text>
+    <g transform="translate(976, 818)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">5. 1D Muskingum Reach Routing</text>
+      <rect x="284.5" y="12" width="111.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="340.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">CASCADE ROUTING</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Routes breach outflow along river thalweg reach</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Simulates cascade overtopping downstream dam</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">route_muskingum_1d · cascade.py</text>
+    </g>
+    <line x1="1181.0" y1="926" x2="1181.0" y2="946" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <g transform="translate(976, 946)">
+      <rect x="0" y="0" width="410" height="108" rx="10" fill="#FFFFFF" stroke="#D97706" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="108" rx="2.5" fill="#D97706"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">6. Outflow Hydrograph Ensemble</text>
+      <rect x="317.0" y="12" width="79.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="356.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">HYDROGRAPH</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Q(t) hydrograph bundle with uncertainty bounds</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Direct boundary condition driving 2D SWE solver</text>
+      <rect x="18" y="82" width="374" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="205.0" y="95" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">get_hydrographs · make_hydrograph</text>
+    </g>
+    <line x1="1181.0" y1="1054" x2="1181.0" y2="1074" stroke="#D97706" stroke-width="1.8" marker-end="url(#arrow-amber)"/>
+    <g transform="translate(976, 1074)">
+      <rect x="0" y="0" width="410" height="114" rx="10" fill="#FEF2F2" stroke="#DC2626" stroke-width="2" filter="url(#abort-shadow)"/>
+      <circle cx="28" cy="28" r="14" fill="#DC2626"/>
+      <line x1="22" y1="22" x2="34" y2="34" stroke="#FFFFFF" stroke-width="2.5"/>
+      <line x1="34" y1="22" x2="22" y2="34" stroke="#FFFFFF" stroke-width="2.5"/>
+      <text x="52" y="25" font-family="Segoe UI, Inter, sans-serif" font-size="14.5" font-weight="800" fill="#B91C1C">7. Debris Flow Regime Gate</text>
+      <text x="52" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" fill="#7F1D1D">Identifies hyper-concentrated non-Newtonian flow</text>
+      <text x="52" y="62" font-family="Segoe UI, Inter, sans-serif" font-size="11.5" fill="#7F1D1D">Marked invalid: codebase refuses to approximate</text>
+      <rect x="52" y="87" width="342" height="19" rx="4" fill="#FEE2E2"/>
+      <text x="225.0" y="100" font-family="Consolas, monospace" font-size="10.5" font-weight="700" fill="#991B1B" text-anchor="middle">regime_status · parse_flow_regime</text>
+    </g>
+    <!-- Col 3 to Col 4 Connector -->
+    <line x1="1386" y1="1000" x2="1438" y2="1000" stroke="#D97706" stroke-width="2.8" marker-end="url(#arrow-amber)"/>
+    <rect x="1390" y="978" width="60" height="18" rx="4" fill="#FEF3C7" stroke="#F59E0B" stroke-width="1"/>
+    <text x="1420" y="991" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#B45309" text-anchor="middle">Q(t) Outflux</text>
+    <g transform="translate(1438, 148)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">1. Physical Barrier Opening</text>
+      <rect x="340.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="373.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">CORRIDOR</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Breach opening replaces water injection into dry cell</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Progressive spatial erosion of bottom elevation z_b</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">swe_2d.BreachOpening · _rhs</text>
+    </g>
+    <line x1="1648.0" y1="252" x2="1648.0" y2="267" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 267)">
+      <rect x="0" y="0" width="420" height="138" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="138" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">2. 2D Shallow-Water Solver</text>
+      <rect x="320.5" y="12" width="85.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="363.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">CORE SOLVER</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Well-balanced Audusse FV with MUSCL 2nd-order reconstruction</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">SSP-RK2 (Heun) time integration + Rusanov numerical flux</text>
+      <text x="18" y="81" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Semi-implicit Manning friction for dry-bed stability</text>
+      <rect x="18" y="112" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="125" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">swe_2d.run_2d_swe_simulation (1,272 lines)</text>
+    </g>
+    <line x1="1648.0" y1="405" x2="1648.0" y2="420" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 420)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">3. Active-Window Speedup</text>
+      <rect x="314.0" y="12" width="92.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="360.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">OPTIMIZATION</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Bit-for-bit exact computation on wet cells + 6-cell halo</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Zero numerical error vs full grid (10-15x acceleration)</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">swe_2d._active_window</text>
+    </g>
+    <line x1="1648.0" y1="524" x2="1648.0" y2="539" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 539)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">4. Mass Conservation &amp; Flux Measurement</text>
+      <rect x="333.5" y="12" width="72.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="369.75" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">INVARIANT</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Breach outflux measured at physical cell edge</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Machine-precision continuity check (ΔMass ~ 10^-16)</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">edge_outflux · mass_balance</text>
+    </g>
+    <line x1="1648.0" y1="643" x2="1648.0" y2="658" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 658)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">5. Hydrodynamic Spatial Rasters</text>
+      <rect x="346.5" y="12" width="59.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="376.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">h, u, v</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Time series depth h(x,y,t) and velocity u,v grids</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Captures shock fronts, peak arrival &amp; ponding depths</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">SimulationResult · run_2d_swe_simulation</text>
+    </g>
+    <line x1="1648.0" y1="762" x2="1648.0" y2="777" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 777)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#059669" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#059669"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">6. Analytical &amp; Lake-at-Rest Validation</text>
+      <rect x="333.5" y="12" width="72.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="369.75" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">BENCHMARK</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Validated against Ritter (1892) analytical dam-break</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Verified on lake-at-rest C-property preservation benchmark</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">ritter.py · m4_solvers/validation.py</text>
+    </g>
+    <line x1="1648.0" y1="881" x2="1648.0" y2="896" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 896)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#7C3AED" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="104" rx="2.5" fill="#7C3AED"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">7. 1D SPH Solver Arm (Thalweg Reach)</text>
+      <rect x="346.5" y="12" width="59.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="376.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">SPH ARM</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Smoothed Particle Hydrodynamics down scenario thalweg</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Independent secondary solver arm benchmarked on Ritter</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">sph_swe.py · run_scenario_thalweg_sph</text>
+    </g>
+    <line x1="1648.0" y1="1000" x2="1648.0" y2="1015" stroke="#7C3AED" stroke-width="1.8" marker-end="url(#arrow-purple)"/>
+    <g transform="translate(1438, 1015)">
+      <rect x="0" y="0" width="420" height="104" rx="10" fill="#FFFFFF" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5 4" filter="url(#card-shadow)"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#64748B">8. GPU Acceleration Path (Opt-In)</text>
+      <rect x="353.0" y="12" width="53.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="379.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">OPT-IN</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">CuPy/CUDA implementation, bit-exact outputs</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Opt-in: 6.6x slower on dev card due to float64 need</text>
+      <rect x="18" y="78" width="384" height="18" rx="4" fill="#F8FAFC"/>
+      <text x="210.0" y="91" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#94A3B8" text-anchor="middle">swe_2d_gpu.py · CPU path preferred</text>
+    </g>
+    <g transform="translate(1910, 148)">
+      <rect x="0" y="0" width="438" height="110" rx="10" fill="#FFFFFF" stroke="#E11D48" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#E11D48"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">1. Population &amp; Asset Exposure</text>
+      <rect x="358.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="391.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">EXPOSURE</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Zonal sum of GHS-POP headcount inside flood polygon</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Overlay against mapped school &amp; hospital facilities</text>
+      <rect x="18" y="84" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">m5_exposure.compute_village_exposure</text>
+    </g>
+    <line x1="2129.0" y1="258" x2="2129.0" y2="276" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 276)">
+      <rect x="0" y="0" width="438" height="114" rx="10" fill="#FFFFFF" stroke="#E11D48" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="114" rx="2.5" fill="#E11D48"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">2. Dynamic Road Graph Network Cuts</text>
+      <rect x="351.5" y="12" width="72.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="387.75" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">ROAD CUTS</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Cuts road edges where water depth h ≥ 0.30 m (cars)</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Evaluates multi-source network reachability per timestep</text>
+      <rect x="18" y="88" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="101" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">m6_isolation.cut_flooded_edges · isolation.py</text>
+    </g>
+    <line x1="2129.0" y1="390" x2="2129.0" y2="408" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 408)">
+      <rect x="0" y="0" width="438" height="120" rx="10" fill="#FFFFFF" stroke="#E11D48" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="120" rx="2.5" fill="#E11D48"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">3. Evacuation Window (ΔT_evac)</text>
+      <rect x="319.0" y="12" width="105.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="371.5" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">DIFFERENTIATOR</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">ΔT_evac = T_arrival - T_isolation per settlement</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Critical metric: access road closes long before water arrives!</text>
+      <rect x="18" y="94" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="107" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">m6_isolation.compute_isolation_times</text>
+    </g>
+    <line x1="2129.0" y1="528" x2="2129.0" y2="546" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 546)">
+      <rect x="0" y="0" width="438" height="110" rx="10" fill="#FFFFFF" stroke="#E11D48" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="110" rx="2.5" fill="#E11D48"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">4. Multi-Criteria Priority Ranking</text>
+      <rect x="358.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="391.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">DECISION</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Weighted ranking: exposed headcount, isolation urgency</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Produces ordered action sequence for first responders</text>
+      <rect x="18" y="84" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="97" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">m7_ranking.rank_villages · ranker.py</text>
+    </g>
+    <line x1="2129.0" y1="656" x2="2129.0" y2="674" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 674)">
+      <rect x="0" y="0" width="438" height="114" rx="10" fill="#FFFFFF" stroke="#4338CA" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="114" rx="2.5" fill="#4338CA"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">5. Exporters, Manifest &amp; Command API</text>
+      <rect x="358.0" y="12" width="66.0" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="391.0" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">SERVICES</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Shapefile, KML, CAP-JSON for NDMA SACHET integration</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">FastAPI background worker + MapLibre GL command UI</text>
+      <rect x="18" y="88" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="101" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">exporters.py · run_manifest · api/main.py</text>
+    </g>
+    <line x1="2129.0" y1="788" x2="2129.0" y2="806" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 806)">
+      <rect x="0" y="0" width="438" height="114" rx="10" fill="#FFFFFF" stroke="#0E7490" stroke-width="1.8" filter="url(#card-shadow)"/>
+      <rect x="0" y="0" width="5" height="114" rx="2.5" fill="#0E7490"/>
+      <text x="18" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="14" font-weight="700" fill="#0F172A">6. Empirical Ground-Truth Validation</text>
+      <rect x="338.5" y="12" width="85.5" height="17" rx="8.5" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1"/>
+      <text x="381.25" y="24" font-family="Segoe UI, Inter, sans-serif" font-size="10" font-weight="700" fill="#475569" text-anchor="middle">SKILL SCORE</text>
+      <text x="18" y="45" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">CSI, POD, FAR &amp; Bias skill scores scored over AOI</text>
+      <text x="18" y="63" font-family="Segoe UI, Inter, sans-serif" font-size="12" font-weight="500" fill="#475569">Validated against Copernicus EMS &amp; Global Flood DB</text>
+      <rect x="18" y="88" width="402" height="18" rx="4" fill="#F1F5F9"/>
+      <text x="219.0" y="101" font-family="Consolas, monospace" font-size="10.5" font-weight="600" fill="#334155" text-anchor="middle">m10_validation.metrics · compare_extent</text>
+    </g>
+    <line x1="2129.0" y1="920" x2="2129.0" y2="938" stroke="#E11D48" stroke-width="1.8" marker-end="url(#arrow-rose)"/>
+    <g transform="translate(1910, 940)">
+      <rect x="0" y="0" width="438" height="152" rx="10" fill="url(#hero-grad)" stroke="#15803D" stroke-width="2.5" filter="url(#hero-shadow)"/>
+      <circle cx="30" cy="32" r="18" fill="#FACC15"/>
+      <text x="30" y="39" font-family="Segoe UI, Inter, sans-serif" font-size="20" font-weight="900" fill="#78350F" text-anchor="middle">★</text>
+      <text x="60" y="28" font-family="Segoe UI, Inter, sans-serif" font-size="16.5" font-weight="800" fill="#FFFFFF">RANKED EVACUATION SCHEDULE</text>
+      <text x="60" y="50" font-family="Segoe UI, Inter, sans-serif" font-size="12.5" fill="#DCFCE7">Who moves first, and exactly how long they have to evacuate (ΔT_evac)</text>
+      <text x="60" y="69" font-family="Segoe UI, Inter, sans-serif" font-size="12.5" fill="#DCFCE7">Every figure carries strict 5-tier epistemic provenance &amp; safety checks</text>
+      <rect x="60" y="120" width="362" height="22" rx="11" fill="#0E3922"/>
+      <text x="241.0" y="135" font-family="Consolas, monospace" font-size="11" font-weight="700" fill="#4ADE80" text-anchor="middle">FINAL RESCUE SCHEDULE · COMPUTED_LIVE &amp; INVARIANTS_PASSED</text>
+    </g>
+  <!-- ================= MAJOR INTER-STAGE CONNECTORS ================= -->
+    <path d="M 462 1109.0 C 518 1109.0, 458 202, 514 202" fill="none" stroke="#0284C7" stroke-width="2.5" marker-end="url(#arrow-blue)"/>
+    <rect x="474" y="1075.0" width="68" height="18" rx="4" fill="#E0F2FE" stroke="#BAE6FD" stroke-width="1"/>
+    <text x="508" y="1088.0" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="700" fill="#0369A1" text-anchor="middle">Terrain Grid</text>
+    <path d="M 1858 710 C 1909 710, 1859 203, 1910 203" fill="none" stroke="#7C3AED" stroke-width="2.5" marker-end="url(#arrow-purple)"/>
+    <rect x="1870" y="682" width="68" height="18" rx="4" fill="#EDE9FE" stroke="#DDD6FE" stroke-width="1"/>
+    <text x="1904" y="695" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="700" fill="#6D28D9" text-anchor="middle">h(x,y,t) Depth</text>
+  <!-- ================= BOTTOM INVARIANT RAIL ================= -->
+  <g id="bottom-rail" transform="translate(36, 1282)">
+    <rect x="0" y="0" width="2328" height="48" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.2" filter="url(#card-shadow)"/>
+    <g transform="translate(16, 10)">
+      <rect x="0" y="0" width="220" height="28" rx="6" fill="#DCFCE7"/>
+      <text x="110" y="18" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#15803D" text-anchor="middle">✓ MACHINE-PRECISION MASS CONTINUITY</text>
+    </g>
+    <g transform="translate(484, 10)">
+      <rect x="0" y="0" width="220" height="28" rx="6" fill="#FEE2E2"/>
+      <text x="110" y="18" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#DC2626" text-anchor="middle">✓ FAIL-CLOSED GEOMETRY HARD GATE</text>
+    </g>
+    <g transform="translate(952, 10)">
+      <rect x="0" y="0" width="220" height="28" rx="6" fill="#FEF3C7"/>
+      <text x="110" y="18" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#D97706" text-anchor="middle">✓ DYNAMIC HYDRODYNAMIC TRIGGER</text>
+    </g>
+    <g transform="translate(1420, 10)">
+      <rect x="0" y="0" width="220" height="28" rx="6" fill="#EDE9FE"/>
+      <text x="110" y="18" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#7C3AED" text-anchor="middle">✓ BIT-EXACT ACTIVE-WINDOW SPEEDUP</text>
+    </g>
+    <g transform="translate(1888, 10)">
+      <rect x="0" y="0" width="220" height="28" rx="6" fill="#EFF6FF"/>
+      <text x="110" y="18" font-family="Segoe UI, Inter, sans-serif" font-size="10.5" font-weight="800" fill="#2563EB" text-anchor="middle">✓ STRICT EPISTEMIC HONESTY</text>
+    </g>
+  </g>
+</svg>

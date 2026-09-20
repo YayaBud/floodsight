@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1520 790" width="1520" height="790" role="img" aria-label="Timeline showing a village access road cut at 25 minutes while water reaches the village centre at 65 minutes, leaving a 40 minute evacuation window that arrival-time models never report">
+
+  <text x="30" y="46" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="21" font-weight="700" fill="#0F1B2D">The road dies before the village does.</text>
+  <text x="30" y="74" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13.5" fill="#475569">One settlement, one breach. Minutes measured from the moment the barrier gives way.</text>
+  <rect x="1170" y="28" width="320" height="52" rx="8" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="1330" y="50" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0F1B2D" text-anchor="middle">&#916;T evac = T arrival &#8722; T isolation</text>
+  <text x="1330" y="69" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" fill="#64748B" text-anchor="middle">computed per settlement, every run</text>
+
+  <!-- evacuation window band (drawn first, everything sits on top) -->
+  <rect x="503" y="112" width="564" height="436" rx="6" fill="#EFF4FF"/>
+  <text x="785" y="148" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="19" font-weight="700" fill="#2F6BFF" text-anchor="middle">EVACUATION WINDOW &#183; 40 MINUTES</text>
+  <text x="785" y="172" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#2F6BFF" text-anchor="middle">everyone still here has to leave on foot, or not at all</text>
+
+  <!-- ===== TRACK A: ACCESS ROAD ===== -->
+  <text x="30" y="232" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0F1B2D">Access road</text>
+  <text x="30" y="251" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" fill="#64748B">only link to a</text>
+  <text x="30" y="268" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" fill="#64748B">dry safe node</text>
+
+  <rect x="150" y="206" width="353" height="56" rx="6" fill="#DCFCE7" stroke="#15803D" stroke-width="1.5"/>
+  <text x="326" y="240" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="600" fill="#15803D" text-anchor="middle">passable &#183; egress open</text>
+
+  <rect x="503" y="206" width="917" height="56" rx="6" fill="#FEE2E2" stroke="#DC2626" stroke-width="1.5"/>
+  <text x="961" y="234" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">CUT &#8212; depth on the link passes 0.30 m, graph edge removed</text>
+  <text x="961" y="252" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#7F1D1D" text-anchor="middle">no surviving path from this settlement to any node that stays dry</text>
+
+  <!-- ===== TRACK B: VILLAGE ===== -->
+  <text x="30" y="362" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13.5" font-weight="700" fill="#0F1B2D">Village centre</text>
+  <text x="30" y="381" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" fill="#64748B">population from</text>
+  <text x="30" y="398" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" fill="#64748B">the GHS-POP grid</text>
+
+  <rect x="150" y="336" width="917" height="56" rx="6" fill="#F1F5F9" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="608" y="370" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="600" fill="#475569" text-anchor="middle">dry &#8212; nothing visible on the ground, nothing on a conventional map</text>
+
+  <rect x="1067" y="336" width="353" height="56" rx="6" fill="#1E3A8A" stroke="#1E3A8A" stroke-width="1.5"/>
+  <text x="1243" y="370" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">inundated</text>
+
+  <!-- ===== EVENT MARKERS ===== -->
+  <line x1="503" y1="112" x2="503" y2="548" stroke="#DC2626" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <circle cx="503" cy="112" r="7" fill="#DC2626"/>
+  <line x1="1067" y1="112" x2="1067" y2="548" stroke="#1E3A8A" stroke-width="2.5" stroke-dasharray="7 5"/>
+  <circle cx="1067" cy="112" r="7" fill="#1E3A8A"/>
+
+  <rect x="392" y="430" width="222" height="60" rx="8" fill="#FFFFFF" stroke="#DC2626" stroke-width="2"/>
+  <text x="503" y="454" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#B91C1C" text-anchor="middle">T isolation = 25 min</text>
+  <text x="503" y="475" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#7F1D1D" text-anchor="middle">the way out closes</text>
+
+  <rect x="956" y="430" width="222" height="60" rx="8" fill="#FFFFFF" stroke="#1E3A8A" stroke-width="2"/>
+  <text x="1067" y="454" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14" font-weight="700" fill="#1E3A8A" text-anchor="middle">T arrival = 65 min</text>
+  <text x="1067" y="475" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#1E3A8A" text-anchor="middle">the water gets here</text>
+
+  <!-- ===== AXIS ===== -->
+  <line x1="150" y1="548" x2="1440" y2="548" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="1440,541 1456,548 1440,555" fill="#94A3B8"/>
+  <line x1="150" y1="548" x2="150" y2="560" stroke="#94A3B8" stroke-width="2"/>
+  <line x1="362" y1="548" x2="362" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="573" y1="548" x2="573" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="785" y1="548" x2="785" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="997" y1="548" x2="997" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="1208" y1="548" x2="1208" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <line x1="1420" y1="548" x2="1420" y2="558" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="150" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569" text-anchor="middle">breach</text>
+  <text x="362" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">15</text>
+  <text x="573" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">30</text>
+  <text x="785" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">45</text>
+  <text x="997" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">60</text>
+  <text x="1208" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">75</text>
+  <text x="1420" y="578" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#64748B" text-anchor="middle">90</text>
+  <text x="1456" y="600" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-style="italic" fill="#64748B" text-anchor="end">minutes since the breach</text>
+
+  <!-- ===== THE COMPARISON ===== -->
+  <rect x="150" y="628" width="620" height="132" rx="10" fill="#FFFFFF" stroke="#2F6BFF" stroke-width="2.5"/>
+  <text x="174" y="662" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4" fill="#2F6BFF">FLOODSIGHT REPORTS</text>
+  <text x="174" y="692" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15.5" font-weight="700" fill="#0F1B2D">&#8220;Egress closes at T+25. You have 40 minutes.&#8221;</text>
+  <text x="174" y="718" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" fill="#475569">Ranked against every other settlement in the valley, so the</text>
+  <text x="174" y="738" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" fill="#475569">commander knows which convoy leaves first.</text>
+  <line x1="460" y1="628" x2="460" y2="500" stroke="#2F6BFF" stroke-width="2" stroke-dasharray="5 4"/>
+  <polygon points="453,500 467,500 460,486" fill="#2F6BFF"/>
+
+  <rect x="800" y="628" width="620" height="132" rx="10" fill="#F8FAFC" stroke="#CBD5E1" stroke-width="2"/>
+  <text x="824" y="662" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11" font-weight="700" letter-spacing="1.4" fill="#64748B">EVERY ARRIVAL-TIME MODEL REPORTS</text>
+  <text x="824" y="692" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15.5" font-weight="700" fill="#475569">&#8220;This village floods at T+65.&#8221;</text>
+  <text x="824" y="718" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" fill="#64748B">True, and 40 minutes too late. A team dispatched on that</text>
+  <text x="824" y="738" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" fill="#64748B">number arrives at a road that is already underwater.</text>
+  <line x1="1110" y1="628" x2="1110" y2="500" stroke="#94A3B8" stroke-width="2" stroke-dasharray="5 4"/>
+  <polygon points="1103,500 1117,500 1110,486" fill="#94A3B8"/>
+</svg>

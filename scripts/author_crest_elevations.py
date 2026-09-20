@@ -64,7 +64,7 @@ from shapely.ops import transform as project
 REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO))
 
-from src.data_fetcher import SCENARIOS  # noqa: E402
+from src.data_fetcher import SCENARIOS, scenario_key_for  # noqa: E402
 
 GEOM_DIR = REPO / "data" / "geometry"
 DEM_DIR = REPO / "data" / "dem"
@@ -97,9 +97,10 @@ def _rasterize(geom, shape_, transform) -> np.ndarray:
 
 
 def derive_crest(key: str) -> dict | None:
-    """Return the crest block for one scenario, or None if it cannot be sourced."""
+    """Return the crest block for one manifest, or None if it cannot be sourced."""
+    scenario = scenario_key_for(key)
     mpath = GEOM_DIR / f"{key}.json"
-    dpath = DEM_DIR / f"{key}_dem.tif"
+    dpath = DEM_DIR / f"{scenario}_dem.tif"
     if not mpath.is_file():
         print(f"{key:14s} SKIP  no geometry manifest")
         return None
@@ -125,9 +126,9 @@ def derive_crest(key: str) -> dict | None:
         }
 
     # ── Route 2: measured foundation + structural height ──────────────────────
-    sc = SCENARIOS.get(key)
+    sc = SCENARIOS.get(scenario)
     if sc is None or "dam_height_m" not in sc:
-        print(f"{key:14s} FAIL  no dam_height_m in SCENARIOS")
+        print(f"{key:14s} FAIL  no dam_height_m in SCENARIOS['{scenario}']")
         return None
 
     with rasterio.open(dpath) as src:
@@ -179,9 +180,9 @@ def derive_crest(key: str) -> dict | None:
         "crest_elev_source": (
             f"foundation {bed:.2f} m = min(DEM) over dam_axis n "
             f"{'blockage' if 'blockage' in roles else 'dam_body'}, measured on "
-            f"data/dem/{key}_dem.tif ({footing.sum()} cells); "
+            f"data/dem/{scenario}_dem.tif ({footing.sum()} cells); "
             f"structural height {height:.1f} m from "
-            f"src/data_fetcher.py::SCENARIOS['{key}']['dam_height_m']"
+            f"src/data_fetcher.py::SCENARIOS['{scenario}']['dam_height_m']"
         ),
         "crest_elev_classification": (
             "RECONSTRUCTION" if natural else "ENGINEERING_ESTIMATE"

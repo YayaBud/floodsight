@@ -336,3 +336,210 @@ def compute_lake_depth_grids(
             "depth_grid": depth,
         })
     return results
+
+def _pool_machinery(dem_array: np.ndarray, transform, seed_xy: tuple[float, float],
+                    barrier_mask: Optional[np.ndarray] = None,
+                    barrier_crest_m: Optional[float] = None):
+    """Barrier-emplaced grid, seed cell, pixel area and a connected-pool probe.
+
+    Built ONCE and reused, so a 240-point probe sweep does not rebuild the
+    working array 240 times. The barrier emplacement here is the same three
+    lines `compute_lake_depth_grids` performs internally;
+    `test_lake_formation_levels.py::test_probe_agrees_with_compute_lake_depth_grids`
+    pins the two together so this copy cannot drift.
+    """
+    dem_work = dem_array.copy().astype(float)
+    if barrier_mask is not None:
+        if np.asarray(barrier_mask).shape != dem_work.shape:
+            raise ValueError("barrier_mask must match DEM shape")
+        if barrier_crest_m is None or not np.isfinite(barrier_crest_m):
+            raise ValueError("barrier_crest_m required with barrier_mask")
+        dem_work = np.where(
+            np.asarray(barrier_mask, dtype=bool) & (dem_work < barrier_crest_m),
+            barrier_crest_m, dem_work)
+
+    row, col = rasterio.transform.rowcol(transform, seed_xy[0], seed_xy[1])
+    row, col = int(row), int(col)
+    ny, nx = dem_work.shape
+    if not (0 <= row < ny and 0 <= col < nx):
+        raise ValueError("seed lies outside DEM extent")
+    pix_area_m2 = abs(transform.a * transform.e)
+
+    def volume_at(level: float) -> float:
+        below = dem_work < level
+        if not below[row, col]:
+            return 0.0
+        labels, _ = ndimage.label(below)
+        pool = labels == labels[row, col]
+        return float(np.sum(np.where(pool, level - dem_work, 0.0)) * pix_area_m2)
+
+    return dem_work, (row, col), pix_area_m2, volume_at
+
+
+def equal_volume_levels(vol_of_level, z_lo: float, z_hi: float, n_frames: int,
+                        n_probe: int = 240) -> tuple[list[float], list[dict]]:
+    """Levels whose impounded volumes are as equally spaced as terrain allows.
+
+    Equal water per frame rather than equal height per frame. On a gorge the
+    difference is the whole animation: measured on phutkal, 3745->3765 m is
+    29 % of the height range and holds **12.9 %** of the water, while
+    3785->3805 m is the same 29 % and holds **47 %**. Spacing by stage gives
+    frames that are empty, empty, puddle, lake.
+
+    V(z) is NOT continuous for a real seeded fill. Measured on phutkal: one
+    0.29 m probe step at **3763.05 m adds 2.488 MCM** against a ~0.24 typical --
+    the pool tops a sill and swallows an adjacent basin in one step. No level
+    exists whose volume lands inside that gap, so a strict equal-volume target
+    is unsatisfiable there and several targets collapse onto the same level.
+    Levels are deduplicated afterwards, and the discontinuities are RETURNED so
+    the caller reports them instead of smoothing them away -- a lake capturing a
+    side valley is a real feature, not noise.
+
+    `vol_of_level` is a callable so both backends share this: a measured seeded
+    fill for the DEM backend, an analytical curve for the hypsometric one.
+    """
+    probe = np.linspace(z_lo, z_hi, n_probe)
+    vols = np.array([vol_of_level(z) for z in probe], dtype=float)
+    # The fill is monotone in level by construction; enforce it so a noisy
+    # measured curve cannot make np.interp return nonsense.
+    vols = np.maximum.accumulate(vols)
+    v_full = float(vols[-1])
+    if v_full <= 0.0:
+        raise ValueError(f"no impounded volume anywhere in [{z_lo}, {z_hi}]")
+
+    steps = np.diff(vols)
+    typical = float(np.median(steps[steps > 0])) if np.any(steps > 0) else 0.0
+    sills = [{"level_m": round(float(probe[i + 1]), 2),
+              "volume_jump_mcm": round(float(steps[i]) / 1e6, 3),
+              "vs_typical_step": round(float(steps[i] / typical), 1) if typical else None}
+             for i in np.argsort(steps)[::-1][:4]
+             if typical and steps[i] > 3.0 * typical]
+
+    targets = np.linspace(v_full / n_frames, v_full, n_frames)
+    raw = [float(np.interp(t, vols, probe)) for t in targets]
+
+    # Deduplicate: a level that repeats is a target that fell inside a sill gap.
+    # Nudge it up the level axis instead, so every frame is a distinct pool.
+    min_gap = (z_hi - z_lo) / (n_probe * 4.0)
+    out: list[float] = []
+    for lv in raw:
+        if out and lv - out[-1] < min_gap:
+            lv = out[-1] + min_gap
+        out.append(min(lv, z_hi))
+    return out, sills
+
+
+def lake_formation_levels(
+    dem_array: np.ndarray,
+    transform,
+    seed_xy: tuple[float, float],
+    wse_m: float,
+    n_frames: int,
+    barrier_mask: Optional[np.ndarray] = None,
+    barrier_crest_m: Optional[float] = None,
+    n_probe: int = 240,
+) -> tuple[list[float], list[dict], float]:
+    """Equal-VOLUME levels for a pre-breach lake-formation animation.
+
+    Returns ``(levels_m, sill_merges, z_min_m)``. Feed ``levels_m`` straight to
+    ``compute_lake_depth_grids(levels_m=...)``.
+
+    This exists in `fill.py` rather than in a script because BOTH
+    `run_pipeline.py` and `scripts/make_lake_formation.py` need it, and when the
+    script owned it the pipeline kept its own stage-fraction version: the
+    animation the API served was four frames of which two were empty
+    (0.00, 0.00, 0.25, 19.54 MCM) while the script produced 24 usable ones off
+    the same DEM. One implementation, one behaviour.
+    """
+    dem_work, (row, col), _px, volume_at = _pool_machinery(
+        dem_array, transform, seed_xy, barrier_mask, barrier_crest_m)
+
+    below = dem_work < wse_m
+    if not below[row, col]:
+        raise ValueError(f"seed is not below the target level {wse_m}")
+    labels, _ = ndimage.label(below)
+    full_pool = labels == labels[row, col]
+    z_min = float(dem_work[full_pool].min())
+
+    levels, sills = equal_volume_levels(volume_at, z_min, float(wse_m),
+                                        n_frames, n_probe=n_probe)
+    return levels, sills, z_min
+
+
+def level_for_volume_fraction(
+    dem_array: np.ndarray,
+    transform,
+    seed_xy: tuple[float, float],
+    wse_m: float,
+    fraction: float,
+    barrier_mask: Optional[np.ndarray] = None,
+    barrier_crest_m: Optional[float] = None,
+    tol_rel: float = 1e-4,
+    max_iter: int = 60,
+) -> float:
+    """Water level that impounds ``fraction`` of the full pool's VOLUME.
+
+    ``compute_lake_depth_grids(fractions=...)`` reads its fractions as **STAGE**
+    fractions: ``level = z_min + f * (wse_m - z_min)``. In a gorge that is not
+    the same number as a volume fraction and is not close to it. Measured on
+    phutkal at 55.8 m cells, 2026-09-18:
+
+        0.9 STAGE fill  -> level 3798.35 m, 22.044 MCM = 0.8044 of the pool
+        0.9 VOLUME fill -> level 3801.76 m, 24.666 MCM = 0.9000 of the pool
+
+    That 10.6 % gap is not cosmetic: ``run_pipeline`` used ``reservoir_fill`` as
+    a VOLUME fraction for ``impounded_vol_m3`` (``geom.volume_m3 *
+    reservoir_fill``) and as a STAGE fraction for the initial condition, 217
+    lines apart, believing the two consistent -- the comment at the call site
+    said so explicitly. Validity gate G1 compares exactly those two quantities
+    and failed at **ratio 0.8937** against a 0.95-1.05 tolerance, reporting
+    "water in the flood did not come from the impoundment" when the water had in
+    fact come from the impoundment and the two sides simply meant different
+    things by 0.9.
+
+    Bisection, because the hypsometry V(z) genuinely steps: a rising pool that
+    tops a sill takes in an adjacent basin in one increment (phutkal gains
+    2.488 MCM in one 0.29 m step at 3763.05 m), so no closed form exists and
+    interpolating a stage-storage curve across a sill would land inside a gap
+    no level occupies.
+
+    Returns ``wse_m`` when the pool has no volume or ``fraction >= 1``.
+    """
+    if not np.isfinite(fraction):
+        raise ValueError("fraction must be finite")
+    fraction = float(fraction)
+
+    ends = compute_lake_depth_grids(
+        dem_array=dem_array, transform=transform, seed_xy=seed_xy, wse_m=wse_m,
+        fractions=(0.0, 1.0), barrier_mask=barrier_mask,
+        barrier_crest_m=barrier_crest_m,
+    )
+    if not ends:
+        return float(wse_m)
+    z_min = float(ends[0]["level_m"])
+    v_full = float(ends[-1]["volume_m3"])
+    if v_full <= 0.0 or fraction >= 1.0:
+        return float(wse_m)
+    if fraction <= 0.0:
+        return z_min
+
+    target = fraction * v_full
+
+    def vol_at(level: float) -> float:
+        g = compute_lake_depth_grids(
+            dem_array=dem_array, transform=transform, seed_xy=seed_xy,
+            wse_m=wse_m, levels_m=[level], barrier_mask=barrier_mask,
+            barrier_crest_m=barrier_crest_m,
+        )
+        return float(g[0]["volume_m3"]) if g else 0.0
+
+    lo, hi = z_min, float(wse_m)
+    for _ in range(max_iter):
+        mid = 0.5 * (lo + hi)
+        if vol_at(mid) < target:
+            lo = mid
+        else:
+            hi = mid
+        if (hi - lo) <= tol_rel * max(1.0, wse_m - z_min):
+            break
+    return 0.5 * (lo + hi)

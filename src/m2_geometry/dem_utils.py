@@ -695,6 +695,16 @@ def compute_hydro_surfaces(
     except ImportError:
         logger.warning("pysheds not installed. Skipping HAND + Flow Accumulation.")
         return None, None
+
+    # ponytail: pysheds 0.5 calls `np.in1d`, which NumPy 2.0 removed, so HAND and
+    # flow accumulation raised `AttributeError` on every run in this environment
+    # (numpy 2.5.2). `np.isin` is NumPy's own documented replacement for it; the
+    # one behavioural difference is that `in1d` always ravelled its first argument
+    # while `isin` preserves its shape, so ravel here to keep the old semantics
+    # exactly. Two lines, and no dependency moves: the alternative was pinning
+    # numpy < 2 or waiting on pysheds > 0.5 to recover what is a pure rename.
+    if not hasattr(np, "in1d"):
+        np.in1d = lambda ar1, ar2, **kw: np.isin(np.ravel(ar1), ar2, **kw)
         
     dem_path = Path(dem_path)
     out_dir = Path(out_dir)

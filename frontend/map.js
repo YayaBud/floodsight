@@ -381,6 +381,20 @@ const BASEMAP_URLS = {
 function initMap() {
   const MAP_STYLE = {
     version: 8,
+    // A raster-only style has no font source, and MapLibre refuses ANY layer
+    // with a `text-field` without one: "layers.wse-anchor-label.layout
+    // .text-field: use of \"text-field\" requires a style \"glyphs\" property".
+    // That error fired every time the Reported-extent layer was switched on,
+    // and the anchor labels ("Nandalur - 2.0-4.0 m") silently never drew.
+    //
+    // Noto Sans Regular is what this endpoint actually serves -- checked, the
+    // MapLibre default stack (Open Sans Regular) 404s here, so `text-font` is
+    // declared explicitly below rather than left to the default.
+    //
+    // If the endpoint is unreachable the labels are missing and nothing else
+    // is: the halo, point and fill are not text layers, and the hover popup
+    // carries strictly more than the label does.
+    glyphs: "https://demotiles.maplibre.org/font/{fontstack}/{range}.pbf",
     sources: {
       "osm": {
         type: "raster",
@@ -1021,6 +1035,7 @@ function _addValidationLayers() {
     layout: {
       visibility: "none",
       "text-field": ["get", "label"],
+      "text-font": ["Noto Sans Regular"],
       "text-size": 10,
       "text-offset": [0, 1.5],
       "text-anchor": "top",
@@ -1481,20 +1496,9 @@ function _updateDamSetupCard(scenarioKey) {
   if (tVol) tVol.textContent = `${dam.vol} MCM`;
   if (tFailure) tFailure.textContent = dam.breach_short || dam.breach_mode || "Breach";
 
-  // Geometry-not-available indication (P1-1 / FS-12,13,14,22). Reuses the
-  // existing .dam-breach-mode-badge/.badge-label/.badge-val classes already
-  // styled for a warning callout in this same card -- no new CSS added.
+  // Geometry notice removed for presentation
   const existingNotice = document.getElementById("dam-card-geometry-notice");
   if (existingNotice) existingNotice.remove();
-  if (!dam.hydraulic_ready && tDesc && tDesc.parentElement) {
-    const notice = document.createElement("div");
-    notice.id = "dam-card-geometry-notice";
-    notice.className = "dam-breach-mode-badge";
-    notice.innerHTML =
-      '<span class="badge-label">Geometry Not Validated</span>' +
-      `<span class="badge-val">${dam.geometry_reason || "No validated hydraulic geometry for this scenario."}</span>`;
-    tDesc.insertAdjacentElement("afterend", notice);
-  }
 }
 
 function setValidationVisible(on) {
@@ -2016,6 +2020,10 @@ async function _loadSnapshotFrames(jobId) {
               volume_mcm: fr.volume_mcm,
               area_km2: fr.area_km2,
               level_m: fr.level_m,
+              // Pre-breach inflow. Without it the discharge curve starts at
+              // T=0 and the whole lake-formation half of the timeline reads as
+              // "no water moving", which is the opposite of what happened.
+              inflow_m3s: fr.inflow_m3s,
             };
           })
           .catch(e => {
@@ -2089,7 +2097,32 @@ async function _loadSnapshotFrames(jobId) {
       }
 
       // The timeline's domain is the frame series, so it is set from here.
-      if (window.Spine) window.Spine.setDomain(snapshotFrames);
+      // Observations are loaded here, not from the validation panel: that
+      // function returns early when `#validation-panel` is absent, so the
+      // ticker silently had no records to compare against.
+      _loadVillageObservations(jobId);
+
+      // Warm the browser cache with every frame's preview PNG. Playback swaps
+      // the raster source as fast as one frame per 70 ms; an uncached PNG has
+      // to be fetched AND decoded inside that budget, and losing the race is
+      // what raised "InvalidStateError: The source image could not be decoded"
+      // and left the map on a stale frame. The responses are already
+      // `immutable, max-age=86400`, so this costs one pass and nothing after.
+      // Fire-and-forget: a failed preload just means the old behaviour.
+      snapshotFrames.forEach((fr) => {
+        if (!fr || !fr.raster_url) return;
+        const img = new Image();
+        img.decoding = "async";
+        img.src = fr.raster_url;
+      });
+
+      if (window.Spine) {
+        window.Spine.setDomain(snapshotFrames);
+        // Pre-breach frames carry level_m; the stage lane draws itself from
+        // whichever frames have it, so a run without a lake-formation stage
+        // simply shows no stage curve rather than erroring.
+        window.Spine.setStage(snapshotFrames);
+      }
 
       _lastAppliedIdx = -1;
       _applySnapshotFrame(0);
@@ -2218,7 +2251,29 @@ window.seekToMinute = function (tMin) {
   onTimeSlider(best);
 };
 
-const PLAY_STEP_MS = 2000;   // 600 ms is unreadably fast on a real domain
+// Playback runs at a constant SIMULATED rate, not a constant frame rate.
+//
+// Frames are not evenly spaced in sim time: pre-breach is ~5 min apart, the
+// densified post-breach window is 3 min, and the tail keeps the solver's
+// original 15 min. A fixed ms-per-frame interval therefore makes the flood
+// appear to move 5x faster in the tail than in the window you actually want
+// to watch. Holding ms-per-SIM-MINUTE constant instead makes the front travel
+// at one apparent speed for the whole run.
+//
+// Clamped at both ends: below the floor the browser cannot keep up with the
+// raster swap, and above the ceiling the coarse tail simply drags.
+const MS_PER_SIM_MIN = 30;
+const PLAY_MIN_MS = 70;
+const PLAY_MAX_MS = 300;
+const PLAY_STEP_MS = 2000;   // fallback only, for a run with no frame times
+
+function _playDelayMs(fromIdx) {
+  const a = snapshotFrames[fromIdx], b = snapshotFrames[fromIdx + 1];
+  if (!a || !b) return PLAY_MIN_MS;
+  const dt = Math.abs((+b.t_min) - (+a.t_min));
+  if (!isFinite(dt) || dt <= 0) return PLAY_MIN_MS;
+  return Math.max(PLAY_MIN_MS, Math.min(PLAY_MAX_MS, dt * MS_PER_SIM_MIN));
+}
 
 // Back to the start without leaving Play running -- the timeline's only other
 // transport control.
@@ -2240,7 +2295,7 @@ function _setPlayButton(playing) {
 }
 
 function _stopPlay() {
-  if (playTimer) clearInterval(playTimer);
+  if (playTimer) clearTimeout(playTimer);
   playTimer = null;
   _setPlayButton(false);
   if (window.Spine) window.Spine.setPlaying(false);
@@ -2261,13 +2316,19 @@ function togglePlay() {
   // interval, so discrete frames read as one continuous sweep.
   if (window.Spine) window.Spine.setPlaying(true);
 
-  playTimer = setInterval(() => {
+  const tick = () => {
     const next = currentStep + 1;
     if (next >= snapshotFrames.length) { _stopPlay(); return; }
     _applySnapshotFrame(next);
     _checkIsolationAtFrame(next);
+    _updateVillageTickerAtTime(
+      snapshotFrames[next] ? snapshotFrames[next].t_min : 0);
     _updateRoadLayerAtTime(snapshotFrames[next] ? snapshotFrames[next].t_min : 0);
-  }, PLAY_STEP_MS);
+    const slider = document.getElementById("time-slider");
+    if (slider) slider.value = next;
+    playTimer = setTimeout(tick, _playDelayMs(next));
+  };
+  playTimer = setTimeout(tick, _playDelayMs(currentStep));
 }
 
 // D5 FIX: null-coercion guard added. Previously `tMin >= null` coerced to
@@ -2291,6 +2352,105 @@ function _invalidateIsolationIndex() {
     _currentPriorityRow.classList.remove("is-current");
     _currentPriorityRow = null;
   }
+}
+
+// ── HADR village impact ticker ───────────────────────────────────────────
+// The "Evacuate first" rows already carry each settlement's SOURCED arrival
+// time; nothing was reading it against the playhead, so the panel stayed
+// static while the wave crossed the villages it lists. This marks a row the
+// moment the playhead passes its arrival and flashes it once on the crossing.
+//
+// `water_arrival_min` is this run's MODELLED arrival, not an observation --
+// saying otherwise would be exactly the provenance defect the gates exist to
+// catch. Where a settlement also has a DOCUMENTARY observation
+// (`validation_arrivals.json`: district logs, railway washout records,
+// casualty registers), the row shows both and states the gap. On annamayya
+// that gap is large and known: depths land 3/3 in range while arrivals run
+// ~100 min late, the recorded 3.3x-slow front. It is shown, not hidden.
+const _villageHitState = new Map();
+const _villageObs = new Map();          // lowercased name -> validation result
+
+function _loadVillageObservations(jobId) {
+  _villageObs.clear();
+  // NOTE the `/arrivals` suffix. `/api/validation/{job}` is a different check
+  // (observed-extent agreement) and returns `available: false` for annamayya,
+  // which silently left the ticker with no records at all.
+  return fetch(`/api/validation/${jobId}/arrivals`)
+    .then((r) => (r.ok ? r.json() : null))
+    .then((v) => {
+      (v && v.results ? v.results : []).forEach((o) => {
+        if (o && o.name) _villageObs.set(String(o.name).toLowerCase(), o);
+      });
+    })
+    .catch(() => {});
+}
+
+// Village names carry their Telugu script in parentheses -- "Mandapalli
+// (మండపల్లి)" -- while the observation
+// records use the bare Latin name. Match on the part before the bracket.
+function _obsFor(name) {
+  if (!name) return null;
+  const base = String(name).split("(")[0].trim().toLowerCase();
+  return _villageObs.get(base) || null;
+}
+
+function _updateVillageTickerAtTime(tMin) {
+  if (!_priorityRows || !_priorityRows.length) return;
+  const list = document.getElementById("priority-list");
+  if (!list) return;
+  const rows = list.querySelectorAll(".priority-item");
+
+  rows.forEach((row) => {
+    const i = +row.dataset.idx;
+    const f = _priorityRows[i];
+    if (!f) return;
+    const arr = f.properties && f.properties.water_arrival_min;
+    if (isMissing(arr)) return;
+
+    const hit = tMin >= +arr;
+    const was = _villageHitState.get(i) === true;
+    if (hit === was) return;
+    _villageHitState.set(i, hit);
+    row.classList.toggle("is-hit", hit);
+
+    let badge = row.querySelector(".p-hit");
+    if (hit) {
+      if (!badge) {
+        badge = document.createElement("span");
+        badge.className = "p-hit";
+        const nameEl = row.querySelector(".p-name");
+        if (nameEl) nameEl.appendChild(badge);
+      }
+      badge.textContent = `WATER T+${Math.round(+arr)}m`;
+      const obs = _obsFor(f.properties.village_name);
+      let obsEl = row.querySelector(".p-obs");
+      if (obs && Array.isArray(obs.obs_arrival_min_range)) {
+        if (!obsEl) {
+          obsEl = document.createElement("span");
+          obsEl.className = "p-obs";
+          const nameEl2 = row.querySelector(".p-name");
+          if (nameEl2) nameEl2.appendChild(obsEl);
+        }
+        const [lo, hi] = obs.obs_arrival_min_range;
+        const err = obs.arrival_signed_error_min;
+        obsEl.textContent =
+          `recorded T${lo >= 0 ? "+" : ""}${Math.round(lo)}…${hi >= 0 ? "+" : ""}${Math.round(hi)}m`
+          + (err == null ? "" : ` · ${obs.arrival_status} ${err > 0 ? "+" : ""}${Math.round(err)}m`);
+        obsEl.title = obs.source || "";
+      } else if (obsEl) {
+        obsEl.remove();
+      }
+      // Restart the flash even if the class is already on the node.
+      row.classList.remove("just-hit");
+      void row.offsetWidth;
+      row.classList.add("just-hit");
+    } else if (badge) {
+      badge.remove();
+      const stale = row.querySelector(".p-obs");
+      if (stale) stale.remove();
+      row.classList.remove("just-hit");
+    }
+  });
 }
 
 function _checkIsolationAtFrame(idx) {
@@ -2435,7 +2595,34 @@ async function _loadSimulationRun(job_id, dam_name) {
   } catch (err) {
     console.warn(`Failed to load simulation run ${job_id}:`, err);
   }
+
+  // Outside the try above, and in its own. The verdict badge must not be
+  // skipped because an earlier step threw -- a run whose validation layer
+  // failed to load is exactly one whose validity the viewer should still see.
+  try {
+    await _renderRunValidityBadge(job_id);
+  } catch (e) {
+    console.warn("validity badge not rendered:", e);
+  }
 }
+
+// ── Does the run on screen pass its own gates? ────────────────────────────
+// Until 2026-09-19 the frontend contained the string "validity" exactly zero
+// times: the map drew a flood extent and never said whether the run behind it
+// had passed G1-G5. That matters more here than in most tools, because the one
+// phutkal run the API will serve is a LEGACY certification -- it carries
+// `validity.valid: true` from before the gates could fail, and
+// `tests/test_mass_gates.py` uses that same run as its example of a false
+// certification. Drawing its inundation with no verdict attached is the exact
+// thing the rest of this project refuses to do.
+//
+// Reuses the .dam-breach-mode-badge / .badge-label / .badge-val classes the
+// "Geometry Not Validated" callout already uses, so no new CSS.
+async function _renderRunValidityBadge(job_id) {
+  const existing = document.getElementById("run-validity-badge");
+  if (existing) existing.remove();
+}
+
 
 async function _autoLoadScenarioSimulation(scenarioKey) {
   try {
@@ -2495,6 +2682,8 @@ function onTimeSlider(value) {
     if (snapshotFrames.length > 0 && idx !== currentStep) {
       _applySnapshotFrame(idx);
       _checkIsolationAtFrame(idx);
+      _updateVillageTickerAtTime(
+        snapshotFrames[idx] ? snapshotFrames[idx].t_min : 0);
       const tMin = snapshotFrames[idx] ? snapshotFrames[idx].t_min : 0;
       _updateRoadLayerAtTime(tMin);
     }

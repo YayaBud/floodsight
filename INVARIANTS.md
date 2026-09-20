@@ -157,6 +157,61 @@ refused. Do not widen this branch to make a scenario render.
 
 ## 3. Traps — looks like a bug, is not
 
+**A job restored from disk is not the same object as a live one, and reconcile will not
+save you.** `_JOBS` is in-memory. After a restart `_rehydrate_saved_scenarios` rebuilds
+each job, and `_reconcile_job` SHORT-CIRCUITS on any job that is already `done` with a
+manifest - which a rehydrated one always is. So any field rehydration forgets is never
+filled in for the life of the process. This produced 404s on `/api/roads`,
+`/api/envelope_geojson` and `/api/arrival`, and a 500 on `/api/manifest`, all with the
+files present and registered. Both paths now build their fields from
+`_job_fields_from_result`; add a field there, not in one caller. Pinned by
+`tests/test_job_rehydration_is_complete.py`.
+
+**Progress crosses a process boundary.** `execute_full_simulation`'s `progress_cb` writes
+to memory in whichever process runs the pipeline, and for an API run that is
+`src/api/worker.py`, not the server. The worker mirrors each callback into
+`progress.json` beside the manifest and the API reads it back. Do not "simplify" this by
+having the API read the callback directly - there is nothing to read. Do not write
+progress into the manifest either: that file is hash-verified provenance.
+
+**`is_valid()` includes the PHYSICS verdict, not just manifest integrity.** It requires
+`validity.valid is True` and `geometry`/`physics`/`sources` all True, so a run whose gates
+refused it is never served - by design, because publishing an inundation map that failed
+its own gates is the one thing this project must not do. The cost is that with 0 of 7
+scenarios passing, only legacy runs are servable. That is a known, deliberate state; see
+`memory.md`, "Nothing produced today can be displayed".
+
+
+**`--wse` raises, and so does the API's `wse_m`. That is deliberate.** The water level
+is NOT settable. `execute_full_simulation` refuses any non-`None` `wse_m` with a
+`ValueError` naming the reason, and `POST /api/run` returns **422** for a supplied
+`wse_m`. A flag that exists and refuses looks like a bug and is not.
+
+Why it is refused rather than honoured: the level must be DERIVED from the sourced
+`thalweg_m + dam_height_m` (or the cascade reservoir's `z_crest_m`) and BOUNDED by the
+sourced `crest_elev_m`. A caller-supplied level is a level floating free of its
+sourcing, which is the defect the 2026-09-18 crest clamp removed - a level 1.23 m above
+the crest cost a 46x volume blow-out.
+
+Why it is refused rather than deleted: **Pydantic drops unknown keys by default**, so
+removing the request field would leave a client still sending `wse_m` having it dropped
+in silence - the same no-op, relocated to the HTTP boundary. Keeping the field with a
+`None` default lets the endpoint say why.
+
+Until 2026-09-18 it was silently discarded: never read between function entry and the
+two points that overwrite it (`run_pipeline.py:549` and `:552`). Three things fed that
+void - the CLI flag, which additionally fell back to the scenario's own `wse_m` so a
+concrete level was ALWAYS passed; `src/api/main.py`'s field, which defaulted to
+**3850.0**; and `src/api/worker.py`'s forwarding. Because `/api/run` writes
+`req.model_dump()` into the run manifest, **archived manifests record a level their run
+never used** - `101520ad...`'s request says 3850.0 against a run that used 3805.11.
+Those manifests will now raise if replayed, which is the point.
+
+`frontend/index.html` had already removed its "Water level" box for this reason and
+documents it there. Pinned by `tests/test_wse_m_is_refused.py`. The level a run actually
+used is reported as `validity.initial_wse_m`.
+
+
 **`test_lake_at_rest_is_still` used to prove nothing, and now does.** Its lake drained
 off the grid — 0.002 % retained — so the velocity sample was taken over dried cells.
 That drain-away turned out to be a SYMPTOM: the lake was being pushed off the grid by
@@ -410,6 +465,42 @@ best available observation is Sentinel-2 24 Nov (+5 d, 61.2 % clear) differenced
 against 4 Dec: **residual standing water, 16.96 km2**, a lower bound on ponding that
 includes rain-filled paddy and tanks. Never label it peak extent, and never quote a
 CSI against it as skill (it computes to 0.029 — the quantities differ).
+
+### Per-STRUCTURE manifests vs per-SCENARIO everything else (south_lhonak)
+
+Geometry manifests are keyed per **structure**; DEMs, `SCENARIOS` entries and OSM
+extracts are keyed per **scenario**. The two coincide for every single-structure
+event, so the distinction was invisible until south_lhonak — a compound event
+authored as `south_lhonak_chungthang.json` + `south_lhonak_moraine.json`, with
+nothing under `south_lhonak.json`.
+
+**Fixed 2026-09-19 in `scripts/author_crest_elevations.py`** via
+`scenario_key_for()` (longest-prefix match). Before it, that script looked for
+`south_lhonak_chungthang_dem.tif` and reported "no DEM" for a scenario whose DEM
+has been on disk since 2026-09-06.
+
+**TRAP — do NOT apply the same fix to `scripts/generate_geometry_manifest.py`.**
+It looks like the identical bug and is not. That script authors geometry *from*
+`SCENARIOS[key]["breach_lon"/"breach_lat"]`, and south_lhonak carries **one**
+breach coordinate — (88.18742, 27.91478), the moraine-dammed lake at ~5,200 m.
+Mapping the structure keys onto the scenario key would hand **both** manifests
+that single coordinate and then `main()` writes straight to
+`data/geometry/<key>.json` with no dry-run. Chungthang's geometry (barrier floor
+**1,510.79 m**, ~42 km downstream) would be silently overwritten with the
+moraine's (barrier floor **5,194.29 m**), destroying the two-structure
+distinction and leaving two manifests that look authored and describe the same
+place.
+
+As it stands the generator fails safely: `KeyError: 'south_lhonak_chungthang'`.
+Leave it failing. A compound event needs a breach coordinate **per structure**,
+which the `SCENARIOS` schema does not carry — that is a schema change, not a
+lookup fix.
+
+Related: the moraine's crest refusal is caused by the same per-scenario/per-
+structure collapse. `dam_height_m = 60.0` is scenario-level and
+`downstream_structure.height_m = 60.0` confirms it is **Chungthang's** height;
+applied to the moraine it derives a crest (5254.29 m) above the moraine's own
+highest barrier cell (5222.18 m), so the crest script correctly refuses.
 
 ## 4. Shortcuts with a known ceiling
 

@@ -1257,8 +1257,16 @@ def run_2d_swe_simulation(
     mc = res.mass_closure()
     logger.info("Simulation complete: %d steps in %.2f s  max_depth=%.2f m",
                 step, time.time() - t_wall, float(max_h.max()))
-    logger.info("  mass: in %.3e m^3, stored %.3e, outflow %.3e, clip %.2e "
-                "-> closure %.3f%%",
-                mc["initial_m3"] + mc["injected_m3"], mc["stored_m3"],
-                mc["outflow_m3"], mc["clipped_m3"], mc["relative_error"] * 100.0)
+    # `bed_lowering_m3` is printed because without it this line reads as mass
+    # appearing from nowhere. `stored` is sum(depth)*cell_area, so when the
+    # breach erodes the bed down by dz over area A, stored rises by A*dz at an
+    # unchanged water surface and no water was added. `mass_closure()` already
+    # carries the term on the input side; omitting it here produced log lines
+    # like "in 2.204e+07, stored 2.213e+07 -> closure 0.000%", where the two
+    # volumes cannot be reconciled by the reader and the closure looks wrong.
+    logger.info("  mass: in %.3e m^3, bed lowering %.3e, stored %.3e, "
+                "outflow %.3e, clip %.2e -> residual %.3e, closure %.3f%%",
+                mc["initial_m3"] + mc["injected_m3"], mc["bed_lowering_m3"],
+                mc["stored_m3"], mc["outflow_m3"], mc["clipped_m3"],
+                mc["residual_m3"], mc["relative_error"] * 100.0)
     return res

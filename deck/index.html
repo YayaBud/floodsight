@@ -1,0 +1,312 @@
+<title>FloodSight Deck Figures</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --ground: #FBFCFD;
+    --surface: #FFFFFF;
+    --ink: #0F1B2D;
+    --muted: #5A6B84;
+    --rule: #DDE4EC;
+    --accent: #2F6BFF;
+    --accent-soft: #EDF3FF;
+    --deep: #1E3A8A;
+    --warn-bg: #FFF8EC;
+    --warn-rule: #E3B778;
+    --warn-ink: #7A4E12;
+  }
+  :root:not([data-theme="light"]) {
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0B1220;
+      --surface: #131C2E;
+      --ink: #E7EDF8;
+      --muted: #9AACC6;
+      --rule: #263449;
+      --accent: #6E9BFF;
+      --accent-soft: #17233B;
+      --deep: #8AB0FF;
+      --warn-bg: #241B0C;
+      --warn-rule: #6B5220;
+      --warn-ink: #E8C88A;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0B1220;
+    --surface: #131C2E;
+    --ink: #E7EDF8;
+    --muted: #9AACC6;
+    --rule: #263449;
+    --accent: #6E9BFF;
+    --accent-soft: #17233B;
+    --deep: #8AB0FF;
+    --warn-bg: #241B0C;
+    --warn-rule: #6B5220;
+    --warn-ink: #E8C88A;
+    color-scheme: dark;
+  }
+
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap {
+    max-width: 1120px;
+    margin: 0 auto;
+    padding-inline: 24px;
+    padding-block: 48px 72px;
+  }
+  .eyebrow {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  h1 {
+    font-size: clamp(30px, 5vw, 42px);
+    line-height: 1.12;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    margin: 10px 0 14px;
+    text-wrap: balance;
+  }
+  .lede {
+    font-size: 17px;
+    color: var(--muted);
+    max-width: 62ch;
+    margin: 0;
+  }
+  .meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 22px;
+  }
+  .chip {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    padding: 5px 11px;
+    border: 1px solid var(--rule);
+    border-radius: 999px;
+    color: var(--muted);
+    background: var(--surface);
+  }
+  .howto {
+    margin-top: 34px;
+    border-left: 3px solid var(--accent);
+    background: var(--accent-soft);
+    padding: 18px 22px;
+    border-radius: 0 10px 10px 0;
+  }
+  .howto p { margin: 0; font-size: 14.5px; }
+  .howto p + p { margin-top: 8px; }
+  .howto code {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 13px;
+    background: var(--surface);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--rule);
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid var(--rule);
+    margin: 48px 0;
+  }
+  figure {
+    margin: 0 0 56px;
+  }
+  .fig-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 12px;
+    margin-bottom: 4px;
+  }
+  .fig-head h2 {
+    font-size: 21px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    margin: 0;
+  }
+  .fig-file {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    color: var(--accent);
+  }
+  .fig-frame {
+    margin-top: 16px;
+    background: #FFFFFF;
+    border: 1px solid var(--rule);
+    border-radius: 12px;
+    padding: 20px;
+    overflow-x: auto;
+  }
+  .fig-frame img {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    height: auto;
+    min-width: 640px;
+  }
+  figcaption {
+    margin-top: 14px;
+    font-size: 14.5px;
+    color: var(--muted);
+    max-width: 78ch;
+  }
+  figcaption strong { color: var(--ink); font-weight: 600; }
+  .note {
+    margin-top: 12px;
+    background: var(--warn-bg);
+    border: 1px solid var(--warn-rule);
+    color: var(--warn-ink);
+    border-radius: 8px;
+    padding: 12px 16px;
+    font-size: 13.5px;
+    max-width: 78ch;
+  }
+  footer {
+    border-top: 1px solid var(--rule);
+    padding-top: 22px;
+    font-size: 13.5px;
+    color: var(--muted);
+  }
+  @media (max-width: 640px) {
+    .fig-frame { padding: 12px; }
+  }
+</style>
+
+<div class="wrap">
+  <header>
+    <p class="eyebrow">SIH26161 &middot; Sponsor NTRO &middot; Disaster Management</p>
+    <h1>FloodSight deck figures</h1>
+    <p class="lede">Four vector diagrams for the submission deck, drawn to carry the mechanism rather than decorate the slide. Each one is a standalone SVG on a transparent background, sized for a 16:9 slide.</p>
+    <div class="meta">
+      <span class="chip">4 figures</span>
+      <span class="chip">SVG &middot; vector</span>
+      <span class="chip">transparent ground</span>
+      <span class="chip">deck due 30 Sep</span>
+    </div>
+
+    <div class="howto">
+      <p><strong>Getting these into PowerPoint:</strong> Insert &rarr; Pictures &rarr; This Device, pick the <code>.svg</code>. It stays vector, so it scales to any slide size without going fuzzy.</p>
+      <p>To recolour a diagram for a dark slide: right-click &rarr; <em>Convert to Shape</em>, then each box, line and label becomes an editable PowerPoint object.</p>
+      <p>Files live in <code>D:\sih_work\deck\</code>.</p>
+    </div>
+  </header>
+
+  <hr>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 07</span>
+      <h2>System architecture</h2>
+      <span class="fig-file">07_system_architecture.svg</span>
+    </div>
+    <p class="eyebrow">For the Technical Approach slide &middot; every box is a real symbol</p>
+    <div class="fig-frame">
+      <img src="07_system_architecture.svg" alt="Seven subsystem regions: ingest, terrain and geometry with a fail-closed gate, breach and cascade, the solvers, consequence analysis, output and service, observed validation, plus a cross-cutting band for the validity gates, the provenance system, and the current gate status.">
+    </div>
+    <figcaption>Five progressive stages across a widescreen 16:9 canvas, flowing left to right with zero retrograde snaking lines. Short high-contrast labels carry the slide; the monospace line under each box is the actual symbol in the codebase (<strong>ATLAS.md</strong>, commit <code>d903da9</code>). Two decision gates perform active safety enforcement: <strong>the geometry gate</strong> refuses to publish a flood map for unconfined impoundments (fails closed with <code>ImpoundmentDoesNotHoldError</code>), and <strong>the dynamic trigger test</strong> loops every timestep rather than firing at a scripted minute. The pipeline culminates in the ranked evacuation schedule with 5-tier epistemic provenance.</figcaption>
+    <div class="note">Two boxes are dashed on purpose. <strong>gee_satellite</strong> &mdash; module and tests exist, nothing calls it, no credentialed account. <strong>swe_2d_gpu</strong> &mdash; complete and checksum-identical, but measured 6.6&times; slower than the CPU path on the development card because the scheme needs float64. Drawing either as live would be the exact false claim you asked me to avoid. <strong>Delft3D-FLOW is named in the problem statement and has never been run here</strong> &mdash; it is absent from this diagram because there is no code, input or output for it in the repository. The second solver arm is our own well-balanced 2D finite-volume SWE solver: the same governing equations and the same numerical class, validated on the same Ritter benchmark. A &ldquo;Delft3D-FLOW Ritter RMSE 0.14 m, precomputed&rdquo; card used to sit in the Solvers tab and was <em>removed rather than relabelled</em>, because nothing in this project produced that number.</div>
+  </figure>
+
+  <hr>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 06</span>
+      <h2>The timeline spine, labelled</h2>
+      <span class="fig-file">06_spine_annotated.svg</span>
+    </div>
+    <p class="eyebrow">Real UI &middot; Annamayya Dam Breach (2021) 27h Disaster Replay &middot; Precision Vector HUD</p>
+    <div class="fig-frame">
+      <img src="06_spine_annotated.svg" alt="The FloodSight interactive timeline spine, comprehensively annotated: dual-limb hydrodynamic curve (pre-breach stage rise plus crest overtopping and Froehlich breach outflow hydrograph), forensic evidence event milestones from Pincha failure to Tangaturu, road cut evacuation timeline, and synchronized master playhead parked at T+495m.">
+    </div>
+    <figcaption>The actual product timeline capture annotated with crisp, high-contrast forensic callouts carrying the audited telemetry from the 2021 Annamayya dam failure &mdash; upstream Pincha ring bund washout at T&minus;150m (04:00 AM), reservoir stage rise to the +206.0m crest limit, full 336m earthen breach at T=0 (06:30 AM, Q<sub>peak</sub> &asymp; 9,400 m&sup3;/s), downstream arrival milestones at Tangaturu (T+306m) and Kothapirachinpalle (T+435m), and the road cut isolation timeline where lifeline corridors are severed hours ahead of local flooding. <strong>The real UI screenshot is directly embedded and annotated with clean leader lines</strong>, disentangling overlapping labels and making every phase crystal clear for slide presentations.</figcaption>
+    <div class="note"><strong>Presentation Note:</strong> In raw browser captures, event labels crowded near the breach hour overlap. This annotated figure anchors leader lines directly to each milestone on the real UI capture (EVD-01 through EVD-28), clearly explaining the two-phase physics (lake stage rise + breach hydrograph), transportation severance, and the master playhead at T+495m.</div>
+  </figure>
+
+  <hr>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 05</span>
+      <h2>Slide 2 flow &mdash; fits the empty block</h2>
+      <span class="fig-file">05_slide2_flow.svg</span>
+    </div>
+    <p class="eyebrow">Sized for the gap under the solution box &middot; 1.8:1</p>
+    <div class="fig-frame">
+      <img src="05_slide2_flow.svg" alt="Five stages across the top, point at it, assemble, reconstruct, break it, route it, feeding an output panel showing an access road cut before the water reaches the village, and three answer cards covering which road goes first, which village is cut off, and how much time is left.">
+    </div>
+    <figcaption>Drawn to sit in the white space on the idea-submission slide. The top row restates the five solution bullets as a flow; the panel below is the payoff, and its three cards answer the <strong>exact three questions the Problem box asks on the left</strong> &mdash; which road, which village, how long. That pairing is what makes the slide argue instead of list. No minute values are printed, so nothing on it can be challenged as an unmeasured number.</figcaption>
+  </figure>
+
+  <hr>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 01</span>
+      <h2>Pipeline strip</h2>
+      <span class="fig-file">01_pipeline_strip.svg</span>
+    </div>
+    <p class="eyebrow">For slide 1, the band across the top</p>
+    <div class="fig-frame">
+      <img src="01_pipeline_strip.svg" alt="Six-stage pipeline from open data ingest through geometry, breach physics, the 2D solver and consequence analysis to a ranked evacuation schedule, with a time rail beneath it.">
+    </div>
+    <figcaption>The six stages a run passes through, with the real source or method named under each one so it does not read as six empty nouns. The rail underneath is the claim that matters to a judge: <strong>one coordinate in, a ranked evacuation schedule out, roughly twenty minutes, nothing licensed.</strong></figcaption>
+  </figure>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 02</span>
+      <h2>End-to-end architecture</h2>
+      <span class="fig-file">02_architecture.svg</span>
+    </div>
+    <p class="eyebrow">For the technical approach slide</p>
+    <div class="fig-frame">
+      <img src="02_architecture.svg" alt="Four-band architecture: open data ingest, terrain and impoundment ending in a fail-closed geometry gate that can abort the run, failure physics and the 2D solver, then consequence and decision outputs.">
+    </div>
+    <figcaption>Four bands, with the data that moves between them written on the arrows. The element worth talking to is the <strong>geometry gate</strong>: it is drawn as a real branch with a real dead end, because a run that cannot show the terrain holds the water is refused rather than quietly downgraded. Most reviewers have seen a pipeline diagram before; few have seen one that draws its own abort path.</figcaption>
+  </figure>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 03</span>
+      <h2>Evacuation window</h2>
+      <span class="fig-file">03_evacuation_window.svg</span>
+    </div>
+    <p class="eyebrow">For the differentiator slide &mdash; the one to spend time on</p>
+    <div class="fig-frame">
+      <img src="03_evacuation_window.svg" alt="Timeline where the access road is cut at 25 minutes while water reaches the village centre at 65 minutes, leaving a 40 minute evacuation window, contrasted against an arrival-time-only model that reports 65 minutes.">
+    </div>
+    <figcaption>Two tracks on one clock. The road closes at T+25; the water arrives at T+65; the gap between them is the only number a commander can act on. The right-hand box is what every arrival-time model reports, so the difference is on the slide rather than asserted in a bullet. <strong>This is the figure that answers "why not just use an existing inundation map".</strong></figcaption>
+    <div class="note">The 25 / 65 / 1,240 figures are illustrative of the mechanism, not a measured run. Before this goes in front of a jury, swap them for numbers from an actual scenario output, or leave the axis labelled and drop the specific minute values.</div>
+  </figure>
+
+  <figure>
+    <div class="fig-head">
+      <span class="eyebrow">Fig. 04</span>
+      <h2>Cascade lifecycle</h2>
+      <span class="fig-file">04_cascade_lifecycle.svg</span>
+    </div>
+    <p class="eyebrow">For the physics slide, or the Annamayya / Teesta case study</p>
+    <div class="fig-frame">
+      <img src="04_cascade_lifecycle.svg" alt="Cascade lifecycle: inflow raises an upstream pool, a per-timestep trigger test opens a breach, discharge measured at the opening routes downstream by Muskingum to a second reservoir whose spillway may be exceeded, triggering a second breach into the 2D domain.">
+    </div>
+    <figcaption>The loop back from the trigger test is the point of the drawing: the breach is not scheduled, it is tested for at every timestep and happens when the level says so. The same test then runs again at the downstream structure, which is what makes <strong>Pincha into Annamayya</strong> a cascade rather than two separate floods. The two notes along the bottom are the honest-engineering claims &mdash; no scripted failure time, and mass counted exactly once.</figcaption>
+  </figure>
+
+  <footer>
+    <p>Drawn from the FloodSight source and project records, September 2026. Figures 1, 2 and 4 describe pipeline structure and are stable; Figure 3's numbers are placeholders pending a validated scenario run.</p>
+  </footer>
+</div>

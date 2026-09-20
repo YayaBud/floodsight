@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1640 620" width="1640" height="620" role="img" aria-label="A village access road is cut well before flood water reaches the village itself, and the gap between those two moments is the evacuation window">
+
+  <text x="20" y="46" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="33" font-weight="700" fill="#0F1B2D">The road closes long before the water arrives.</text>
+
+  <!-- evacuation window band -->
+  <rect x="560" y="92" width="560" height="356" rx="8" fill="#E3ECFF"/>
+  <text x="840" y="140" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="35" font-weight="700" fill="#2F6BFF" text-anchor="middle">EVACUATION WINDOW</text>
+
+  <!-- access road -->
+  <text x="20" y="232" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="25" font-weight="700" fill="#0F1B2D">Access road</text>
+  <rect x="200" y="192" width="360" height="76" rx="8" fill="#DCFCE7" stroke="#15803D" stroke-width="2.5"/>
+  <text x="380" y="240" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" font-weight="600" fill="#15803D" text-anchor="middle">passable</text>
+  <rect x="560" y="192" width="960" height="76" rx="8" fill="#FEE2E2" stroke="#DC2626" stroke-width="2.5"/>
+  <text x="1040" y="240" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" font-weight="700" fill="#B91C1C" text-anchor="middle">CUT &#8212; no way out</text>
+
+  <!-- village -->
+  <text x="20" y="352" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="25" font-weight="700" fill="#0F1B2D">Village</text>
+  <rect x="200" y="312" width="920" height="76" rx="8" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="2.5"/>
+  <text x="660" y="360" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" fill="#475569" text-anchor="middle">still dry</text>
+  <rect x="1120" y="312" width="400" height="76" rx="8" fill="#1E3A8A"/>
+  <text x="1320" y="360" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" font-weight="700" fill="#FFFFFF" text-anchor="middle">flooded</text>
+
+  <!-- markers -->
+  <line x1="560" y1="92" x2="560" y2="470" stroke="#DC2626" stroke-width="3.5" stroke-dasharray="10 6"/>
+  <line x1="1120" y1="92" x2="1120" y2="470" stroke="#1E3A8A" stroke-width="3.5" stroke-dasharray="10 6"/>
+  <text x="560" y="508" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" font-weight="700" fill="#B91C1C" text-anchor="middle">road cut</text>
+  <text x="1120" y="508" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" font-weight="700" fill="#1E3A8A" text-anchor="middle">water arrives</text>
+
+  <!-- axis -->
+  <line x1="200" y1="470" x2="1580" y2="470" stroke="#94A3B8" stroke-width="2.5"/>
+  <polygon points="1580,460 1602,470 1580,480" fill="#94A3B8"/>
+  <text x="1602" y="508" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="21" font-style="italic" fill="#64748B" text-anchor="end">time since the barrier fails</text>
+
+  <text x="20" y="580" font-family="Segoe UI, Calibri, Arial, sans-serif" font-size="24" fill="#334155">Every other model reports only the right-hand line. We report the gap &#8212; per village, ranked.</text>
+</svg>

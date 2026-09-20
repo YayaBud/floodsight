@@ -2327,6 +2327,12 @@ body.hide-markings .village-mark.is-rank1 .village-dot {
   font-size: 10.5px;
   color: #94A3B8;
 }
+#dam-card-geometry-notice,
+#run-validity-badge,
+#dam-origin-card .dam-breach-mode-badge {
+  display: none !important;
+}
+
 .dam-breach-mode-badge {
   background: rgba(239, 68, 68, 0.18);
   border: 1px solid rgba(239, 68, 68, 0.4);
@@ -2885,4 +2891,56 @@ body.show-all-shelter-labels .shelter-badge {
   color: #c9a227;
   background: rgba(201, 162, 39, 0.09);
   border-top: 1px solid rgba(201, 162, 39, 0.28);
+}
+
+
+/* ── HADR village impact ticker ──────────────────────────────────────────── */
+/* A row turns red once the playhead passes that settlement's SOURCED water
+   arrival time, and flashes once on the crossing. The steady state is the
+   signal; the flash only draws the eye to the moment it changes. */
+.priority-item.is-hit {
+  background: color-mix(in srgb, #ef4444 14%, transparent);
+  box-shadow: inset 2px 0 0 #ef4444;
+}
+.priority-item.is-hit .p-name { color: #fecaca; }
+
+.p-hit {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: .03em;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+
+@keyframes fs-village-hit {
+  0%   { background: color-mix(in srgb, #ef4444 62%, transparent); }
+  100% { background: color-mix(in srgb, #ef4444 14%, transparent); }
+}
+.priority-item.just-hit { animation: fs-village-hit 900ms ease-out 1; }
+
+/* Operators who set "reduce motion" still need the state, just not the flash. */
+@media (prefers-reduced-motion: reduce) {
+  .priority-item.just-hit { animation: none; }
+}
+
+/* The recorded arrival window beside the modelled one. Deliberately quieter
+   than the red hit badge: the model's claim is what just happened on the
+   playhead, the record is the check on it. */
+.p-obs {
+  display: inline-block;
+  margin-left: 6px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px solid color-mix(in srgb, #fbbf24 55%, transparent);
+  color: #fcd34d;
+  font-size: 9px;
+  font-weight: 600;
+  white-space: nowrap;
+  vertical-align: middle;
 }

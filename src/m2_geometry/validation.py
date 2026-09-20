@@ -18,7 +18,17 @@ from src.m2_geometry.seed_walk import walk_seed
 
 
 class GeometryValidationError(ValueError):
-    """Raised when geometry cannot support a hydraulic run."""
+    """Raised when geometry cannot support a hydraulic run.
+
+    Carries ``.result`` -- whatever `validate_geometry` had computed by the time
+    it refused. ``str(exc)`` stays exactly the message, so callers that only
+    read the string are unaffected; the dict is there so a refusal does not have
+    to be re-diagnosed by hand to learn WHY it fired.
+    """
+
+    def __init__(self, message: str, result: dict[str, Any] | None = None):
+        super().__init__(message)
+        self.result = result or {}
 
 
 class ImpoundmentDoesNotHoldError(GeometryValidationError):
@@ -36,12 +46,9 @@ class ImpoundmentDoesNotHoldError(GeometryValidationError):
     time it refused, including the derived seeds and the rasterized masks. The
     structural work is still valid, so callers that were only ever asking
     about it (seed derivation, mask rasterization) can read it without a
-    bypass flag having to exist on the production entry point.
+    bypass flag having to exist on the production entry point. The channel
+    itself is inherited from `GeometryValidationError`.
     """
-
-    def __init__(self, message: str, result: dict[str, Any] | None = None):
-        super().__init__(message)
-        self.result = result or {}
 
 
 _REQUIRED = {"breach_point", "breach_zone", "river", "upstream_seed", "downstream_seed"}
@@ -199,7 +206,7 @@ def validate_geometry(manifest: dict[str, Any], elevation: np.ndarray,
         raise GeometryValidationError("finite water_level_m required for connectivity validation")
     valid = np.isfinite(elevation) & (elevation <= float(level))
     blocked = valid & ~barrier_mask
-    labels, _ = ndimage.label(blocked, structure=np.ones((3, 3), dtype=bool))
+    labels, n_components = ndimage.label(blocked, structure=np.ones((3, 3), dtype=bool))
     upstream_rc = tuple(int(v) for v in rasterio.transform.rowcol(transform, *upstream_xy))
     downstream_rc = tuple(int(v) for v in rasterio.transform.rowcol(transform, *downstream_xy))
     ur, uc = upstream_rc
@@ -210,7 +217,51 @@ def validate_geometry(manifest: dict[str, Any], elevation: np.ndarray,
     upstream_label = int(labels[ur, uc])
     downstream_label = int(labels[dr, dc])
     if upstream_label == 0 or downstream_label == 0 or upstream_label == downstream_label:
-        raise GeometryValidationError("upstream/downstream seeds lack separated connected components")
+        # The bare message cost a full session to diagnose once, because the
+        # three distinct causes it covers -- a seed above water, and a barrier
+        # that fails to cut the wet region -- are indistinguishable from the
+        # string. The numbers that DO distinguish them are already computed
+        # here, so they travel with the refusal rather than being re-derived.
+        #
+        # The discriminator is `barrier_end_elev_m` against `water_level_m`: a
+        # barrier whose ends stand above the level has real abutments and a
+        # genuine terrain problem, while one with an end below the level is not
+        # spanning its valley at all. Extending such a barrier until the labels
+        # separate is REJECTED (scripts/generate_geometry_manifest.py:64-77, and
+        # findings_results.md 2026-09-19 measured the end elevations that make
+        # it wrong) -- it splits the components while water still spills around.
+        ends: list[float] = []
+        try:
+            hull = barrier if barrier.geom_type == "Polygon" else barrier.convex_hull
+            pts = np.asarray(hull.exterior.coords)[:, :2]
+            centre = pts.mean(axis=0)
+            axis = np.linalg.svd(pts - centre, full_matrices=False)[2][0]
+            offs = (pts - centre) @ axis
+            for end in (centre + axis * offs.max(), centre + axis * offs.min()):
+                er, ec = (int(v) for v in rasterio.transform.rowcol(transform, *end))
+                if 0 <= er < elevation.shape[0] and 0 <= ec < elevation.shape[1]:
+                    ends.append(round(float(elevation[er, ec]), 2))
+            span_m = round(float(offs.max() - offs.min()), 1)
+        except Exception:                                     # noqa: BLE001
+            span_m = None
+        same = upstream_label != 0 and upstream_label == downstream_label
+        raise GeometryValidationError(
+            "upstream/downstream seeds lack separated connected components",
+            {"cause": ("barrier does not cut the wet region" if same
+                       else "a seed lies above water_level_m"),
+             "water_level_m": float(level),
+             "wet_cells_below_level": int(valid.sum()),
+             "components_below_level": int(n_components),
+             "upstream_label": upstream_label,
+             "downstream_label": downstream_label,
+             "shared_component_cells": (int((labels == upstream_label).sum())
+                                        if same else None),
+             "upstream_seed_elev_m": round(float(elevation[ur, uc]), 2),
+             "downstream_seed_elev_m": round(float(elevation[dr, dc]), 2),
+             "barrier_cells": int(barrier_mask.sum()),
+             "barrier_span_m": span_m,
+             "barrier_end_elev_m": ends,
+             "barrier_ends_above_level": (bool(ends) and min(ends) >= float(level))})
     upstream_basin = labels == upstream_label
     if (upstream_basin[0, :].any() or upstream_basin[-1, :].any() or
             upstream_basin[:, 0].any() or upstream_basin[:, -1].any()):

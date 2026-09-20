@@ -109,17 +109,83 @@ window.Spine = (function () {
 
     const n = d.t_s.length;
     const stride = Math.max(1, Math.floor(n / 260));
-    const qMax = d.Q_m3s.reduce((m, q) => (q > m ? q : m), 0) || 1;
+    // Scale against BOTH limbs. The pre-breach inflow peaks around 7,100 m3/s
+    // and the release peaks near 9,400; scaling on the release alone would be
+    // fine, but scaling on the pre-breach alone would clip the release off the
+    // top of the lane, so the max is taken over whichever limbs exist.
+    const preQ = stageFrames.map((f) => +f.inflow_m3s).filter((v) => isFinite(v));
+    const qMax = Math.max(
+      d.Q_m3s.reduce((m, q) => (q > m ? q : m), 0),
+      preQ.length ? Math.max(...preQ) : 0) || 1;
 
     const zeroX = pct(0) * FLOW_W;
-    let path = `M${zeroX.toFixed(1)} ${FLOW_H}`;
+    let path = "";
+    // Pre-breach limb first, so the curve is continuous across T=0 instead of
+    // appearing from nothing at the breach.
+    if (preQ.length > 1) {
+      stageFrames.forEach((f, i) => {
+        if (!isFinite(+f.inflow_m3s)) return;
+        const x = pct(+f.t_min) * FLOW_W;
+        const y = FLOW_H - (+f.inflow_m3s / qMax) * (FLOW_H - 3);
+        path += `${path ? " L" : "M"}${x.toFixed(1)} ${y.toFixed(1)}`;
+      });
+    }
+    if (!path) path = `M${zeroX.toFixed(1)} ${FLOW_H}`;
     for (let i = 0; i < n; i += stride) {
       const x = pct(d.t_s[i] / 60) * FLOW_W;
       const y = FLOW_H - (d.Q_m3s[i] / qMax) * (FLOW_H - 3);
       path += ` L${x.toFixed(1)} ${y.toFixed(1)}`;
     }
     line.setAttribute("d", path);
-    area.setAttribute("d", `${path} L${FLOW_W} ${FLOW_H} L${zeroX.toFixed(1)} ${FLOW_H} Z`);
+    const startX = (preQ.length > 1 && stageFrames.length)
+      ? pct(+stageFrames[0].t_min) * FLOW_W : zeroX;
+    area.setAttribute("d", `${path} L${FLOW_W} ${FLOW_H} L${startX.toFixed(1)} ${FLOW_H} Z`);
+  }
+
+  // ── stage lane ───────────────────────────────────────────────────────────
+  // Reservoir elevation over the pre-breach half, in the same svg as the
+  // discharge curve. The two answer the PS's "lake formation and then the
+  // breach" as one picture: the level climbs to the crest, the crest line is
+  // crossed, and the discharge curve takes over at T=0.
+  //
+  // Scaled over [FRL - 10 %, crest + 10 %] of its own range rather than 0 --
+  // the whole story here is 2.4 m on a 206 m datum, and a zero-based axis
+  // would render it as a flat line.
+  let stageFrames = [];
+
+  function setStage(frames) {
+    stageFrames = (frames || []).filter(
+      (f) => f && f.level_m != null && isFinite(+f.level_m));
+    drawStage();
+    drawFlow();          // the flow lane's pre-breach limb comes from these
+  }
+
+  function drawStage() {
+    const line = $("stage-line"), crest = $("crest-line");
+    if (!line || !crest) return;
+    if (stageFrames.length < 2) {
+      line.setAttribute("d", ""); crest.setAttribute("d", "");
+      return;
+    }
+    const lv = stageFrames.map((f) => +f.level_m);
+    const lo = Math.min(...lv), hi = Math.max(...lv);
+    const pad = Math.max(0.05, (hi - lo) * 0.1);
+    const y0 = lo - pad, y1 = hi + pad;
+    const yOf = (v) => FLOW_H - ((v - y0) / (y1 - y0)) * (FLOW_H - 4) - 2;
+
+    let d = "";
+    stageFrames.forEach((f, i) => {
+      const x = pct(+f.t_min) * FLOW_W;
+      d += `${i ? " L" : "M"}${x.toFixed(1)} ${yOf(+f.level_m).toFixed(1)}`;
+    });
+    line.setAttribute("d", d);
+
+    // The crest is the level the last pre-breach frame reaches -- taken from
+    // the data, not hardcoded, so it stays right for any scenario.
+    const yc = yOf(hi);
+    const xa = pct(+stageFrames[0].t_min) * FLOW_W;
+    const xb = pct(+stageFrames[stageFrames.length - 1].t_min) * FLOW_W;
+    crest.setAttribute("d", `M${xa.toFixed(1)} ${yc.toFixed(1)} L${xb.toFixed(1)} ${yc.toFixed(1)}`);
   }
 
   // ── events lane ──────────────────────────────────────────────────────────
@@ -505,6 +571,7 @@ window.Spine = (function () {
   // timeline blank until something else happened to redraw it, so a hidden
   // document paints straight away and visibilitychange repaints on return.
   function render() {
+    drawStage();
     if (document.hidden) { paint(); return; }
     if (raf) return;
     raf = requestAnimationFrame(paint);
@@ -540,7 +607,7 @@ window.Spine = (function () {
     render();
   });
 
-  return { setDomain, setFlow, setEvents, setRoads, setTime, setPlaying, reset,
+  return { setDomain, setFlow, setStage, setEvents, setRoads, setTime, setPlaying, reset,
            cutAt, isolatedAt, roadCount,
            get tMax() { return tMax; } };
 })();

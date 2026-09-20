@@ -494,6 +494,13 @@
             </defs>
             <path id="flow-area" d="" />
             <path id="flow-line" d="" />
+            <!-- Stage lane: reservoir level over the pre-breach half, drawn in
+                 the SAME svg as discharge so both share the playhead's x-axis.
+                 A separate chart would need its own alignment and could clip. -->
+            <path id="crest-line" d="" stroke="#f87171" stroke-width="1"
+                  stroke-dasharray="4 3" fill="none" opacity="0.75" />
+            <path id="stage-line" d="" stroke="#38bdf8" stroke-width="1.6"
+                  fill="none" vector-effect="non-scaling-stroke" />
           </svg>
 
           <div id="lane-events" class="lane lane-events">

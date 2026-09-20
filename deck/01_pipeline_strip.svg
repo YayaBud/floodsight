@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 268" width="1600" height="268" role="img" aria-label="FloodSight pipeline: six stages from open data ingest to a ranked evacuation schedule, about twenty minutes end to end">
+
+  <!-- ========= STAGE 1 ========= -->
+  <rect x="24" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <rect x="24" y="24" width="230" height="5" rx="2.5" fill="#2F6BFF"/>
+  <circle cx="44" cy="54" r="13" fill="#E8EFFF"/>
+  <text x="44" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#2F6BFF" text-anchor="middle">1</text>
+  <text x="66" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">INGEST</text>
+  <text x="42" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">Open data</text>
+  <text x="42" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">GLO-30 DEM · OSM roads</text>
+  <text x="42" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">GHS-POP · Sentinel-1/2</text>
+
+  <polygon points="262,84 282,91 262,98" fill="#2F6BFF"/>
+  <line x1="256" y1="91" x2="264" y2="91" stroke="#2F6BFF" stroke-width="2"/>
+
+  <!-- ========= STAGE 2 ========= -->
+  <rect x="288" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <rect x="288" y="24" width="230" height="5" rx="2.5" fill="#2F6BFF"/>
+  <circle cx="308" cy="54" r="13" fill="#E8EFFF"/>
+  <text x="308" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#2F6BFF" text-anchor="middle">2</text>
+  <text x="330" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">GEOMETRY</text>
+  <text x="306" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">Impoundment</text>
+  <text x="306" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">Seeded fill → V(h) curve</text>
+  <text x="306" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">fail-closed terrain gate</text>
+
+  <polygon points="526,84 546,91 526,98" fill="#2F6BFF"/>
+  <line x1="520" y1="91" x2="528" y2="91" stroke="#2F6BFF" stroke-width="2"/>
+
+  <!-- ========= STAGE 3 ========= -->
+  <rect x="552" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <rect x="552" y="24" width="230" height="5" rx="2.5" fill="#2F6BFF"/>
+  <circle cx="572" cy="54" r="13" fill="#E8EFFF"/>
+  <text x="572" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#2F6BFF" text-anchor="middle">3</text>
+  <text x="594" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">BREACH</text>
+  <text x="570" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">Failure physics</text>
+  <text x="570" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">3-arm ensemble band</text>
+  <text x="570" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">DAMBRK weir kernel</text>
+
+  <polygon points="790,84 810,91 790,98" fill="#2F6BFF"/>
+  <line x1="784" y1="91" x2="792" y2="91" stroke="#2F6BFF" stroke-width="2"/>
+
+  <!-- ========= STAGE 4 ========= -->
+  <rect x="816" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <rect x="816" y="24" width="230" height="5" rx="2.5" fill="#1E3A8A"/>
+  <circle cx="836" cy="54" r="13" fill="#DBEAFE"/>
+  <text x="836" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#1E3A8A" text-anchor="middle">4</text>
+  <text x="858" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">HYDRAULICS</text>
+  <text x="834" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">2D SWE solver</text>
+  <text x="834" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">Audusse FV · MUSCL</text>
+  <text x="834" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">SSP-RK2 · written in-house</text>
+
+  <polygon points="1054,84 1074,91 1054,98" fill="#2F6BFF"/>
+  <line x1="1048" y1="91" x2="1056" y2="91" stroke="#2F6BFF" stroke-width="2"/>
+
+  <!-- ========= STAGE 5 ========= -->
+  <rect x="1080" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <rect x="1080" y="24" width="230" height="5" rx="2.5" fill="#D97706"/>
+  <circle cx="1100" cy="54" r="13" fill="#FEF3C7"/>
+  <text x="1100" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#B45309" text-anchor="middle">5</text>
+  <text x="1122" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">CONSEQUENCE</text>
+  <text x="1098" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">People &amp; roads</text>
+  <text x="1098" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">population zonal sum</text>
+  <text x="1098" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">road graph cut per step</text>
+
+  <polygon points="1318,84 1338,91 1318,98" fill="#2F6BFF"/>
+  <line x1="1312" y1="91" x2="1320" y2="91" stroke="#2F6BFF" stroke-width="2"/>
+
+  <!-- ========= STAGE 6 ========= -->
+  <rect x="1344" y="24" width="230" height="134" rx="10" fill="#FFFFFF" stroke="#0F1B2D" stroke-width="2"/>
+  <rect x="1344" y="24" width="230" height="5" rx="2.5" fill="#0F1B2D"/>
+  <circle cx="1364" cy="54" r="13" fill="#0F1B2D"/>
+  <text x="1364" y="59" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="700" fill="#FFFFFF" text-anchor="middle">6</text>
+  <text x="1386" y="58" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="10.5" font-weight="600" letter-spacing="1.3" fill="#64748B">DECISION</text>
+  <text x="1362" y="92" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="16.5" font-weight="700" fill="#0F1B2D">Command output</text>
+  <text x="1362" y="115" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">ranked evac schedule</text>
+  <text x="1362" y="132" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" fill="#475569">SHP · KML · CAP-JSON</text>
+
+  <!-- ========= TIME RAIL ========= -->
+  <line x1="24" y1="212" x2="1574" y2="212" stroke="#CBD5E1" stroke-width="1.5" stroke-dasharray="5 5"/>
+  <circle cx="24" cy="212" r="5" fill="#2F6BFF"/>
+  <circle cx="1574" cy="212" r="5" fill="#0F1B2D"/>
+  <text x="38" y="240" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">T + 0 &#8212; one river coordinate or lake bounding box</text>
+  <text x="1560" y="240" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#0F1B2D" text-anchor="end">T + ~20 min &#8212; who to move, and how long they have</text>
+  <rect x="690" y="198" width="218" height="27" rx="13.5" fill="#E8EFFF"/>
+  <text x="799" y="216" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-weight="600" fill="#2F6BFF" text-anchor="middle">unattended, no licensed software</text>
+</svg>

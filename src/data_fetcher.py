@@ -643,6 +643,31 @@ def _load_external_scenarios(directory: Path | None = None) -> dict[str, dict]:
 SCENARIOS.update(_load_external_scenarios())
 
 
+def scenario_key_for(manifest_key: str) -> str:
+    """Map a geometry-MANIFEST key to the SCENARIO key it belongs to.
+
+    Manifests are keyed per STRUCTURE; DEMs, `SCENARIOS` entries and OSM extracts
+    are keyed per SCENARIO. The two coincide for every single-structure event, so
+    this is the identity function everywhere except south_lhonak — a compound
+    event authored as `south_lhonak_chungthang` + `south_lhonak_moraine` with
+    nothing under `south_lhonak`. Longest prefix wins, so a future `phutkal_*`
+    structure cannot be captured by a shorter key, and an unmatched key is
+    returned unchanged (derna / ivanovo / malpasset have no `SCENARIOS` entry at
+    all, and must keep failing for that reason).
+
+    Defined here, once, because applying it in the WRONG place is destructive:
+    `scripts/generate_geometry_manifest.py` authors geometry FROM a scenario's
+    single `breach_lon`/`breach_lat`, so mapping structure keys onto the scenario
+    there would hand both south_lhonak manifests the same coordinate and
+    overwrite Chungthang's geometry (barrier floor 1,510.79 m) with the moraine's
+    (5,194.29 m). See `INVARIANTS.md` §3.
+    """
+    if manifest_key in SCENARIOS:
+        return manifest_key
+    candidates = [k for k in SCENARIOS if manifest_key.startswith(f"{k}_")]
+    return max(candidates, key=len) if candidates else manifest_key
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # DEM
 # ──────────────────────────────────────────────────────────────────────────────

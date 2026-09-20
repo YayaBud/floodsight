@@ -83,11 +83,34 @@ def test_pipeline_emits_validity_and_manifest_lifecycle_completes(tmp_path):
                  "gate_g3_reachable_outlet", "gate_g4_impoundment_retention"):
         assert gate in v, f"{gate} missing from the validity block"
 
-    # G1: the water in the domain must come from the impoundment. Measured on
-    # this run -- phutkal, coarsen 4, 1800 s -- 1.8046e+07 m^3 supplied against
-    # a 2.7000e+07 m^3 impoundment, ratio 0.668.
-    assert v["gate_g1_volume_provenance"]["ok"] is False
-    assert v["gate_g1_volume_provenance"]["ratio"] is not None
+    # G1: the water in the domain must come from the impoundment.
+    #
+    # UPDATED 2026-09-18. This asserted `ok is False` and cited "1.8046e+07 m^3
+    # supplied against a 2.7000e+07 m^3 impoundment, ratio 0.668" -- but that
+    # ratio was an artefact, not physics. `reservoir_fill = 0.9` was read as a
+    # VOLUME fraction for `impounded_vol_m3` (`run_pipeline.py:895`) and as a
+    # STAGE fraction for the initial condition (`:1112`), so the IC held ~0.80
+    # of the pool where the gate expected 0.90. The old assertion therefore
+    # PINNED THE DEFECT as expected behaviour.
+    #
+    # Proof it was a units defect and not a physical shortfall: at coarsen 2 the
+    # predicted stage-fill ratio and the gate's observed ratio agreed to four
+    # decimals (0.8937 both), and with the fix G1 reports 1.0000034. The fix is
+    # `src/m2_geometry/fill.py::level_for_volume_fraction`, pinned independently
+    # by `tests/test_reservoir_fill_is_volume.py`.
+    #
+    # G1 now PASSES here. That does not make this test toothless: G4 below still
+    # fails on the same run, so the block still proves the gates can fail.
+    g1 = v["gate_g1_volume_provenance"]
+    assert g1["ratio"] is not None
+    assert g1["ok"] is True, (
+        f"G1 regressed to {g1['ratio']:.4f}; if the initial condition is being "
+        f"built from a STAGE fraction again, see level_for_volume_fraction"
+    )
+    assert 0.95 <= g1["ratio"] <= 1.05, (
+        f"G1 ratio {g1['ratio']:.4f} is outside the gate's own tolerance while "
+        f"still reporting ok -- the gate and its tolerance have diverged"
+    )
 
     # G4: the pool sits 28.47 m above what this basin holds at 111.6 m cells,
     # so it spreads downhill whether or not the barrier ever fails.

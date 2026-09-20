@@ -53,7 +53,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from src.provenance import Provenance, LABELS, worst
 from src.m3_breach import DamGeometry, failure_mode_to_mechanism, require_implemented_mechanism
-from src.m2_geometry.fill import build_stage_storage
+from src.m2_geometry.fill import build_stage_storage, level_for_volume_fraction
 from src.m3_breach.ensemble import get_hydrographs
 from src.m4_solvers.swe_2d import run_2d_swe_simulation
 from src.m4_solvers.validation import run_ritter_benchmark
@@ -227,9 +227,9 @@ def gate_g2(clipped_m3: float, initial_m3: float, injected_m3: float):
 
 
 def execute_full_simulation(
-    dam_name: str = "Phutkal River Landslide Dam 2015",
+    dam_name: str | None = None,
     scenario_key: str = "phutkal",
-    wse_m: float = 3850.0,
+    wse_m: float | None = None,
     failure_mode: str = "overtopping",
     reservoir_fill: float = 0.9,
     out_dir: str | Path = "data/scenarios/phutkal_real",
@@ -244,6 +244,48 @@ def execute_full_simulation(
     lulc_raster_path: str | Path | None = None,
     population_csv: str | Path | None = None,
 ) -> dict:
+    # `wse_m` is REFUSED, not honoured, and not ignored.
+    #
+    # This parameter used to be accepted, validated and then silently
+    # discarded: it is never read between here and the two points that
+    # overwrite it -- `:549` on the cascade path (`z_crest_m`) and `:552` on
+    # the non-cascade path (`thalweg_z + dam_height`, clamped to the sourced
+    # crest at `:571-577`). The CLI's `--wse`, `src/api/main.py`'s request
+    # field and `src/api/worker.py`'s forwarding all fed a value into that
+    # void. Worse, `main.py` defaulted the field to 3850.0 and wrote the whole
+    # request into the run manifest, so archived manifests RECORD a water
+    # level the run never used: `101520ad...`'s request says 3850.0 while the
+    # run it describes used 3805.11.
+    #
+    # Honouring it is not the fix. The pool level must be DERIVED from the
+    # sourced `thalweg_m + dam_height_m` and BOUNDED by the sourced
+    # `crest_elev_m` -- see findings_results.md, "DEFECT 1 - the pool level
+    # was derived above the sourced crest", where a level 1.23 m above the
+    # crest cost a 46x volume blow-out. A caller-supplied level is a level
+    # floating free of its sourcing, which is the defect that work removed.
+    #
+    # So the silent no-op becomes a loud refusal. `frontend/index.html`
+    # already removed its "Water level" box for this reason and says so.
+    # Resolve the dam's name from the scenario when the caller did not give one.
+    # The default used to be the literal string "Phutkal River Landslide Dam
+    # 2015", so any caller that omitted it labelled its run -- and its exports,
+    # and its manifest -- as Phutkal regardless of which dam it actually ran.
+    # Observed 2026-09-19 on a rishiganga job submitted through the API.
+    if not dam_name:
+        from src.data_fetcher import SCENARIOS as _SC
+        dam_name = (_SC.get(scenario_key, {}) or {}).get("name")             or f"{scenario_key} scenario"
+
+    if wse_m is not None:
+        raise ValueError(
+            f"wse_m is not a settable parameter (got {wse_m!r}). The impounded "
+            f"water level is DERIVED from the scenario's sourced thalweg_m + "
+            f"dam_height_m (or the cascade reservoir's z_crest_m) and is then "
+            f"clamped to the sourced crest_elev_m, so a supplied level would be "
+            f"overwritten before first use. It was silently discarded until "
+            f"2026-09-18. Pass wse_m=None, or omit it. The level the run "
+            f"actually used is reported as validity.initial_wse_m."
+        )
+
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     t_wall = time.time()
@@ -384,8 +426,29 @@ def execute_full_simulation(
     # so validating after carving would hide exactly the unconfirmed-geometry
     # condition this gate exists to catch (see the `has_explicit_breach`
     # block: carving there is now conditioned on this gate having passed).
-    from src.m2_geometry.validation import validate_geometry
+    from src.m2_geometry.validation import (GeometryValidationError,
+                                            validate_geometry)
     geometry_manifest_path = DATA_DIR / "geometry" / f"{scenario_key}.json"
+    if not geometry_manifest_path.exists():
+        # Without this the read raises FileNotFoundError, which worker.py turns
+        # into a "failed" manifest whose only reason is an OS errno and a
+        # Windows path -- useless to anyone reading it. south_lhonak is the live
+        # case: its geometry is authored per STRUCTURE
+        # (south_lhonak_chungthang.json, south_lhonak_moraine.json) because the
+        # event has two of them, so no file is ever written under the scenario
+        # key itself. Name what exists rather than making the next reader go
+        # looking. A GeometryValidationError here is the same hard refusal an
+        # unusable manifest gets -- this is not a fallback path.
+        siblings = sorted(p.stem for p in (DATA_DIR / "geometry").glob(f"{scenario_key}_*.json"))
+        raise GeometryValidationError(
+            f"no geometry manifest for scenario '{scenario_key}'"
+            + (f" — geometry is authored per structure as {', '.join(siblings)}; "
+               "this scenario needs a compound-event path that selects between "
+               "them, not a manifest under its own key" if siblings else
+               f" — expected {geometry_manifest_path.name}"),
+            {"scenario_key": scenario_key,
+             "expected_path": str(geometry_manifest_path),
+             "structure_manifests": siblings})
     geometry_manifest = json.loads(geometry_manifest_path.read_text(encoding="utf-8"))
     geometry_result = validate_geometry(geometry_manifest, dem_elev, transform, crs)
     logger.info("M2: geometry gate PASSED for %s — barrier/breach/river/seeds "
@@ -1106,10 +1169,34 @@ def execute_full_simulation(
             # number: the reservoir is nearly full right before an
             # assumed-fraction breach, and this keeps that one assumption
             # consistent across the volume and the initial water surface.
+            #
+            # `reservoir_fill` is a VOLUME fraction. `impounded_vol_m3` above is
+            # `geom.volume_m3 * reservoir_fill`, and "the reservoir is 90 % full"
+            # means 90 % of its capacity everywhere else in this project.
+            # `compute_lake_depth_grids(fractions=...)` reads its fractions as
+            # STAGE instead -- `z_min + f*(wse - z_min)` -- so passing it
+            # straight through made the comment above FALSE: the two were not
+            # consistent, they were 10.6 % apart.
+            #
+            # Measured on phutkal at 55.8 m cells, 2026-09-18: a 0.9 STAGE fill
+            # holds 22.044 MCM = 0.8044 of the pool, against a 0.9 VOLUME fill's
+            # 24.666 MCM. G1 compares exactly these two numbers and FAILED at
+            # ratio 0.8937 (tolerance 0.95-1.05), accusing the run of water that
+            # "did not come from the impoundment" -- when it had, and only the
+            # meaning of 0.9 differed. Converted to a level first.
+            _ic_level_vol = level_for_volume_fraction(
+                dem_array=dem_elev, transform=transform, seed_xy=seed_xy,
+                wse_m=wse_m, fraction=reservoir_fill,
+                barrier_mask=geometry_result["barrier_mask"],
+                barrier_crest_m=barrier_crest_elev_m,
+            )
+            logger.info("M4: reservoir_fill %.3f read as a VOLUME fraction "
+                        "-> initial level %.2f m (crest %.2f m)",
+                        reservoir_fill, _ic_level_vol, wse_m)
             _ic_frames = _lake_grids_for_ic(
                 dem_array=dem_elev, transform=transform, seed_xy=seed_xy,
                 wse_m=wse_m, barrier_mask=geometry_result["barrier_mask"],
-                barrier_crest_m=barrier_crest_elev_m, fractions=(reservoir_fill,),
+                barrier_crest_m=barrier_crest_elev_m, levels_m=[_ic_level_vol],
             )
             if _ic_frames:
                 initial_depth = _ic_frames[0]["depth_grid"]
@@ -1599,7 +1686,8 @@ def execute_full_simulation(
     # 1a/1e: For cascade scenarios, use simulate_prebreach_rise to compute
     # physically correct reservoir elevations; for non-cascade, use fraction-
     # based filling as before.
-    from src.m2_geometry.fill import compute_lake_depth_grids
+    from src.m2_geometry.fill import (compute_lake_depth_grids,
+                                      lake_formation_levels)
     lake_frames = []
     lake_meta = {"scenario": scenario_key, "stages": []}
     try:
@@ -1643,18 +1731,84 @@ def execute_full_simulation(
             )
             lake_dt_mins = pb_times_min
         else:
-            lake_fractions = (0.25, 0.50, 0.75, 0.95)
-            lake_dt_mins = [-120.0, -60.0, -30.0, -10.0]
-            level_source = "ASSUMED_FRACTION"
+            # Equal-VOLUME frames over the scenario's SOURCED formation time.
+            #
+            # This branch used to be four STAGE fractions (0.25/0.50/0.75/0.95)
+            # on four hardcoded timestamps. Both were wrong, and the API served
+            # the result: measured on phutkal, those four frames held 0.49,
+            # 2.16, 3.86 and 11.77 MCM of a ~27 MCM pool, so the frame labelled
+            # "25% Capacity" was 1.8 % of it and the first two rendered as
+            # nothing. In a gorge 29 % of the height range holds 12.9 % of the
+            # water at the bottom and 47 % at the top, so equal stage steps can
+            # never give an even-looking animation.
+            #
+            # `lake_formation_levels` lives in fill.py precisely so this and
+            # `scripts/make_lake_formation.py` cannot disagree again -- the
+            # script had the fix for a day while the pipeline kept the defect.
+            _n_lake_frames = 24
+            _lake_levels, _lake_sills, _lake_zmin = lake_formation_levels(
+                dem_array=dem_elev,
+                transform=transform,
+                seed_xy=seed_xy,
+                wse_m=wse_m,
+                n_frames=_n_lake_frames,
+                barrier_mask=geometry_result["barrier_mask"],
+                barrier_crest_m=barrier_crest_elev_m,
+            )
+            level_source = "EQUAL_VOLUME_DEM_FILL"
             lake_depths = compute_lake_depth_grids(
                 dem_array=dem_elev,
                 transform=transform,
                 seed_xy=seed_xy,
                 wse_m=wse_m,
-                fractions=lake_fractions,
                 barrier_mask=geometry_result["barrier_mask"],
                 barrier_crest_m=barrier_crest_elev_m,
+                levels_m=_lake_levels,
             )
+            lake_meta["extent_provenance"] = "DEM_FILL_SOURCED_CREST"
+            lake_meta["sill_merges"] = _lake_sills
+            lake_meta["z_min_m"] = round(float(_lake_zmin), 2)
+            lake_meta["crest_m"] = round(float(barrier_crest_elev_m), 2)
+
+            # Timing. Constant inflow means volume accumulates linearly, so a
+            # frame holding fraction f of the final pool sits at -(1-f) x the
+            # formation time. The duration is SOURCED or it is declared as not
+            # sourced -- the old [-120, -60, -30, -10] was neither, while
+            # `formation_time_h` sat in the scenario config read by nothing.
+            _lf_cfg = sc_cfg.get("lake_formation") or {}
+            _ft_h = _lf_cfg.get("formation_time_h")
+            _v_full = max((g["volume_m3"] for g in lake_depths), default=0.0)
+            if _ft_h and _v_full > 0:
+                _total_min = float(_ft_h) * 60.0
+                lake_dt_mins = [-_total_min * (1.0 - g["volume_m3"] / _v_full)
+                                for g in lake_depths]
+                lake_meta["time_provenance"] = "SOURCED_DURATION_ASSUMED_CONSTANT_INFLOW"
+                lake_meta["time_note"] = (
+                    f"duration {_ft_h} h sourced from "
+                    f"SCENARIOS['{scenario_key}']['lake_formation']['formation_time_h']; "
+                    f"constant inflow assumed within it")
+            else:
+                # No sourced duration. Say so rather than inventing one; the
+                # frames are still equal-volume and still worth showing.
+                _total_min = 120.0
+                _n = max(1, len(lake_depths))
+                lake_dt_mins = [-_total_min * (1.0 - (i + 1) / _n)
+                                for i in range(_n)]
+                lake_meta["time_provenance"] = "NO_SOURCED_DURATION_DECLARED_WINDOW"
+                lake_meta["time_note"] = (
+                    f"no formation_time_h for '{scenario_key}'; frames are spaced "
+                    f"over a DECLARED {_total_min:.0f} min window that is NOT sourced. "
+                    f"Levels are equal-volume and are independent of this choice.")
+                logger.warning(
+                    "M2: '%s' has no sourced formation_time_h - lake-formation "
+                    "frame TIMES are a declared %.0f min window, not sourced",
+                    scenario_key, _total_min)
+            logger.info(
+                "M2: lake formation - %d equal-volume frames, %.2f -> %.2f MCM, "
+                "levels %.1f -> %.1f m, %d sill merge(s), timing %s",
+                len(lake_depths), lake_depths[0]["volume_m3"] / 1e6,
+                _v_full / 1e6, lake_depths[0]["level_m"], lake_depths[-1]["level_m"],
+                len(_lake_sills), lake_meta["time_provenance"])
         for k, lk in enumerate(lake_depths):
             t_min = lake_dt_mins[k] if k < len(lake_dt_mins) else -10.0
             t_s = t_min * 60.0
@@ -1676,7 +1830,14 @@ def execute_full_simulation(
                     phase_title = f"Overtopping Threshold ({elev:.1f} m)"
             else:
                 stage_label = "lake_formation"
-                phase_title = f"Lake Formation ({int(lk['fraction']*100)}% Capacity)"
+                # `lk["fraction"]` is a STAGE fraction -- the share of the HEIGHT
+                # range, not of the water. Labelling it "% Capacity" is how the
+                # UI came to show "25% Capacity" on a frame holding 1.8 % of the
+                # pool. Report the share of the impounded VOLUME instead, and
+                # name it as such.
+                _v_ref = max((g["volume_m3"] for g in lake_depths), default=0.0)
+                _share = (100.0 * lk["volume_m3"] / _v_ref) if _v_ref > 0 else 0.0
+                phase_title = f"Lake Formation ({_share:.0f}% of pool volume)"
             fr_entry = {
                 "t_s": t_s,
                 "t_min": t_min,
@@ -2030,18 +2191,25 @@ def execute_full_simulation(
     # `dem_crest_along_axis` is the highest DEM cell the dam axis crosses -- in a
     # gorge that is the valley wall, not the structure. Checking only against it
     # lets a water level sit far above the dam and still pass, as long as it is
-    # below the surrounding mountains. Measured on phutkal: the configured
-    # `wse_m` is 3878.0 m against a sourced barrier crest of 3794.11 m -- **84 m
-    # above the dam** -- and it passed this gate because the DEM ridge along the
-    # axis is 3989.38 m.
+    # below the surrounding mountains -- on phutkal the DEM ridge along the axis
+    # is 3989.38 m, roughly 184 m above the structure.
     #
-    # That single number is the root cause of both of phutkal's remaining gate
-    # failures. At 3878.0 m `build_stage_storage` floods the valley to the domain
-    # edge and is correctly rejected, so the pipeline falls back to the TYPED
-    # `volume_mcm = 30.0` (labelled PROXY DATA); G1 then compares the sane
-    # DEM-derived pool (7.40e6 m^3) against that typed 2.70e7 m^3 and fails at
-    # ratio 0.274. The basin physically holds 18.98 MCM at the crest, so 27.0 MCM
-    # is not impoundable behind this dam at any water level.
+    # SUPERSEDED STATE, kept because the record still quotes it: this comment
+    # used to cite a configured `wse_m` of 3878.0 m against a sourced crest of
+    # 3794.11 m, and derived phutkal's G1/G4 failures from that 84 m gap. Both
+    # numbers are gone. The config now holds `wse_m == thalweg_m + dam_height_m
+    # == 3736.11 + 69.0 == 3805.11`, and the manifest's re-sourced crest is
+    # 3805.11 m -- the same value, so the freeboard is 0.0 m by construction.
+    #
+    # Measured 2026-09-18 against the current tree: the seeded pool at 3805.11 m
+    # holds 27.14 / 27.41 / 27.18 MCM at coarsen 1 / 2 / 4 against a configured
+    # 30.0, and G1 PASSES. At the old 3878.0 m the same fill returns ~2886 MCM
+    # and is correctly rejected as unconfined, which is what drove the old
+    # fallback to the TYPED `volume_mcm = 30.0` labelled PROXY. The old "basin
+    # holds 18.98 MCM at the crest" reproduces exactly (18.984 MCM at coarsen 2)
+    # once the crest is set back to 3794.11 -- it was a measurement of the old
+    # crest, not of this one. The old "DEM pool 2.97e6 m^3 at coarsen 4" does
+    # NOT reproduce at any resolution, level or barrier state tried.
     #
     # A pool above the structure's own crest is not impounded -- it has already
     # overtopped, and whatever floods downstream was not caused by the breach.
@@ -2357,7 +2525,11 @@ if __name__ == "__main__":
     parser.add_argument("--dam-name", default=None)
     parser.add_argument("--scenario", default="phutkal",
                         choices=list(SCENARIOS.keys()))
-    parser.add_argument("--wse", type=float, default=None)
+    parser.add_argument("--wse", type=float, default=None,
+                        help="REFUSED. The water level is derived from the "
+                             "scenario's sourced thalweg + dam height and "
+                             "clamped to the sourced crest; supplying one "
+                             "raises rather than being silently ignored.")
     parser.add_argument("--failure-mode", choices=["overtopping", "piping"],
                         default="overtopping")
     parser.add_argument("--reservoir-fill", type=float, default=0.9)
@@ -2377,7 +2549,11 @@ if __name__ == "__main__":
 
     sc_info = SCENARIOS.get(args.scenario, {})
     dam_name = args.dam_name or sc_info.get("name", f"{args.scenario.capitalize()} Scenario")
-    wse_m = args.wse or sc_info.get("wse_m", 3850.0)
+    # Do NOT fall back to the scenario's own `wse_m` here. That fallback meant
+    # the CLI always handed `execute_full_simulation` a concrete level, so the
+    # parameter looked live from the outside while being overwritten inside.
+    # None is the only value the pipeline accepts; `--wse` now raises.
+    wse_m = args.wse
     out_dir = args.out_dir or f"data/scenarios/{args.scenario}_real"
     duration_s = args.duration or (20000.0 if args.scenario == "annamayya" else 7200.0)
 

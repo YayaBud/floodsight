@@ -73,6 +73,7 @@ from run_pipeline import _depth_to_geojson, _write_depth_preview   # noqa: E402
 from src.data_fetcher import SCENARIOS                             # noqa: E402
 from src.m2_geometry.dem_utils import condition_dem                # noqa: E402
 from src.m2_geometry.fill import compute_lake_depth_grids          # noqa: E402
+from src.m2_geometry.fill import equal_volume_levels          # noqa: E402
 from src.m2_geometry.validation import validate_geometry           # noqa: E402
 
 logger = logging.getLogger("lake_formation")
@@ -86,55 +87,12 @@ _PLANE_ATOL_M = 0.005
 
 # ── level selection ───────────────────────────────────────────────────────────
 
-def equal_volume_levels(vol_of_level, z_lo: float, z_hi: float, n_frames: int,
-                        n_probe: int = 240) -> tuple[list[float], list[dict]]:
-    """Levels whose impounded volumes are as equally spaced as the terrain allows.
+# `equal_volume_levels` used to live here. It now lives in
+# `src/m2_geometry/fill.py` because `run_pipeline.py` needs the same physics:
+# while it was a script-local function the pipeline kept its own STAGE-fraction
+# version, and the API served four frames (two of them empty) while this script
+# produced 24 usable ones off the same DEM. One implementation, one behaviour.
 
-    Equal water per frame rather than equal height per frame. `vol_of_level` is
-    a callable so both backends share this: the analytical curve for the
-    hypsometric backend, a measured seeded fill for the DEM backend.
-
-    V(z) is NOT continuous for a real seeded fill. Measured on phutkal: one
-    0.29 m probe step at **3762.76 m adds 2.488 MCM** while its neighbours add
-    ~0.24 -- the pool tops a sill and swallows an adjacent basin in one step.
-    No level exists whose volume lands inside that gap, so a strict equal-volume
-    target is unsatisfiable there and several targets collapse onto the same
-    level. Levels are therefore deduplicated afterwards, and the discontinuities
-    are returned so the caller can report them instead of smoothing them away --
-    a lake capturing a side valley is a real feature of the animation, not noise.
-    """
-    probe = np.linspace(z_lo, z_hi, n_probe)
-    vols = np.array([vol_of_level(z) for z in probe], dtype=float)
-    # The fill is monotone in level by construction; enforce it so a noisy
-    # measured curve cannot make np.interp return nonsense.
-    vols = np.maximum.accumulate(vols)
-    v_full = float(vols[-1])
-    if v_full <= 0.0:
-        raise SystemExit(f"no impounded volume anywhere in [{z_lo}, {z_hi}]")
-
-    steps = np.diff(vols)
-    typical = float(np.median(steps[steps > 0])) if np.any(steps > 0) else 0.0
-    sills = [{"level_m": round(float(probe[i + 1]), 2),
-              "volume_jump_mcm": round(float(steps[i]) / 1e6, 3),
-              "vs_typical_step": round(float(steps[i] / typical), 1) if typical else None}
-             for i in np.argsort(steps)[::-1][:4]
-             if typical and steps[i] > 3.0 * typical]
-
-    targets = np.linspace(v_full / n_frames, v_full, n_frames)
-    raw = [float(np.interp(t, vols, probe)) for t in targets]
-
-    # Deduplicate: a level that repeats is a target that fell inside a sill gap.
-    # Nudge it up the level axis instead, so every frame is a distinct pool.
-    min_gap = (z_hi - z_lo) / (n_probe * 4.0)
-    out: list[float] = []
-    for lv in raw:
-        if out and lv - out[-1] < min_gap:
-            lv = out[-1] + min_gap
-        out.append(min(lv, z_hi))
-    return out, sills
-
-
-# ── backend: hypsometric reconstruction ──────────────────────────────────────
 
 def _observed_plane(z: np.ndarray, plane_m: float, near_rc: tuple[int, int]) -> np.ndarray:
     """The connected DSM water-plane component that represents the reservoir."""

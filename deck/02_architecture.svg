@@ -1,0 +1,157 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1064" width="1600" height="1064" role="img" aria-label="FloodSight end-to-end architecture in four bands: open data ingest, terrain and impoundment with a fail-closed geometry gate, failure physics and the 2D solver, and consequence and decision outputs">
+
+  <!-- ===================== BAND 1: OPEN DATA ===================== -->
+  <rect x="20" y="46" width="1560" height="168" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="44" y="76" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.6" fill="#64748B">OPEN DATA &#8212; M1 &#183; AUTO-FETCHED FROM A COORDINATE, NOTHING PRE-STAGED</text>
+
+  <rect x="98" y="96" width="330" height="94" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="120" y="130" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">Copernicus GLO-30</text>
+  <text x="120" y="153" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">30 m terrain, reprojected to</text>
+  <text x="120" y="171" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">local UTM and mosaicked</text>
+
+  <rect x="456" y="96" width="330" height="94" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="478" y="130" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">OpenStreetMap</text>
+  <text x="478" y="153" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">drivable road graph, rivers,</text>
+  <text x="478" y="171" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">settlements, hospitals, schools</text>
+
+  <rect x="814" y="96" width="330" height="94" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="836" y="130" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">GHS-POP 100 m</text>
+  <text x="836" y="153" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">population grid, resampled</text>
+  <text x="836" y="171" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">conserving headcount mass</text>
+
+  <rect x="1172" y="96" width="330" height="94" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="1194" y="130" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">Sentinel-1 / 2 via GEE</text>
+  <text x="1194" y="153" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">SAR backscatter + NDWI,</text>
+  <text x="1194" y="171" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">pre / post event pair</text>
+
+  <!-- band 1 -> band 2 -->
+  <line x1="800" y1="214" x2="800" y2="252" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="793,252 807,252 800,266" fill="#94A3B8"/>
+  <text x="818" y="242" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-style="italic" fill="#475569">rasters + vectors, clipped to the study area</text>
+
+  <!-- ===================== BAND 2: TERRAIN &amp; IMPOUNDMENT ===================== -->
+  <rect x="20" y="272" width="1560" height="244" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="44" y="302" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.6" fill="#64748B">TERRAIN &amp; IMPOUNDMENT &#8212; M2 &#183; RECONSTRUCT THE LAKE NOBODY SURVEYED</text>
+
+  <rect x="60" y="330" width="290" height="132" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="80" y="364" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">DEM conditioning</text>
+  <text x="80" y="388" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">carve adverse bed rises on</text>
+  <text x="80" y="406" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">the mapped channel; open an</text>
+  <text x="80" y="424" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">outlet where the river leaves</text>
+  <text x="80" y="442" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">the domain</text>
+
+  <line x1="350" y1="396" x2="380" y2="396" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="380,389 394,396 380,403" fill="#94A3B8"/>
+
+  <rect x="400" y="330" width="290" height="132" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="420" y="364" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">Seeded pool fill</text>
+  <text x="420" y="388" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">connected component upstream</text>
+  <text x="420" y="406" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">of the barrier gives the</text>
+  <text x="420" y="424" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">stage-storage curve V(h)</text>
+  <text x="420" y="442" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">and area curve A(h)</text>
+
+  <line x1="690" y1="396" x2="740" y2="396" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="740,389 754,396 740,403" fill="#94A3B8"/>
+
+  <!-- GATE diamond -->
+  <polygon points="900,320 1032,396 900,472 768,396" fill="#FFFFFF" stroke="#2F6BFF" stroke-width="2.5"/>
+  <text x="900" y="381" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#2F6BFF" text-anchor="middle">Geometry gate</text>
+  <text x="900" y="403" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569" text-anchor="middle">does this terrain actually</text>
+  <text x="900" y="420" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569" text-anchor="middle">hold that water?</text>
+
+  <!-- FAIL branch -->
+  <line x1="1032" y1="396" x2="1130" y2="396" stroke="#DC2626" stroke-width="2"/>
+  <polygon points="1130,389 1144,396 1130,403" fill="#DC2626"/>
+  <text x="1080" y="386" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="700" fill="#DC2626" text-anchor="middle">NO</text>
+
+  <rect x="1150" y="330" width="390" height="132" rx="9" fill="#FEF2F2" stroke="#DC2626" stroke-width="2"/>
+  <text x="1172" y="364" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#B91C1C">Run aborts. Fail-closed.</text>
+  <text x="1172" y="388" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#7F1D1D">The pipeline refuses to publish a flood</text>
+  <text x="1172" y="406" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#7F1D1D">map for an impoundment the terrain</text>
+  <text x="1172" y="424" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#7F1D1D">cannot confine. No fallback path,</text>
+  <text x="1172" y="442" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#7F1D1D">no silently substituted geometry.</text>
+
+  <!-- PASS branch -->
+  <line x1="900" y1="472" x2="900" y2="552" stroke="#2F6BFF" stroke-width="2.5"/>
+  <polygon points="893,552 907,552 900,566" fill="#2F6BFF"/>
+  <text x="918" y="512" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-weight="700" fill="#2F6BFF">YES</text>
+  <text x="918" y="532" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-style="italic" fill="#475569">validated barrier, pool and V(h)</text>
+
+  <!-- ===================== BAND 3: FAILURE PHYSICS ===================== -->
+  <rect x="20" y="572" width="1560" height="256" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="44" y="602" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.6" fill="#64748B">FAILURE PHYSICS &#8212; M3 &#183; M4 &#183; HOW IT BREAKS, THEN WHERE THE WATER GOES</text>
+
+  <rect x="60" y="630" width="330" height="164" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="80" y="664" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">3-arm breach ensemble</text>
+  <text x="80" y="690" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">Froehlich &#183; Von Thun &#183; MacDonald</text>
+  <text x="80" y="714" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">run together, not averaged, so</text>
+  <text x="80" y="732" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">the output is a confidence band</text>
+  <text x="80" y="750" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">rather than one curve a</text>
+  <text x="80" y="768" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">commander has to trust blind</text>
+
+  <line x1="390" y1="712" x2="420" y2="712" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="420,705 434,712 420,719" fill="#94A3B8"/>
+
+  <rect x="440" y="630" width="330" height="164" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="460" y="664" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">DAMBRK breach kernel</text>
+  <text x="460" y="692" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="13" font-weight="600" fill="#2F6BFF">Q = 1.7 B H^1.5 + 1.35 Z H^2.5</text>
+  <text x="460" y="716" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">one shared trapezoidal opening,</text>
+  <text x="460" y="734" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">widening and cutting down as</text>
+  <text x="460" y="752" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">the pool drains through it</text>
+
+  <line x1="770" y1="712" x2="800" y2="712" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="800,705 814,712 800,719" fill="#94A3B8"/>
+
+  <rect x="820" y="630" width="330" height="164" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="840" y="664" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#0F1B2D">Cascade routing</text>
+  <text x="840" y="690" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">Muskingum reach transport to the</text>
+  <text x="840" y="708" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">next structure, level-pool rise,</text>
+  <text x="840" y="726" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">spillway capacity check, then a</text>
+  <text x="840" y="744" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">second breach if it is exceeded</text>
+  <text x="840" y="768" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12" font-style="italic" fill="#64748B">the Annamayya and Teesta pattern</text>
+
+  <line x1="1150" y1="712" x2="1180" y2="712" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="1180,705 1194,712 1180,719" fill="#94A3B8"/>
+
+  <rect x="1200" y="630" width="340" height="164" rx="9" fill="#EFF6FF" stroke="#1E3A8A" stroke-width="2"/>
+  <text x="1222" y="664" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="15" font-weight="700" fill="#1E3A8A">2D shallow-water solver</text>
+  <text x="1222" y="690" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#1E3A8A">written from scratch, no HEC-RAS,</text>
+  <text x="1222" y="708" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#1E3A8A">no MIKE, no licence</text>
+  <text x="1222" y="732" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">Audusse well-balanced finite volume</text>
+  <text x="1222" y="750" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">MUSCL 2nd order &#183; SSP-RK2 &#183; Rusanov</text>
+  <text x="1222" y="768" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">active-window speedup, bit-exact</text>
+
+  <!-- band 3 -> band 4 -->
+  <line x1="800" y1="828" x2="800" y2="866" stroke="#94A3B8" stroke-width="2"/>
+  <polygon points="793,866 807,866 800,880" fill="#94A3B8"/>
+  <text x="818" y="856" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" font-style="italic" fill="#475569">depth and velocity rasters for every timestep, h(x, y, t)</text>
+
+  <!-- ===================== BAND 4: CONSEQUENCE &amp; DECISION ===================== -->
+  <rect x="20" y="886" width="1560" height="156" rx="14" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1.5"/>
+  <text x="44" y="916" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="11.5" font-weight="700" letter-spacing="1.6" fill="#64748B">CONSEQUENCE &amp; DECISION &#8212; M5 &#183; M6 &#183; M7 &#183; M8 &#183; M9 &#183; M10</text>
+
+  <rect x="60" y="934" width="284" height="88" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="80" y="964" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#0F1B2D">Exposure</text>
+  <text x="80" y="987" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">population at risk, buildings,</text>
+  <text x="80" y="1005" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">hospitals, JRC damage curves</text>
+
+  <rect x="368" y="934" width="284" height="88" rx="9" fill="#FFF7ED" stroke="#D97706" stroke-width="2"/>
+  <text x="388" y="964" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#B45309">Road isolation</text>
+  <text x="388" y="987" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#92400E">graph edge cut once depth on</text>
+  <text x="388" y="1005" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#92400E">the link passes 0.30 m</text>
+
+  <rect x="676" y="934" width="284" height="88" rx="9" fill="#FFFFFF" stroke="#CBD5E1" stroke-width="1.5"/>
+  <text x="696" y="964" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#0F1B2D">Priority ranking</text>
+  <text x="696" y="987" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">isolation urgency, headcount,</text>
+  <text x="696" y="1005" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">surviving egress, facilities</text>
+
+  <rect x="984" y="934" width="284" height="88" rx="9" fill="#FFFFFF" stroke="#0F1B2D" stroke-width="2"/>
+  <text x="1004" y="964" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#0F1B2D">Responder output</text>
+  <text x="1004" y="987" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">live dashboard, Shapefile, KML,</text>
+  <text x="1004" y="1005" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#475569">CAP-JSON for NDMA SACHET</text>
+
+  <rect x="1292" y="934" width="248" height="88" rx="9" fill="#F0FDF4" stroke="#15803D" stroke-width="2"/>
+  <text x="1312" y="964" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="14.5" font-weight="700" fill="#15803D">Skill scoring</text>
+  <text x="1312" y="987" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#166534">CSI / POD / FAR / Bias against</text>
+  <text x="1312" y="1005" font-family="Segoe UI, Inter, Arial, sans-serif" font-size="12.5" fill="#166534">Copernicus EMS satellite extent</text>
+</svg>

@@ -3365,7 +3365,7 @@ Every gate was given an input that should fail it.
 | gate | failing input | result |
 |---|---|---|
 | geometry | derna, malpasset, ivanovo, south_lhonak manifests on their real DEMs | **FAILS**, four distinct messages (§56.2) |
-| G1 | live phutkal c=4: pool 2.97e6 against configured 2.70e7 | **FAILS**, ratio 0.110 (§56.3) |
+| G1 | live phutkal c=4: pool 2.97e6 against configured 2.70e7 | **SUPERSEDED 2026-09-18** — this figure does not reproduce at any resolution, level or barrier state tried. G1 now **passes** at ratio 1.0000034 after the `reservoir_fill` stage-vs-volume defect was fixed |
 | G2 | `cfl = 0.9` on a 60 m bed step | **FAILS**: clipped 9.2337e+05 m³ = **2.012 %** of input, tolerance 0.1 % |
 | G3 | — | **not constructed**; passes at 55.53 / 58.0 on live phutkal, and **N-9** shows a vacuous-pass path |
 | G4 | live phutkal c=4 | **FAILS**, 28.47 m over (§56.3) |
@@ -3575,7 +3575,7 @@ Everything else stands as Parts I–V left it.
 | **N-1** | **critical** | measured Q reaches no artifact, manifest or UI — §1(a) on Part III's headline result |
 | **N-2** | **critical** | uncited `dam_height * 1.15` in the production breach path (`run_pipeline.py:842`) |
 | **N-13** | **critical** | test A3's free-fall bound is 1.31× too tight and passes only because friction is on |
-| **N-14** | **critical** | the impoundment is under-filled 9.1× — 2.97e6 m³ against a configured 2.70e7 m³ |
+| **N-14** | **CLOSED 2026-09-18** | the 9.1× under-fill does not reproduce. The real defect was `reservoir_fill` read as a STAGE fraction for the initial condition and a VOLUME fraction for `impounded_vol_m3` — a 0.894 ratio, not 0.110. Fixed; G1 passes |
 | N-3 | major | fabricated ±15 % sensitivity band exported as a result |
 | N-5 | major | GPU backend still carries the P4 arrival-time defect |
 | N-6 | major | `test_mass_gates.py` tests copies of the gates, not the gates |

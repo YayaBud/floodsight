@@ -83,6 +83,51 @@ FRONT_DIR = BASE_DIR / "frontend"
 # actually evidence.
 
 
+def _job_fields_from_result(result: dict) -> dict:
+    """The artifact keys a completed job serves, derived from one place.
+
+    Both `_reconcile_job` (live runs) and `_rehydrate_saved_scenarios` (runs
+    restored from disk after a restart) need these, and they used to build them
+    separately. Rehydration set 10 keys; reconcile set 18; and reconcile
+    SHORT-CIRCUITS on a job that is already `done` with a manifest -- which a
+    rehydrated job always is. So every key rehydration missed was never filled
+    in, for the whole life of the process.
+
+    Measured 2026-09-19 on the archived phutkal run: `/api/roads/{job}` and
+    `/api/envelope_geojson/{job}` both 404'd while `latest_job` cheerfully
+    reported `has_roads_timeline: true`, because that endpoint reads the
+    manifest directly and these read `_JOBS`. `/api/lake_formation` escaped only
+    because it has a fallback that looks next to `snapshots_index`.
+
+    The same defect had already been found and patched once, for `hydrograph`
+    alone -- see the comment in `_rehydrate_saved_scenarios`. Patching one key
+    at a time is why it came back. One map, both callers.
+    """
+    return {
+        "result_path": result.get("results_geojson"),
+        # `shp` and `kml` are the ranked SETTLEMENTS layer -- the consequence
+        # table. `inundation_shp` / `inundation_kml` are the flood EXTENT
+        # itself. A GIS user asking for "the shapefile" of a dam-break study
+        # wants the second at least as often as the first, and serving only one
+        # of them made the other unreachable even though it was on disk.
+        "exports": {"shp": result.get("shp"), "kml": result.get("kml"),
+                    "cap": result.get("cap"), "tif": result.get("max_depth_tif"),
+                    "inundation_shp": result.get("inundation_shp"),
+                    "inundation_kml": result.get("inundation_kml")},
+        "snapshots_index": result.get("snapshots_index"),
+        "lake_formation": result.get("lake_formation"),
+        "validation_agreement": result.get("validation_agreement"),
+        "observed_extent": result.get("observed_extent"),
+        "validation_roads": result.get("validation_roads"),
+        "observed": result.get("observed"),
+        "roads_timeline": result.get("roads_timeline"),
+        "envelope_geojson": result.get("envelope_geojson"),
+        "arrival_time_tif": result.get("arrival_time_tif"),
+        "cell_size_m": result.get("cell_size_m"),
+        "coarsen": result.get("coarsen"),
+    }
+
+
 def _rehydrate_saved_scenarios():
     """Rehydrate only completed, valid manifests; legacy archives stay untrusted."""
     scenarios_dir = DATA_DIR / "scenarios"
@@ -112,12 +157,21 @@ def _rehydrate_saved_scenarios():
                     hydro = json.loads(Path(_hp).read_text(encoding="utf-8"))
                 except (OSError, ValueError):
                     hydro = {}
+            # Every artifact key, from the SAME map `_reconcile_job` uses.
+            # Listing a subset here is what made /api/roads and
+            # /api/envelope_geojson 404 on every restored run: reconcile
+            # short-circuits on an already-`done` job, so whatever is missed
+            # here is missed forever.
             _JOBS[job_id] = {"status": "done", "job_id": job_id, "hydrograph": hydro,
                              "manifest": manifest, "scenario_key": manifest.get("scenario_key"),
+                             # Without this, `/api/manifest/{job}` called
+                             # `load_manifest(None)` and returned 500 for every
+                             # restored run -- the endpoint reads it off the job.
+                             "manifest_path": str(p / "manifest.json"),
                              "dam_name": manifest.get("request", {}).get("dam_name"),
-                             "result_path": result.get("results_geojson"),
-                             "snapshots_index": result.get("snapshots_index"),
-                             "metrics": manifest.get("metrics", {}), "progress": {"stage": "done", "frac": 1.0}}
+                             "metrics": manifest.get("metrics", {}),
+                             "progress": {"stage": "done", "frac": 1.0},
+                             **_job_fields_from_result(result)}
             count += 1
         except ManifestError:
             continue
@@ -135,9 +189,28 @@ _rehydrate_saved_scenarios()
 
 
 class RunRequest(BaseModel):
-    dam_name: str = "Phutkal River Landslide Dam 2015"
+    # None, not a hardcoded phutkal string. `/api/run` writes `model_dump()`
+    # into the run manifest, so a request that omitted `dam_name` recorded
+    # "Phutkal River Landslide Dam 2015" as the name of whatever dam it
+    # actually ran -- observed 2026-09-19 on a rishiganga job. The CLI has
+    # always resolved this from the scenario (`args.dam_name or
+    # sc_info.get("name")`); the endpoint now does the same.
+    dam_name: Optional[str] = None
     scenario_key: str = "phutkal"
-    wse_m: float = 3850.0
+    # REFUSED, and deliberately not removed.
+    #
+    # This defaulted to 3850.0, and `/api/run` writes `req.model_dump()` into
+    # the run manifest, so every archived manifest RECORDS a water level the
+    # run never used -- `101520ad...`'s request says 3850.0 against a run that
+    # used 3805.11. The pipeline overwrites any supplied level before first
+    # use (run_pipeline.py:549 / :552), so the field was pure fiction.
+    #
+    # Deleting the field would not help: Pydantic ignores unknown keys by
+    # default, so a client still sending `wse_m` would have it dropped in
+    # silence -- the same no-op, moved to the HTTP boundary. Keeping it with a
+    # default of None lets the endpoint tell the caller exactly why it cannot
+    # be set, and stops a fictional number entering the manifest.
+    wse_m: Optional[float] = None
     failure_mode: str = "overtopping"
     reservoir_level_fraction: float = 0.9
     duration_s: float = 7200.0
@@ -147,6 +220,28 @@ class RunRequest(BaseModel):
     dam_type: Optional[str] = None
     lulc_raster_path: Optional[str] = None
     population_csv: Optional[str] = None
+
+
+def _read_progress_sidecar(job: dict) -> dict | None:
+    """Progress written by the worker process, if it has written any yet.
+
+    `progress_cb` updates memory in whichever process runs the pipeline, and
+    for an API run that is the worker, not this one. `src/api/worker.py` mirrors
+    each callback into `progress.json` beside the manifest; this reads it back.
+    Returns None rather than raising: a missing or half-written sidecar means
+    "no progress to report", never a failed run.
+    """
+    mp = job.get("manifest_path")
+    if not mp:
+        return None
+    try:
+        path = Path(mp).parent / "progress.json"
+        if not path.is_file():
+            return None
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return data if isinstance(data, dict) else None
+    except (OSError, ValueError):
+        return None
 
 
 def _reconcile_job(job_id: str) -> dict | None:
@@ -175,20 +270,9 @@ def _reconcile_job(job_id: str) -> dict | None:
         result = manifest.get("pipeline_result", {}) or {}
         job.update({
             "status": "done",
-            "result_path": result.get("results_geojson"),
             "hydrograph": _read_json_file(result["hydrograph_json"]) if result.get("hydrograph_json") and Path(result["hydrograph_json"]).exists() else {},
-            "exports": {"shp": result.get("shp"), "kml": result.get("kml"), "cap": result.get("cap"), "tif": result.get("max_depth_tif")},
             "metrics": {"total_par": result.get("total_par"), "total_buildings": result.get("total_buildings"), "total_loss_inr": result.get("total_loss_inr")},
-            "snapshots_index": result.get("snapshots_index"),
-            "lake_formation": result.get("lake_formation"),
-            "validation_agreement": result.get("validation_agreement"),
-            "observed_extent": result.get("observed_extent"),
-            "validation_roads": result.get("validation_roads"),
-            "observed": result.get("observed"),
-            "roads_timeline": result.get("roads_timeline"),
-            "arrival_time_tif": result.get("arrival_time_tif"),
-            "cell_size_m": result.get("cell_size_m"),
-            "coarsen": result.get("coarsen"),
+            **_job_fields_from_result(result),
         })
     elif status == "completed":
         # Pipeline finished but is_valid() says no (e.g. hash mismatch, missing
@@ -200,7 +284,15 @@ def _reconcile_job(job_id: str) -> dict | None:
         job["error"] = "; ".join(manifest.get("validity", {}).get("reasons", [])) or "run failed"
     elif status in {"cancelled", "interrupted"}:
         job["status"] = "cancelled"
-    # else status is "queued" or "running" — leave _JOBS status as-is, caller polls again later
+    elif status == "running":
+        # Report what the manifest says. This used to fall through to the
+        # "leave it as-is" branch below, so a job that had been solving for ten
+        # minutes still reported "queued" to the UI.
+        job["status"] = "running"
+        _p = _read_progress_sidecar(job)
+        if _p:
+            job["progress"] = _p
+    # else the manifest says "queued" — leave _JOBS status as-is, caller polls again
     return job
 
 
@@ -211,7 +303,20 @@ async def run_simulation_endpoint(req: RunRequest):
         resolved = get_scenario_manifest(req.scenario_key)
     except Exception as exc:
         raise HTTPException(status_code=422, detail=f"unknown or unavailable scenario: {exc}")
-    if not all(map(lambda x: isinstance(x, (int, float)) and x == x and abs(x) != float("inf"), (req.wse_m, req.duration_s, req.reservoir_level_fraction))):
+    if req.wse_m is not None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "wse_m is not a settable parameter. The impounded water level is "
+                "derived from the scenario's sourced thalweg_m + dam_height_m (or "
+                "the cascade reservoir's z_crest_m) and clamped to the sourced "
+                "crest_elev_m, so a supplied level is overwritten before first "
+                "use. It was silently discarded until 2026-09-18. Omit the field; "
+                "the level the run actually used is reported as "
+                "validity.initial_wse_m in the run manifest."
+            ),
+        )
+    if not all(map(lambda x: isinstance(x, (int, float)) and x == x and abs(x) != float("inf"), (req.duration_s, req.reservoir_level_fraction))):
         raise HTTPException(status_code=422, detail="numeric request values must be finite")
     if not (0 < req.reservoir_level_fraction <= 1 and 0 < req.duration_s <= 86400 and isinstance(req.coarsen, int) and 1 <= req.coarsen <= 32):
         raise HTTPException(status_code=422, detail="request values out of range")
@@ -232,10 +337,20 @@ async def run_simulation_endpoint(req: RunRequest):
             raise HTTPException(status_code=429, detail="simulation worker queue is full")
     job_id = uuid.uuid4().hex
     request_data = req.model_dump() if hasattr(req, "model_dump") else req.dict()
+    if not request_data.get("dam_name"):
+        # Resolve from the scenario rather than leaving None or a wrong default,
+        # so the manifest records the dam that actually ran.
+        from src.data_fetcher import SCENARIOS
+        request_data["dam_name"] = (SCENARIOS.get(req.scenario_key, {}).get("name")
+                                    or f"{req.scenario_key} scenario")
     manifest = new_manifest(req.scenario_key, resolved_scenario=resolved, request=request_data)
     manifest["run_id"] = job_id
     manifest_path = write_manifest(manifest, DATA_DIR / "scenarios")
-    _JOBS[job_id] = {"status": "queued", "job_id": job_id, "dam_name": req.dam_name,
+    # `request_data["dam_name"]`, not `req.dam_name`: the latter is None when the
+    # caller omitted it, and the status endpoint would then report the run's dam
+    # as null for its whole life. The resolved name is what goes in the manifest.
+    _JOBS[job_id] = {"status": "queued", "job_id": job_id,
+                     "dam_name": request_data.get("dam_name"),
                      "scenario_key": req.scenario_key, "manifest_path": str(manifest_path)}
     creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
     proc = subprocess.Popen([sys.executable, "-m", "src.api.worker", "--manifest", str(manifest_path)],
@@ -248,7 +363,10 @@ async def run_simulation_endpoint(req: RunRequest):
 @app.get("/api/manifest/{job_id}")
 async def get_manifest(job_id: str):
     job = _reconcile_job(job_id)
-    path = job.get("manifest_path") if job else str(DATA_DIR / "scenarios" / job_id / "manifest.json")
+    # Fall back to the conventional location rather than passing None into
+    # `load_manifest`, which raised TypeError and surfaced as a 500.
+    path = (job or {}).get("manifest_path") or str(
+        DATA_DIR / "scenarios" / job_id / "manifest.json")
     try:
         manifest = load_manifest(path)
     except ManifestError:
@@ -335,7 +453,11 @@ async def get_snapshots(job_id: str):
     safe_frames = []
     for i, frame in enumerate(frames):
         if not isinstance(frame, dict): continue
-        item = {k: frame[k] for k in ("frame_idx", "t_s", "t_min", "event_time_iso", "stage", "phase_title", "preview_bounds", "vector_url", "raster_url", "bytes", "sha256", "provenance") if k in frame}
+        # The pre-breach block carries the reservoir state -- level, inflow,
+        # impounded volume, and where the level came from. Those were dropped
+        # here, so the stage/discharge chart had nothing to draw and the UI
+        # could not say how full the reservoir was at any frame.
+        item = {k: frame[k] for k in ("frame_idx", "t_s", "t_min", "event_time_iso", "stage", "phase_title", "preview_bounds", "vector_url", "raster_url", "bytes", "sha256", "provenance", "level_m", "inflow_m3s", "volume_mcm", "area_km2", "level_source") if k in frame}
         item.setdefault("frame_idx", i)
         safe_frames.append(item)
     return {"job_id": job_id, "frame_count": len(safe_frames), "frames": safe_frames}
