@@ -125,6 +125,16 @@ def _job_fields_from_result(result: dict) -> dict:
         "arrival_time_tif": result.get("arrival_time_tif"),
         "cell_size_m": result.get("cell_size_m"),
         "coarsen": result.get("coarsen"),
+        # `/api/run_layer/{job_id}/{kind}` -- backfilled visual layers. Listed
+        # here, not just in `_reconcile_job`'s own map, for the same reason
+        # `roads_timeline` above is: this dict is the ONE place both callers
+        # read from, and a key missing here is missed forever for a job
+        # restored from disk after a restart.
+        "evac_routes": result.get("evac_routes"),
+        "lake_frames": result.get("lake_frames"),
+        "water_planes": result.get("water_planes"),
+        "front_field": result.get("front_field"),
+        "village_depth": result.get("village_depth"),
     }
 
 
@@ -595,6 +605,31 @@ async def get_roads_timeline(job_id: str):
     path = job.get("roads_timeline")
     if not path or not Path(path).exists():
         raise HTTPException(status_code=404, detail="roads_timeline.geojson not found")
+    return _read_json_file(path)
+
+
+# Job keys `_job_fields_from_result` populates for each backfilled layer kind.
+_RUN_LAYER_KEYS = {
+    "evac_routes": "evac_routes",
+    "lake_frames": "lake_frames",
+    "water_planes": "water_planes",
+    "front_field": "front_field",
+    "village_depth": "village_depth",
+}
+
+
+@app.get("/api/run_layer/{job_id}/{kind}")
+async def get_run_layer(job_id: str, kind: str):
+    """Return a backfilled visual-layer artifact (evac_routes, lake_frames,
+    water_planes, front_field, village_depth) for a completed run."""
+    if kind not in _RUN_LAYER_KEYS:
+        raise HTTPException(status_code=400, detail=f"unknown layer kind: {kind}")
+    job = _reconcile_job(job_id)
+    if not job or job.get("status") != "done":
+        raise HTTPException(status_code=404, detail=f"{kind} not ready")
+    path = job.get(_RUN_LAYER_KEYS[kind])
+    if not path or not Path(path).exists():
+        raise HTTPException(status_code=404, detail=f"{kind} not found for this run")
     return _read_json_file(path)
 
 

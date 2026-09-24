@@ -49,6 +49,17 @@ let mapMarkingsVisible = true;
 let shelterMarkers = [];
 let sheltersVisible = true;
 
+// ── New run-layer state (lake, water planes, front field, evac routes) ─────
+let lakeFrames = [];          // [{t_min, level_m, volume_mcm, area_km2, phase, source, geojson}]
+let lakePopup = null;
+let waterPlanesPopup = null;
+let frontField = null;        // {west,south,east,north,nx,ny,t_arr_min,u,v,provenance}
+let flowFieldOn = true;
+let evacRoutesGeoJSON = null;
+let evacRoutePopup = null;
+let selectedEvacVillageId = null;
+let storyRunning = false;
+
 const SCENARIO_PRESENTATION = {
   rishiganga: {
     name: "Rishi Ganga Avalanche Barrier & Cascade",
@@ -447,14 +458,21 @@ function initMap() {
       ["india boundary", _addIndiaBoundaryLayer],
       ["rivers",         _addRiversLayer],
       ["flood depth",    _addFloodLayer],
+      // Water planes above the flood (Somasila must not read as flooded) but
+      // BELOW the lake: the Annamayya reservoir's own DSM plane is a pale
+      // wedge inside the lake outline and showed through it as a triangle.
+      ["water planes",    _addWaterPlanesLayer],
+      ["lake",            _addLakeLayer],
       ["envelope",       _addEnvelopeLayer],
       ["roads",          _addRoadLayer],
+      ["evac routes",     _addEvacRoutesLayer],
       ["buildings",      _addBuildingsLayer],
       ["validation",     _addValidationLayers],
       ["dam structure",  _addDamStructureLayers],
       ["shelters",       _addSheltersLayer],
       ["villages",       _addVillageLayer],
       ["demo results",   _loadDemoResults],
+      ["flow field",      _initFlowFieldCanvas],
       ["context layers", () =>
         _loadContextLayers(document.getElementById("scenario-select").value)],
     ];
@@ -478,6 +496,22 @@ function initMap() {
       el.classList.toggle("force-show-badge", isZoomedIn);
     });
   });
+
+  // Viewport-dependent overlays: the road-cut marker set is filtered to what
+  // is on screen, and marker labels are re-declashed after every pan/zoom.
+  // Throttled to one pass per event rather than per pixel of drag.
+  let _viewportRafId = null;
+  const _onViewportChange = () => {
+    if (_viewportRafId) return;
+    _viewportRafId = requestAnimationFrame(() => {
+      _viewportRafId = null;
+      _lastRoadCutT = -99999; // force a re-filter even if tMin is unchanged
+      _updateRoadCutMarkers(snapshotFrames.length ? snapshotFrames[currentStep].t_min : 0);
+      _declutterVillageMarkers();
+    });
+  };
+  map.on("moveend", _onViewportChange);
+  map.on("zoomend", _onViewportChange);
 
   // Keyboard scrubber controls (§18: operators use keyboards under stress)
   document.addEventListener("keydown", (e) => {
@@ -1501,6 +1535,31 @@ function _updateDamSetupCard(scenarioKey) {
   if (existingNotice) existingNotice.remove();
 }
 
+// Short-lived visual cues on the existing dam marker: a pulse while
+// overtopping (T-45..T+0) and a one-shot flash at the breach (T+0). Per
+// ui.md's animation rule, the marker itself is always visible without either
+// class -- these only ADD emphasis, never provide the only visibility.
+let _breachFlashPlayed = false;
+function _updateDamOvertopBreachFx(tMin) {
+  if (!damMarker) return;
+  const el = damMarker.getElement();
+  if (!el) return;
+  const isOvertop = tMin >= -45 && tMin < 0;
+  el.classList.toggle("is-overtop", isOvertop);
+
+  if (tMin >= 0 && !_breachFlashPlayed) {
+    _breachFlashPlayed = true;
+    el.classList.remove("is-breach-flash");
+    void el.offsetWidth;
+    el.classList.add("is-breach-flash");
+  } else if (tMin < 0 && _breachFlashPlayed) {
+    // Scrubbed back before the breach -- allow the flash to replay if T+0 is
+    // crossed again.
+    _breachFlashPlayed = false;
+    el.classList.remove("is-breach-flash");
+  }
+}
+
 function setValidationVisible(on) {
   const v = on ? "visible" : "none";
   for (const id of ["agreement-fill", "observed-fill", "observed-casing", "observed-outline"]) {
@@ -1534,11 +1593,19 @@ function _addRoadLayer() {
     id: "roads-open",
     type: "line",
     source: "roads-timeline",
-    filter: ["!", ["has", "cut_time_min"]],
+    // "Never cut" is carried two ways: the key absent (older emitters) or the
+    // key present with null (emit_road_cut_timeline writes every link, null
+    // when it never goes under). Testing only `has` put all 5,299 Annamayya
+    // links in roads-cut-soon, where a null in the paint `<=` fails and
+    // MapLibre falls back to black -- a black mesh over the whole valley.
+    filter: ["!", _HAS_CUT_TIME],
+    // Faint on purpose: Annamayya has 5,299 links and only 355 are ever cut.
+    // At valley zoom a solid 1.5 px grey turned the whole map into a black mesh
+    // that buried the flood; the links that matter are drawn by roads-cut-soon.
     paint: {
-      "line-color": "#6b7280",
-      "line-width": 1.5,
-      "line-opacity": 0.7,
+      "line-color": "#94a3b8",
+      "line-width": ["interpolate", ["linear"], ["zoom"], 9, 0.3, 12, 0.9, 15, 2],
+      "line-opacity": 0.45,
     },
   });
 
@@ -1556,11 +1623,11 @@ function _addRoadLayer() {
     id: "roads-cut-soon",
     type: "line",
     source: "roads-timeline",
-    filter: ["has", "cut_time_min"],
+    filter: _HAS_CUT_TIME,
     paint: {
       "line-color": _roadColorAt(0),
       "line-width": _roadWidthAt(0),
-      "line-opacity": 0.9,
+      "line-opacity": _roadOpacityAt(0),
     },
   });
 
@@ -1570,7 +1637,7 @@ function _addRoadLayer() {
     source: "roads-timeline",
     filter: ["all",
       ["==", ["get", "is_bridge"], true],
-      ["has", "cut_time_min"],
+      _HAS_CUT_TIME,
     ],
     paint: {
       "line-color": "#7c3aed",
@@ -1591,13 +1658,30 @@ function _bridgeOpacityAt(tMin) {
 // Already cut at time t -> red and thick. Not yet cut -> amber and thin.
 // Expressed as data-driven paint so the per-frame update is a paint swap
 // rather than a re-tile of the whole road source.
+// Three states at the scrubber's minute: already cut (red), cut within the
+// next ROAD_WARN_MIN (orange, "about to go"), and everything later, which is
+// drawn like an open road. Painting every eventually-cut link orange from T+0
+// showed 355 warnings before any water had moved.
+const ROAD_WARN_MIN = 60;
+// True only for links with a real cut time -- see the roads-open filter.
+const _HAS_CUT_TIME = ["all", ["has", "cut_time_min"], ["!=", ["get", "cut_time_min"], null]];
 function _roadColorAt(tMin) {
-  if (tMin < 0) return "#6b7280";
-  return ["case", ["<=", ["get", "cut_time_min"], tMin], "#dc2626", "#f97316"];
+  if (tMin < 0) return "#94a3b8";
+  return ["case",
+    ["<=", ["get", "cut_time_min"], tMin], "#dc2626",
+    ["<=", ["get", "cut_time_min"], tMin + ROAD_WARN_MIN], "#f97316",
+    "#94a3b8"];
 }
 function _roadWidthAt(tMin) {
-  if (tMin < 0) return 1.5;
-  return ["case", ["<=", ["get", "cut_time_min"], tMin], 4, 2.2];
+  const cut = tMin < 0 ? false : ["<=", ["get", "cut_time_min"], tMin];
+  const warn = tMin < 0 ? false : ["<=", ["get", "cut_time_min"], tMin + ROAD_WARN_MIN];
+  return ["interpolate", ["linear"], ["zoom"],
+    9,  ["case", cut, 1.6, warn, 1.2, 0.3],
+    13, ["case", cut, 4,   warn, 2.4, 0.9]];
+}
+function _roadOpacityAt(tMin) {
+  if (tMin < 0) return 0.45;
+  return ["case", ["<=", ["get", "cut_time_min"], tMin + ROAD_WARN_MIN], 0.95, 0.45];
 }
 
 let _lastRoadT = null;
@@ -1610,6 +1694,7 @@ function _updateRoadLayerAtTime(tMin) {
   _lastRoadT = t;
   map.setPaintProperty("roads-cut-soon", "line-color", _roadColorAt(t));
   map.setPaintProperty("roads-cut-soon", "line-width", _roadWidthAt(t));
+  map.setPaintProperty("roads-cut-soon", "line-opacity", _roadOpacityAt(t));
   if (map.getLayer("roads-bridge-cut")) {
     map.setPaintProperty("roads-bridge-cut", "line-opacity", _bridgeOpacityAt(t));
   }
@@ -1738,6 +1823,164 @@ function _addFloodLayer() {
     },
     layout: { "line-join": "round", "line-cap": "round" },
   });
+}
+
+// ── Lake layer (run_layer/lake_frames) ─────────────────────────────────────
+// One polygon per solver step: 36 rising frames sourced pre-breach, 27
+// draining frames from a 0-D mass balance post-breach. Drawn by STEP (the
+// frame with the greatest t_min <= current t, no interpolation) so the shape
+// on screen always matches a real solver frame instead of an invented
+// in-between one.
+//
+// Deliberately its own colour, never the flood-depth ramp and never the
+// chrome accent (ui.md): a reservoir is not the same claim as flooded land,
+// and must not be readable as either.
+function _addLakeLayer() {
+  map.addSource("lake", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({
+    id: "lake-fill",
+    type: "fill",
+    source: "lake",
+    paint: {
+      "fill-color": "#1e3a8a",
+      "fill-opacity": 0.8,
+    },
+  });
+  map.addLayer({
+    id: "lake-shoreline",
+    type: "line",
+    source: "lake",
+    paint: {
+      "line-color": "#7dd3fc",
+      "line-width": 1.4,
+      "line-opacity": 0.85,
+    },
+  });
+
+  lakePopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "280px" });
+  map.on("mouseenter", "lake-fill", (e) => {
+    map.getCanvas().style.cursor = "pointer";
+    const p = (e.features[0] && e.features[0].properties) || {};
+    lakePopup.setLngLat(e.lngLat).setHTML(`
+      <div class="village-popup">
+        <div class="pop-name">Reservoir</div>
+        <dl class="pop-grid" style="margin-top:6px;">
+          <dt>Level</dt><dd>${isMissing(p.level_m) ? "—" : (+p.level_m).toFixed(1) + " m"}</dd>
+          <dt>Volume</dt><dd>${isMissing(p.volume_mcm) ? "—" : (+p.volume_mcm).toFixed(2) + " MCM"}</dd>
+          <dt>Area</dt><dd>${isMissing(p.area_km2) ? "—" : (+p.area_km2).toFixed(2) + " km²"}</dd>
+          <dt>Source</dt><dd>${escapeHtml(p.source || "—")}</dd>
+        </dl>
+      </div>
+    `).addTo(map);
+  });
+  map.on("mouseleave", "lake-fill", () => {
+    map.getCanvas().style.cursor = "";
+    lakePopup.remove();
+  });
+}
+
+// Step lookup: the frame with the greatest t_min <= t. Before the first
+// frame, nothing is drawn -- there is no real solver state to show yet.
+function _lakeFrameAt(tMin) {
+  if (!lakeFrames.length) return null;
+  let best = null;
+  for (const f of lakeFrames) {
+    if (f.t_min <= tMin && (!best || f.t_min > best.t_min)) best = f;
+  }
+  return best;
+}
+
+let _lastLakeT = null;
+function _updateLakeAtTime(tMin) {
+  if (!map || !map.getSource("lake")) return;
+  const t = Math.round(tMin);
+  if (t === _lastLakeT) return;
+  _lastLakeT = t;
+  const frame = _lakeFrameAt(tMin);
+  map.getSource("lake").setData(frame ? frame.geojson : { type: "FeatureCollection", features: [] });
+}
+
+async function _loadLakeFrames(jobId) {
+  lakeFrames = [];
+  _lastLakeT = null;
+  try {
+    const r = await fetch(`/api/run_layer/${jobId}/lake_frames`);
+    if (!r.ok) return;
+    const fc = await r.json();
+    lakeFrames = (fc.features || [])
+      .map((f) => {
+        const p = f.properties || {};
+        return {
+          t_min: +p.t_min,
+          level_m: p.level_m, volume_mcm: p.volume_mcm, area_km2: p.area_km2,
+          phase: p.phase, source: p.source,
+          geojson: { type: "FeatureCollection", features: [f] },
+        };
+      })
+      .filter((f) => isFinite(f.t_min))
+      .sort((a, b) => a.t_min - b.t_min);
+  } catch (e) {
+    console.warn("lake_frames not available:", e);
+  }
+}
+
+// ── Existing water planes (run_layer/water_planes) ──────────────────────────
+// Flat water surfaces already in the DEM (e.g. Somasila reservoir), drawn
+// ABOVE the flood layers and the lake so flood water that ponds on an
+// existing water body never reads as newly-flooded land.
+function _addWaterPlanesLayer() {
+  map.addSource("water-planes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({
+    id: "water-planes-fill",
+    type: "fill",
+    source: "water-planes",
+    paint: {
+      "fill-color": "#9cc3e6",
+      "fill-opacity": 0.92,
+    },
+  });
+  map.addLayer({
+    id: "water-planes-outline",
+    type: "line",
+    source: "water-planes",
+    paint: {
+      "line-color": "#5b86ad",
+      "line-width": 0.8,
+      "line-opacity": 0.8,
+    },
+  });
+
+  waterPlanesPopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "280px" });
+  map.on("mouseenter", "water-planes-fill", (e) => {
+    map.getCanvas().style.cursor = "pointer";
+    const p = (e.features[0] && e.features[0].properties) || {};
+    const elev = isMissing(p.elev_m) ? "—" : (+p.elev_m).toFixed(1);
+    waterPlanesPopup.setLngLat(e.lngLat).setHTML(`
+      <div class="village-popup">
+        <div class="pop-name">Existing water surface</div>
+        <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">
+          Existing water surface in the DEM (elev ${elev} m). Flood water that ponds on it
+          is not drawn as flooded land.
+        </p>
+      </div>
+    `).addTo(map);
+  });
+  map.on("mouseleave", "water-planes-fill", () => {
+    map.getCanvas().style.cursor = "";
+    waterPlanesPopup.remove();
+  });
+}
+
+async function _loadWaterPlanes(jobId) {
+  try {
+    const r = await fetch(`/api/run_layer/${jobId}/water_planes`);
+    const src = map.getSource("water-planes");
+    if (!r.ok || !src) { if (src) src.setData({ type: "FeatureCollection", features: [] }); return; }
+    const fc = await r.json();
+    src.setData(fc);
+  } catch (e) {
+    console.warn("water_planes not available:", e);
+  }
 }
 
 // ── Context layers, per scenario ──────────────────────────────────────────
@@ -1956,8 +2199,16 @@ function _transitionToFloodFrame(frame) {
   if (frame.geojson) current.setData(frame.geojson);
   if (map.getLayer("flood-depth-fill")) {
     if (frame.stage === "reservoir_rise") {
-      map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
-      map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+      // The lake layer (run_layer/lake_frames) draws the reservoir for this
+      // stage when it has data; painting flood-depth-fill too would double
+      // the same water in two layers. Fall back to the old solid fill only
+      // when this run has no lake_frames of its own.
+      if (lakeFrames.length) {
+        map.setPaintProperty("flood-depth-fill", "fill-opacity", 0);
+      } else {
+        map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
+        map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+      }
     } else {
       map.setPaintProperty("flood-depth-fill", "fill-color", [
         "step", ["get", "depth_class"],
@@ -2188,8 +2439,14 @@ function _applySnapshotFrame(idx) {
       }
       if (map.getLayer("flood-depth-fill")) {
         if (frame.stage === "reservoir_rise") {
-          map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
-          map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+          // See the matching comment in _transitionToFloodFrame: the lake
+          // layer takes over this stage when it has its own frames.
+          if (lakeFrames.length) {
+            map.setPaintProperty("flood-depth-fill", "fill-opacity", 0);
+          } else {
+            map.setPaintProperty("flood-depth-fill", "fill-color", "#0284c7");
+            map.setPaintProperty("flood-depth-fill", "fill-opacity", 0.68);
+          }
         } else {
           map.setPaintProperty("flood-depth-fill", "fill-color", [
             "step", ["get", "depth_class"],
@@ -2225,6 +2482,9 @@ function _applySnapshotFrame(idx) {
     } else {
       readout.textContent = `T+${t} min · Flood Surge Propagation`;
     }
+    // CSS ellipses this to one line; the full text still reaches the user
+    // via the native title tooltip.
+    readout.title = readout.textContent;
   }
   const slider = document.getElementById("time-slider");
   if (slider) slider.value = idx;
@@ -2237,6 +2497,12 @@ function _applySnapshotFrame(idx) {
   _updateWavefrontMarker(frame, frame.t_min);
   _updateSurgeWaveMarker(frame.t_min);
   _updateRoadCutMarkers(frame.t_min);
+  _updateLakeAtTime(frame.t_min);
+  _updateDamOvertopBreachFx(frame.t_min);
+  _updateVillageDepthFill(frame.t_min);
+  _updateEvacRoutesAtTime(frame.t_min);
+  _updateFlowFieldTime(frame.t_min);
+  _declutterVillageMarkers();
 }
 
 // Jump to the frame nearest a given simulated minute. Used by the timeline
@@ -2526,6 +2792,31 @@ function _markCurrentVillage(name) {
 // started and completed in a background tab is followed by the map's "load"
 // event firing on return -- which used to wipe a real result back to zeros.
 async function _loadSimulationRun(job_id, dam_name) {
+  // New per-run layers reset before the fetches below repopulate them, so a
+  // run with none of this data (every scenario but annamayya_compound today)
+  // leaves the map exactly as before -- no stale layer from a previous run.
+  lakeFrames = [];
+  _lastLakeT = null;
+  _breachFlashPlayed = false;
+  frontField = null;
+  evacRoutesGeoJSON = null;
+  villageDepthSeries = null;
+  selectedEvacVillageId = null;
+  _lastEvacT = null;
+  _arrivalRingPlayed.clear();
+  flowLastFrameT = 0;
+  _stopFlowLoop();
+  if (map.getSource("water-planes")) {
+    map.getSource("water-planes").setData({ type: "FeatureCollection", features: [] });
+  }
+  if (map.getSource("lake")) {
+    map.getSource("lake").setData({ type: "FeatureCollection", features: [] });
+  }
+  if (map.getSource("evac-routes")) {
+    map.getSource("evac-routes").setData({ type: "FeatureCollection", features: [] });
+  }
+  _clearEvacRouteMarkers();
+
   try {
     if (window.FloodSightDebug) {
       window.FloodSightDebug.log.push({
@@ -2590,6 +2881,18 @@ async function _loadSimulationRun(job_id, dam_name) {
     } catch (e) {
       console.warn("Envelope not available:", e);
     }
+
+    // Each of these is its own scenario's optional extra data; a 404 on any
+    // one leaves that layer empty rather than breaking the others.
+    await _loadLakeFrames(job_id);
+    if (snapshotFrames.length) {
+      _updateLakeAtTime(snapshotFrames[currentStep] ? snapshotFrames[currentStep].t_min : 0);
+    }
+    await _loadWaterPlanes(job_id);
+    await _loadFrontField(job_id);
+    await _loadEvacRoutes(job_id);
+    await _loadVillageDepth(job_id);
+    _updateStoryButton();
 
     await _loadValidation(job_id);
   } catch (err) {
@@ -3289,7 +3592,22 @@ function renderPriorityList(features) {
       const row = ev.target.closest(".priority-item[data-idx]");
       if (!row) return;
       const f = _priorityRows[+row.dataset.idx];
-      if (f) showIsolationCallout(f.properties);
+      if (f) {
+        showIsolationCallout(f.properties);
+        if (window.showEvacRouteFor) window.showEvacRouteFor(f.properties.village_id);
+      }
+    });
+    // Hovering a row previews that village's route without moving the
+    // playhead or opening the popover -- a lighter-weight interaction than
+    // click, matched by leaving on mouseleave.
+    list.addEventListener("mouseover", (ev) => {
+      const row = ev.target.closest(".priority-item[data-idx]");
+      if (!row) return;
+      const f = _priorityRows[+row.dataset.idx];
+      if (f && window.showEvacRouteFor) window.showEvacRouteFor(f.properties.village_id);
+    });
+    list.addEventListener("mouseleave", () => {
+      if (window.showEvacRouteFor) window.showEvacRouteFor(null);
     });
     list._fsDelegated = true;
   }
@@ -3948,8 +4266,9 @@ function _updateVillageMarkers(geojson) {
     const el = document.createElement("div");
     el.className = `map-mark village-mark ${statusClass} ${dotOnlyClass}`;
     el.title = `${p.village_name || "Village"} — Click for evacuation timeline`;
+    if (p.village_id) el.dataset.villageId = p.village_id;
     el.innerHTML = `
-      <div class="village-dot"></div>
+      <div class="village-dot"><div class="arrival-ring"></div></div>
       <div class="village-badge">
         <span class="village-name" dir="auto">${escapeHtml(p.village_name || "Village")}</span>
         ${statusText ? `<span class="village-status">${statusText}</span>` : ""}
@@ -4065,6 +4384,26 @@ function _updateWavefrontMarker(frame, tMin) {
     const dSpan = document.getElementById("wave-depth");
     if (dSpan) dSpan.textContent = `Max Depth ~${maxDepth.toFixed(1)}m`;
   }
+  _clampWavefrontCallout();
+}
+
+// Hides the wavefront callout when it would sit under the left/right panels
+// or the spine -- those are opaque glass chrome above the map's z-index, so a
+// marker drawn there is not just crowded, it is actually covered.
+function _clampWavefrontCallout() {
+  if (!wavefrontMarker) return;
+  const el = wavefrontMarker.getElement();
+  if (!el) return;
+  const r = el.getBoundingClientRect();
+  if (!r.width) return;
+  const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
+  const covered = ["left-panel", "right-panel", "spine"].some((id) => {
+    const panel = document.getElementById(id);
+    if (!panel || panel.offsetParent === null) return false;
+    const p = panel.getBoundingClientRect();
+    return cx >= p.left && cx <= p.right && cy >= p.top && cy <= p.bottom;
+  });
+  el.style.visibility = covered ? "hidden" : "";
 }
 
 let surgeWaveMarker = null;
@@ -4186,7 +4525,25 @@ function _updateRoadCutMarkers(tMin) {
       high = mid;
     }
   }
-  const displayed = cuts.slice(0, Math.min(low, 6));
+  // On a dense graph (Annamayya: 355 cut links) a marker per link is
+  // unreadable clutter. Cap at the ~40 most important VISIBLE ones: major
+  // highway classes first, and only links whose midpoint is on screen.
+  const ROADCUT_CAP = 15;
+  const MAJOR_CLASS = new Set(["trunk", "primary", "secondary", "tertiary"]);
+  const bounds = map.getBounds();
+  const eligible = cuts.slice(0, low).filter((f) => {
+    const coords = f.geometry?.coordinates;
+    if (!coords || !coords.length) return false;
+    const pt = coords[Math.floor(coords.length / 2)];
+    return bounds.contains(pt);
+  });
+  eligible.sort((a, b) => {
+    const am = MAJOR_CLASS.has(a.properties?.highway) ? 0 : 1;
+    const bm = MAJOR_CLASS.has(b.properties?.highway) ? 0 : 1;
+    if (am !== bm) return am - bm;
+    return (+b.properties.cut_time_min) - (+a.properties.cut_time_min); // most recent first
+  });
+  const displayed = eligible.slice(0, ROADCUT_CAP);
 
   for (let i = 0; i < displayed.length; i++) {
     const f = displayed[i];
@@ -4212,7 +4569,9 @@ function _updateRoadCutMarkers(tMin) {
     if (item.key !== key) {
       item.key = key;
       item.el.className = `map-mark roadcut-mark ${isBridge ? "is-bridge" : ""}`;
-      item.el.title = `${isBridge ? "Bridge lost" : "Road severed"} at T+${cutT} min`;
+      item.el.title = isBridge
+        ? `Bridge lost at T+${cutT} min`
+        : `Road cut at T+${cutT} min (depth ≥ threshold)`;
       item.el.innerHTML = `
         <div class="roadcut-pin">
           ${isBridge ? `
@@ -4361,5 +4720,512 @@ window.toggleMapMarkings = function() {
     btn.classList.toggle("is-active", mapMarkingsVisible);
     btn.setAttribute("aria-pressed", mapMarkingsVisible ? "true" : "false");
   }
+};
+
+// ── Flow-field particle overlay (run_layer/front_field) ─────────────────────
+// A regular lon/lat grid of (u, v) unit vectors -- the gradient of the run's
+// own arrival-time field, i.e. which way the front was travelling, not a
+// velocity. Rendered as drifting particles on a plain 2D canvas so the cost
+// stays flat regardless of zoom: MapLibre's WebGL context is never touched.
+const FLOW_PARTICLE_COUNT = 1600;
+let flowCanvas = null, flowCtx = null;
+let flowParticles = null;   // typed arrays: x, y (screen px), age, seedCol, seedRow
+let flowRafId = null;
+let flowLastFrameT = 0;
+
+function _initFlowFieldCanvas() {
+  flowCanvas = document.getElementById("flow-canvas");
+  if (!flowCanvas) return;
+  flowCtx = flowCanvas.getContext("2d");
+  _resizeFlowCanvas();
+  window.addEventListener("resize", _resizeFlowCanvas);
+  map.on("move", () => { if (flowParticles) _seedFlowParticles(); });
+  map.on("moveend", () => { if (flowParticles) _seedFlowParticles(); });
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) { _stopFlowLoop(); }
+    else if (flowFieldOn && frontField) { _startFlowLoop(); }
+  });
+}
+
+function _resizeFlowCanvas() {
+  if (!flowCanvas) return;
+  const dpr = Math.min(2, window.devicePixelRatio || 1);
+  flowCanvas.width = Math.round(window.innerWidth * dpr);
+  flowCanvas.height = Math.round(window.innerHeight * dpr);
+  flowCanvas.style.width = window.innerWidth + "px";
+  flowCanvas.style.height = window.innerHeight + "px";
+  if (flowCtx) flowCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+
+async function _loadFrontField(jobId) {
+  frontField = null;
+  try {
+    const r = await fetch(`/api/run_layer/${jobId}/front_field`);
+    if (!r.ok) return;
+    frontField = await r.json();
+    if (frontField && flowFieldOn) {
+      _seedFlowParticles();
+      _startFlowLoop();
+    }
+  } catch (e) {
+    console.warn("front_field not available:", e);
+  }
+}
+
+// Sample (u, v, t_arr_min) at the nearest grid cell. Grid rows are stored
+// NORTH row first, so row index grows southward -- the opposite of latitude.
+function _sampleFrontField(lon, lat) {
+  const f = frontField;
+  if (!f || !f.nx || !f.ny) return null;
+  const col = Math.round(((lon - f.west) / (f.east - f.west)) * (f.nx - 1));
+  const rowFromNorth = Math.round(((f.north - lat) / (f.north - f.south)) * (f.ny - 1));
+  if (col < 0 || col >= f.nx || rowFromNorth < 0 || rowFromNorth >= f.ny) return null;
+  const idx = rowFromNorth * f.nx + col;
+  const u = f.u[idx], v = f.v[idx], t = f.t_arr_min[idx];
+  if (u === null || u === undefined || v === null || v === undefined) return null;
+  return { u, v, t_arr_min: (t === null || t === undefined) ? null : t };
+}
+
+function _seedFlowParticles() {
+  if (!frontField || !map) return;
+  const n = FLOW_PARTICLE_COUNT;
+  if (!flowParticles || flowParticles.x.length !== n) {
+    flowParticles = {
+      x: new Float32Array(n), y: new Float32Array(n),
+      age: new Float32Array(n), life: new Float32Array(n),
+    };
+  }
+  const b = map.getBounds();
+  const west = Math.max(frontField.west, b.getWest());
+  const east = Math.min(frontField.east, b.getEast());
+  const south = Math.max(frontField.south, b.getSouth());
+  const north = Math.min(frontField.north, b.getNorth());
+  for (let i = 0; i < n; i++) _respawnParticle(i, west, east, south, north);
+}
+
+const _flowRespawnBounds = { west: 0, east: 0, south: 0, north: 0 };
+function _respawnParticle(i, west, east, south, north) {
+  // Only spawn where the front has already arrived by the current sim time
+  // (t_arr_min <= t); retried a handful of times before giving up on this
+  // tick so a mostly-dry frame does not spin forever.
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const lon = west + Math.random() * (east - west);
+    const lat = south + Math.random() * (north - south);
+    const s = _sampleFrontField(lon, lat);
+    if (!s || s.t_arr_min === null) continue;
+    if (s.t_arr_min > flowLastFrameT) continue;
+    const pt = map.project([lon, lat]);
+    flowParticles.x[i] = pt.x;
+    flowParticles.y[i] = pt.y;
+    flowParticles.age[i] = 0;
+    flowParticles.life[i] = 40 + Math.random() * 40;
+    return;
+  }
+  // Nothing wet found nearby this attempt -- park it off-screen; the next
+  // tick's respawn pass will retry it once more water has arrived.
+  flowParticles.x[i] = -9999;
+  flowParticles.y[i] = -9999;
+  flowParticles.age[i] = flowParticles.life[i] || 1;
+}
+
+const FLOW_SPEED_PX_S = 55; // constant screen speed, independent of zoom
+function _stepFlowParticles(dtS) {
+  if (!flowParticles || !frontField) return;
+  const b = map.getBounds();
+  const west = b.getWest(), east = b.getEast(), south = b.getSouth(), north = b.getNorth();
+  const n = flowParticles.x.length;
+  for (let i = 0; i < n; i++) {
+    flowParticles.age[i] += dtS;
+    if (flowParticles.age[i] >= flowParticles.life[i]) {
+      _respawnParticle(i, west, east, south, north);
+      continue;
+    }
+    const ll = map.unproject([flowParticles.x[i], flowParticles.y[i]]);
+    const s = _sampleFrontField(ll.lng, ll.lat);
+    if (!s || s.t_arr_min === null || s.t_arr_min > flowLastFrameT) {
+      _respawnParticle(i, west, east, south, north);
+      continue;
+    }
+    // u is east, v is north; screen y grows downward, so v flips sign.
+    const mag = Math.hypot(s.u, s.v) || 1;
+    const dx = (s.u / mag) * FLOW_SPEED_PX_S * dtS;
+    const dy = -(s.v / mag) * FLOW_SPEED_PX_S * dtS;
+    flowParticles.x[i] += dx;
+    flowParticles.y[i] += dy;
+  }
+}
+
+function _drawFlowParticles() {
+  if (!flowCtx || !flowCanvas || !flowParticles) return;
+  const w = window.innerWidth, h = window.innerHeight;
+  // Fade previous trails rather than clearing outright -- cheap motion blur.
+  flowCtx.globalCompositeOperation = "destination-out";
+  flowCtx.fillStyle = "rgba(0,0,0,0.12)";
+  flowCtx.fillRect(0, 0, w, h);
+  flowCtx.globalCompositeOperation = "source-over";
+  flowCtx.fillStyle = "rgba(224, 242, 254, 0.85)";
+  const n = flowParticles.x.length;
+  for (let i = 0; i < n; i++) {
+    const x = flowParticles.x[i], y = flowParticles.y[i];
+    if (x < -100 || x > w + 100 || y < -100 || y > h + 100) continue;
+    flowCtx.fillRect(x, y, 1.6, 1.6);
+  }
+}
+
+let _flowLastTs = 0;
+function _flowTick(ts) {
+  if (document.hidden || !flowFieldOn) { flowRafId = null; return; }
+  const dt = _flowLastTs ? Math.min(0.05, (ts - _flowLastTs) / 1000) : 0.016;
+  _flowLastTs = ts;
+  const start = performance.now();
+  _stepFlowParticles(dt);
+  _drawFlowParticles();
+  // Cost guard: if a tick runs long, skip the next one rather than compound.
+  const cost = performance.now() - start;
+  flowRafId = requestAnimationFrame((t2) => {
+    if (cost > 16) {
+      requestAnimationFrame(_flowTick);
+    } else {
+      _flowTick(t2);
+    }
+  });
+}
+
+function _startFlowLoop() {
+  if (flowRafId || document.hidden || !flowFieldOn || !frontField) return;
+  _flowLastTs = 0;
+  flowRafId = requestAnimationFrame(_flowTick);
+}
+function _stopFlowLoop() {
+  if (flowRafId) cancelAnimationFrame(flowRafId);
+  flowRafId = null;
+}
+
+// Called from _applySnapshotFrame-adjacent updates so particle spawning
+// tracks the same "wet by now" boundary the map itself shows.
+function _updateFlowFieldTime(tMin) {
+  flowLastFrameT = tMin;
+}
+
+window.toggleFlowField = function () {
+  flowFieldOn = !flowFieldOn;
+  const btn = document.getElementById("btn-toggle-flow");
+  if (btn) {
+    btn.classList.toggle("is-active", flowFieldOn);
+    btn.setAttribute("aria-pressed", flowFieldOn ? "true" : "false");
+  }
+  if (flowFieldOn) {
+    if (frontField) { _seedFlowParticles(); _startFlowLoop(); }
+  } else {
+    _stopFlowLoop();
+    if (flowCtx) flowCtx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+  }
+};
+
+// ── Evacuation routes (run_layer/evac_routes) ───────────────────────────────
+let evacRouteMarkers = [];
+
+// Two layers, not one: `line-dasharray` is a layout-time-only property in
+// MapLibre (no data-driven expression support), so "solid while open, dashed
+// once lost" needs a STATIC filter split rather than a data expression --
+// the same pattern `roads-bridge-cut` already uses for the same reason.
+function _addEvacRoutesLayer() {
+  map.addSource("evac-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  map.addLayer({
+    id: "evac-routes-line",
+    type: "line",
+    source: "evac-routes",
+    filter: ["!=", ["get", "route_status"], "lost"],
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": ["match", ["get", "route_status"], "amber", "#f59e0b", "#10b981"],
+      "line-width": 3,
+      "line-opacity": 0.9,
+    },
+  });
+  map.addLayer({
+    id: "evac-routes-line-lost",
+    type: "line",
+    source: "evac-routes",
+    filter: ["==", ["get", "route_status"], "lost"],
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: {
+      "line-color": "#64748b",
+      "line-width": 3,
+      "line-dasharray": [2, 1.5],
+      "line-opacity": 0.85,
+    },
+  });
+
+  evacRoutePopup = new maplibregl.Popup({ closeButton: false, closeOnClick: false, maxWidth: "260px" });
+  for (const id of ["evac-routes-line", "evac-routes-line-lost"]) {
+    map.on("mouseenter", id, (e) => {
+      map.getCanvas().style.cursor = "pointer";
+      const p = (e.features[0] && e.features[0].properties) || {};
+      evacRoutePopup.setLngLat(e.lngLat).setHTML(_evacRoutePopupHtml(p)).addTo(map);
+    });
+    map.on("mouseleave", id, () => {
+      map.getCanvas().style.cursor = "";
+      evacRoutePopup.remove();
+    });
+  }
+}
+
+function _evacRoutePopupHtml(p) {
+  if (p.length_km !== undefined && +p.length_km === 0) {
+    return `<div class="village-popup"><div class="pop-name" dir="auto">${escapeHtml(p.village_name || "Village")}</div>
+      <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">
+      ${escapeHtml(p.status_note || "Nearest road stays dry — move to high ground nearby.")}</p></div>`;
+  }
+  const cutTxt = isMissing(p.route_cut_min) ? "not cut in this run" : `cut at T+${Math.round(+p.route_cut_min)} min`;
+  return `<div class="village-popup"><div class="pop-name" dir="auto">${escapeHtml(p.village_name || "Village")}</div>
+    <dl class="pop-grid" style="margin-top:6px;">
+      <dt>Length</dt><dd>${isMissing(p.length_km) ? "—" : (+p.length_km).toFixed(2) + " km"}</dd>
+      <dt>Travel</dt><dd>${isMissing(p.travel_min) ? "—" : Math.round(+p.travel_min) + " min"}</dd>
+      <dt>Route</dt><dd>${escapeHtml(cutTxt)}</dd>
+      <dt>Water there</dt><dd>${isMissing(p.water_arrival_min) ? "—" : "T+" + Math.round(+p.water_arrival_min) + " min"}</dd>
+    </dl></div>`;
+}
+
+async function _loadEvacRoutes(jobId) {
+  evacRoutesGeoJSON = null;
+  try {
+    const r = await fetch(`/api/run_layer/${jobId}/evac_routes`);
+    if (!r.ok) return;
+    evacRoutesGeoJSON = await r.json();
+  } catch (e) {
+    console.warn("evac_routes not available:", e);
+  }
+}
+
+function _clearEvacRouteMarkers() {
+  for (const m of evacRouteMarkers) m.remove();
+  evacRouteMarkers = [];
+}
+
+// Colours a route by status at time t: green (safe margin), amber (within
+// the last 60 min before its cut), red dashed (route lost). Zero-length
+// routes (village's nearest road node never gets wet) draw no line -- the
+// list/popover note carries the "move to high ground" guidance instead.
+let _lastEvacT = null;
+function _updateEvacRoutesAtTime(tMin) {
+  if (!map || !map.getSource("evac-routes")) return;
+  if (!evacRoutesGeoJSON || !evacRoutesGeoJSON.features) return;
+  const t = Math.round(tMin);
+  if (t === _lastEvacT) return;
+  _lastEvacT = t;
+
+  const ranked = [...evacRoutesGeoJSON.features]
+    .filter((f) => f.properties && +f.properties.length_km > 0)
+    .sort((a, b) => (a.properties.priority_rank || 999) - (b.properties.priority_rank || 999));
+
+  const wanted = selectedEvacVillageId
+    ? ranked.filter((f) => f.properties.village_id === selectedEvacVillageId)
+    : ranked.slice(0, 5);
+
+  const out = wanted.map((f) => {
+    const p = f.properties;
+    const cut = isMissing(p.route_cut_min) ? null : +p.route_cut_min;
+    let status = "safe";
+    if (cut !== null) {
+      if (tMin >= cut) status = "lost";
+      else if (cut - tMin <= 60) status = "amber";
+    }
+    return { ...f, properties: { ...p, route_status: status } };
+  });
+  map.getSource("evac-routes").setData({ type: "FeatureCollection", features: out });
+
+  // Destination "safe ground" dots, pooled like the road-cut markers.
+  for (let i = 0; i < out.length; i++) {
+    const p = out[i].properties;
+    if (isMissing(p.dest_lon) || isMissing(p.dest_lat)) continue;
+    let m = evacRouteMarkers[i];
+    const cls = `evac-route-arrow${p.route_status === "amber" ? " is-amber" : ""}${p.route_status === "lost" ? " is-lost" : ""}`;
+    if (!m) {
+      const el = document.createElement("div");
+      el.className = cls;
+      m = new maplibregl.Marker({ element: el, anchor: "center" })
+        .setLngLat([p.dest_lon, p.dest_lat])
+        .addTo(map);
+      evacRouteMarkers[i] = m;
+    } else {
+      m.getElement().className = cls;
+      m.setLngLat([p.dest_lon, p.dest_lat]);
+    }
+    m.getElement().title = `Safe ground for ${p.village_name || "village"}`;
+    m.getElement().style.display = "";
+  }
+  for (let i = out.length; i < evacRouteMarkers.length; i++) {
+    if (evacRouteMarkers[i]) evacRouteMarkers[i].getElement().style.display = "none";
+  }
+}
+
+// Called from the "Evacuate first" list (ui.js row hover/click) to show one
+// village's route regardless of its rank.
+window.showEvacRouteFor = function (villageId) {
+  selectedEvacVillageId = villageId || null;
+  _lastEvacT = null;
+  _updateEvacRoutesAtTime(snapshotFrames.length ? snapshotFrames[currentStep].t_min : 0);
+};
+
+// ── Village depth fill (run_layer/village_depth) ────────────────────────────
+let villageDepthSeries = null; // {village_id: {name, series: [[t_min, depth_m], ...]}}
+const _arrivalRingPlayed = new Set();
+
+async function _loadVillageDepth(jobId) {
+  villageDepthSeries = null;
+  try {
+    const r = await fetch(`/api/run_layer/${jobId}/village_depth`);
+    if (!r.ok) return;
+    villageDepthSeries = await r.json();
+  } catch (e) {
+    console.warn("village_depth not available:", e);
+  }
+}
+
+// Linear interpolation between the two bracketing samples. Returns null
+// before the series starts or when the village has no series at all.
+function _depthAt(series, tMin) {
+  if (!series || !series.length) return null;
+  if (tMin <= series[0][0]) return tMin === series[0][0] ? series[0][1] : null;
+  for (let i = 1; i < series.length; i++) {
+    const [t0, d0] = series[i - 1], [t1, d1] = series[i];
+    if (tMin <= t1) {
+      if (t1 === t0) return d1;
+      const f = (tMin - t0) / (t1 - t0);
+      return d0 + (d1 - d0) * f;
+    }
+  }
+  return series[series.length - 1][1];
+}
+
+function _updateVillageDepthFill(tMin) {
+  if (!villageDepthSeries) return;
+  const ramp = depthRamp();
+  for (const m of villageMarkers) {
+    const el = m.getElement();
+    const vid = el && el.dataset && el.dataset.villageId;
+    if (!vid) continue;
+    const rec = villageDepthSeries[vid];
+    const depth = rec ? _depthAt(rec.series, tMin) : null;
+    const dot = el.querySelector(".village-dot");
+    if (dot) {
+      if (depth === null || depth <= 0) {
+        dot.style.background = "";
+      } else {
+        const idx = Math.max(0, Math.min(ramp.length - 1, Math.floor(depth) - 1));
+        dot.style.background = ramp[idx];
+      }
+    }
+    if (depth !== null && depth >= 0.3 && !_arrivalRingPlayed.has(vid)) {
+      _arrivalRingPlayed.add(vid);
+      const ring = el.querySelector(".arrival-ring");
+      if (ring) {
+        ring.classList.remove("is-playing");
+        void ring.offsetWidth;
+        ring.classList.add("is-playing");
+      }
+    }
+  }
+}
+
+// ── Village marker label collision ──────────────────────────────────────────
+// Markers are placed in DOM order (map.js keeps them sorted by priority_rank
+// ascending already). After layout, hide the badge of any lower-priority
+// marker whose screen box overlaps one already kept -- rank #1 is never
+// hidden. Hidden markers keep their dot so the place stays marked.
+let _declutterRaf = null;
+function _declutterVillageMarkers() {
+  if (_declutterRaf) return;
+  _declutterRaf = requestAnimationFrame(() => {
+    _declutterRaf = null;
+    if (!villageMarkers.length) return;
+    const boxes = [];
+    for (const m of villageMarkers) {
+      const el = m.getElement();
+      const badge = el.querySelector(".village-badge");
+      el.classList.remove("is-collision-hidden");
+      if (!badge) { boxes.push(null); continue; }
+      const r = badge.getBoundingClientRect();
+      boxes.push(r.width ? r : null);
+    }
+    const kept = [];
+    for (let i = 0; i < villageMarkers.length; i++) {
+      const el = villageMarkers[i].getElement();
+      const isRank1 = el.classList.contains("is-rank1");
+      const box = boxes[i];
+      if (!box) continue;
+      if (isRank1) { kept.push(box); continue; }
+      const overlaps = kept.some((k) =>
+        box.left < k.right && box.right > k.left && box.top < k.bottom && box.bottom > k.top);
+      if (overlaps) {
+        el.classList.add("is-collision-hidden");
+      } else {
+        kept.push(box);
+      }
+    }
+  });
+}
+
+function _updateStoryButton() {
+  const btn = document.getElementById("btn-story");
+  if (btn) btn.disabled = !snapshotFrames.length;
+}
+
+// ── Story mode ───────────────────────────────────────────────────────────
+// A guided, cancellable fly-through. Any user wheel/drag/click on the map or
+// timeline cancels it -- the map stays exactly where that interaction left it.
+let _storyCancelled = false;
+function _cancelStory() {
+  _storyCancelled = true;
+  storyRunning = false;
+}
+function _armStoryCancelListeners() {
+  const cancel = () => _cancelStory();
+  map.once("wheel", cancel);
+  map.once("dragstart", cancel);
+  map.once("click", cancel);
+  const slider = document.getElementById("time-slider");
+  if (slider) slider.addEventListener("pointerdown", cancel, { once: true });
+}
+
+const _EASE_CUBIC = (t) => 1 - Math.pow(1 - t, 3);
+
+function _flyToAsync(opts) {
+  return new Promise((resolve) => {
+    map.once("moveend", resolve);
+    map.flyTo({ ...opts, duration: 1400, easing: _EASE_CUBIC });
+  });
+}
+function _wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+window.playStoryMode = async function () {
+  if (storyRunning || !snapshotFrames.length) return;
+  storyRunning = true;
+  _storyCancelled = false;
+  _armStoryCancelListeners();
+
+  const dam = _getDamData(document.getElementById("scenario-select")?.value || "annamayya")
+    || _getDamData("annamayya");
+  const steps = [
+    { center: [dam.lon, dam.lat], zoom: 13.5, t: -120 },
+    { center: [dam.lon, dam.lat], zoom: 14.2, t: -45 },
+    { center: [dam.lon, dam.lat], zoom: 14.5, t: 0 },
+    { center: [dam.lon, dam.lat], zoom: 12.5, t: 180 },
+    { center: [79.1200, 14.2580], zoom: 12.8, t: 360 },
+    { center: [dam.lon, dam.lat], zoom: 10.5, t: 1440 },
+  ];
+
+  for (const step of steps) {
+    if (_storyCancelled) break;
+    await _flyToAsync({ center: step.center, zoom: step.zoom, pitch: 40, bearing: -10 });
+    if (_storyCancelled) break;
+    if (window.seekToMinute) window.seekToMinute(step.t);
+    if (_storyCancelled) break;
+    await _wait(2500);
+  }
+  storyRunning = false;
 };
 

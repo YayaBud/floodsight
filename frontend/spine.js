@@ -467,6 +467,22 @@ window.Spine = (function () {
     // truth without a source manifest). Real data belongs behind
     // /api/validation/{id}/arrivals when that is wired into the timeline.
 
+    // Greedy left-to-right label placement on ONE row: a label is skipped (not
+    // the pin, which always renders and always carries its `title`) if it would
+    // overlap the previous label. A second staggered row was tried at top 50px;
+    // a two-line label there is ~74px deep in a 66px lane, so it printed over
+    // the roads lane below. One row, skip on collision.
+    //
+    // The gap threshold is the label's own rendered width (CSS max-width:
+    // 132px, centred on its pin), converted to a fraction of the lane's
+    // actual pixel width -- LABEL_GAP alone (a fixed 6.5% of the 1000-unit
+    // viewBox) is narrower than one label on any lane under ~2000px wide, so
+    // two adjacent labels could clear that check and still overprint.
+    const hostWidthPx = host.getBoundingClientRect().width || 1000;
+    const labelHalfWidthPct = (132 / 2) / hostWidthPx;
+    const minGapPct = Math.max(LABEL_GAP, labelHalfWidthPct * 2);
+    let lastPlacedPct = [-Infinity, -Infinity]; // per row (0 = base, 1 = staggered)
+
     placed.forEach((e, i) => {
       const p = pct(e.t);
       const btn = document.createElement("button");
@@ -486,20 +502,29 @@ window.Spine = (function () {
       _pinEls.push(btn);
       _pinPassed.push(false);
 
-      // Labels only where there is room; otherwise the pin's title carries it.
-      const prev = placed[i - 1], next = placed[i + 1];
-      const room =
-        (!prev || p - pct(prev.t) > LABEL_GAP) &&
-        (!next || pct(next.t) - p > LABEL_GAP);
-      if (!room && !e.major) return;
+      // Try the base row first, then the staggered row -- whichever has room
+      // left of this label wins. A major event still yields to an existing
+      // label rather than overprinting it; it only skips the NEIGHBOUR-GAP
+      // check that would otherwise suppress it outright.
+      let row = -1;
+      for (const candidate of [0]) {
+        if (p - lastPlacedPct[candidate] > minGapPct) { row = candidate; break; }
+      }
+      if (row === -1) return; // pin still renders above; title carries the text
+
+      lastPlacedPct[row] = p;
 
       // Time above, name below, both centred on the pin. Stacking them means a
       // long place name cannot drag the time out of alignment with its dot.
       const lab = document.createElement("span");
-      const isStaggered = i % 2 === 1;
+      const isStaggered = row === 1;
       lab.className = "pin-label" + (isStaggered ? " pin-label-stagger" : "") + (animatable() ? " pin-in" : "");
       lab.style.left = (p * 100).toFixed(3) + "%";
-      if (isStaggered) lab.style.top = "24px";
+      // The base row sits at CSS top: 26px and is ~24px tall (two lines of
+      // 10px/9.5px text). The staggered row has to clear that, not sit 2px
+      // below its top -- the events lane is 66px tall (ui.md), so 50px still
+      // fits a second two-line label inside it.
+      if (isStaggered) lab.style.top = "50px";
       if (animatable()) lab.style.animationDelay = `${Math.min(i * 45 + 60, 460)}ms`;
       lab.innerHTML =
         `<b>${fmtT(e.t)} min</b><span dir="auto">${escapeHtmlLocal(e.label)}</span>`;

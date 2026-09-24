@@ -570,6 +570,8 @@ floodsight/
 
 **Data and scope ceilings:**
 
+- **Flooded area includes water on an existing reservoir.** Of the served Annamayya run's 156.14 km² above 0.3 m, 56.35 km² lies on Somasila reservoir, which the GLO-30 DSM holds as a flat 96.5 m water plane; the model ponds up to 2.6 m of flood water on it. Dry land flooded is **99.6 km²**. The map draws the reservoir as existing water, not as flooded land.
+
 - **No satellite observed the Annamayya flood.** Sentinel-1's only footprint over the reach acquired 16 Nov and 28 Nov — the event sits in a 12-day gap — and Sentinel-2 passed 4 h after the breach into 98.7% cloud. No CSI or POD is quoted for it, and the map's purple layer is a **reported-depth-anchored reconstruction**, never served as an observation.
 - **Annamayya's dam is not in the DEM.** GLO-30 here is a DSM captured with the reservoir full: a flat 192.50 m water plane against a 206.0 m crest, 25.1 km of valley against a 366 m dam footprint. No coordinate or footprint edit fixes this, which is why the scenario is routed rather than breached.
 - **No debris or sediment physics exists anywhere.** Debris-flow scenarios (Rishi Ganga) fail the flow-regime gate rather than being modelled with clear-water equations and presented as results.

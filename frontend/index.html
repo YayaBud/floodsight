@@ -25,6 +25,10 @@
   <!-- Full-bleed map, always a sibling of the chrome overlay, never a grid track. -->
   <section id="stage" aria-label="Flood map">
     <div id="map"></div>
+    <!-- Flow-field particle overlay. Sits above the map canvas and below the
+         chrome grid; pointer-events stays off so it never intercepts a drag.
+         Sized and redrawn by map.js, never by CSS layout. -->
+    <canvas id="flow-canvas" aria-hidden="true"></canvas>
     <div id="map-vignette" aria-hidden="true"></div>
 
     <div class="map-tools">
@@ -76,6 +80,24 @@
           <path d="M8 2l5 2.5v4c0 3-2.5 5.5-5 6.5-2.5-1-5-3.5-5-6.5v-4L8 2z" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
         <span>Shelters</span>
+      </button>
+
+      <button class="btn btn-quiet is-active" type="button" id="btn-toggle-flow"
+              onclick="toggleFlowField()" aria-pressed="true"
+              title="Direction the flood front travelled (from the run's arrival times) — not a velocity field">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M2 8h9m0 0-3-3m3 3-3 3" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span>Flow</span>
+      </button>
+
+      <button class="btn btn-quiet" type="button" id="btn-story"
+              onclick="playStoryMode()" disabled
+              title="Guided fly-through of the run, from lake rise to full reach">
+        <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.8">
+          <path d="M4 2.5v11l9-5.5z" stroke-linejoin="round"/>
+        </svg>
+        <span>Story</span>
       </button>
 
       <div class="menu-wrap">
