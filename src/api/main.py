@@ -60,7 +60,7 @@ def _read_json_file(path: str | Path):
     return json.loads(text)
 
 app = FastAPI(
-    title="FloodSight API",
+    title="FloodSense API",
     description="Rapid consequence-assessment engine for unmapped impoundments (SIH26161)",
     version="1.0.0",
 )

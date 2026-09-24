@@ -1,21 +1,33 @@
-# FloodSight — SIH26161
+# FloodSense — SIH26161
 
-> **"NDSA has a plan for all 6,628 specified dams. Nobody has a plan for the dam that formed last Tuesday. We build that in twenty minutes from open data."**
+> **"India registers 6,628 specified dams, and only about 11% of them have an Emergency Action Plan. Nobody has a plan for the dam that formed last Tuesday. We build one in minutes, from open data."**
 
-[![CI Test Suite](https://img.shields.io/badge/Tests-241%20Passed-brightgreen.svg)](tests/)
+[![CI Test Suite](https://img.shields.io/badge/Tests-287%20Passed-brightgreen.svg)](tests/)
 [![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-blue.svg)](requirements.txt)
 [![Theme](https://img.shields.io/badge/SIH%202026-Disaster%20Management-orange.svg)](#)
 [![Sponsor](https://img.shields.io/badge/Sponsor-NTRO-red.svg)](#)
 [![License](https://img.shields.io/badge/License-Proprietary%20%2F%20Open%20Data-lightgrey.svg)](#license--attribution)
 
-A rapid consequence-assessment engine for **unmapped impoundments** — landslide dams, moraine-dammed lakes, and blocked river reaches — sponsored by **NTRO** (National Technical Research Organisation), Smart India Hackathon 2026.
+A rapid consequence-assessment engine for **unmapped impoundments** — landslide dams, moraine-dammed lakes, and blocked river reaches — sponsored by **NTRO** (National Technical Research Organisation), Smart India Hackathon 2026. The codebase is named `floodsight`; the team and product are **FloodSense**.
+
+### Status at a glance
+
+| PS deliverable | What exists | Status |
+|---|---|---|
+| (i) SPH and Delft3D, compared | 2D finite-volume SWE engine (every run) · 1D SWE-SPH (Ritter case) · Delft3D FM | SWE and SWE-SPH **live** · Delft3D and 3D SPH **planned** |
+| (ii) Custom framework, any dataset | New site = one JSON definition; open data fetched automatically; custom DEM and population | **Live** |
+| (iii) Dashboard, .shp / .kml | MapLibre dashboard with timeline; .shp, .kml, GeoTIFF, CSV, CAP-structured alert | **Live** |
+| (iv) Near-real-time via Google Earth Engine | Sentinel-1 SAR / Sentinel-2 module with tests | **Built, being wired in** |
+| (v) Indian river and dam | Annamayya 2021 (Cheyyeru, AP): complete 2D run driven by reported discharges | **Live** |
+
+Verification: **287/287** automated tests passing · Ritter dam-break RMSE **0.043 m** · lake at rest held to **1.8 × 10⁻¹⁴ m/s** · Annamayya mass closure **8 × 10⁻⁷** · an 8-hour Annamayya event in **144 s** on a laptop CPU (152 m grid).
 
 ---
 
 ## Table of Contents
 
 - [Executive Summary & Problem Statement](#executive-summary--problem-statement)
-- [What Makes FloodSight Different](#what-makes-floodsight-different)
+- [What Makes FloodSense Different](#what-makes-floodsense-different)
 - [System Architecture & Pipelines](#system-architecture--pipelines)
   - [End-to-End Execution Flowchart](#end-to-end-execution-flowchart)
   - [Physical State Continuity & Event Cascade Lifecycle](#physical-state-continuity--event-cascade-lifecycle)
@@ -48,7 +60,7 @@ A rapid consequence-assessment engine for **unmapped impoundments** — landslid
 
 ## Executive Summary & Problem Statement
 
-In India, statutory dam safety frameworks (NDSA / CWC) focus on **6,628 specified, engineered dams** documented in the National Register of Large Dams. Emergency Action Plans (EAPs) and inundation maps exist for known assets.
+In India, statutory dam safety frameworks (NDSA / CWC) focus on **6,628 specified, engineered dams** documented in the National Register of Large Dams. Even for these, Emergency Action Plans cover only 735 of 6,598 operational dams (Ministry of Jal Shakti, Rajya Sabha, 3 Aug 2026).
 
 However, recent catastrophic disasters highlight an unaddressed vulnerability:
 1. **Landslide dams** (e.g., Phutkal River 2015) that form suddenly in narrow gorges and breach weeks later.
@@ -56,20 +68,20 @@ However, recent catastrophic disasters highlight an unaddressed vulnerability:
 3. **Rock-ice avalanches** triggering cascading river reach blockages and infrastructure destruction (e.g., Rishi Ganga / Tapovan 2021).
 4. **Cascading multi-reservoir breaches** where an unmonitored upstream structure overwhelms downstream spillways (e.g., Pincha $\to$ Annamayya 2021).
 
-**FloodSight** replaces months of specialized hydraulic modeling with an **automated 20-minute pipeline** built exclusively from open data. Given an arbitrary river coordinate or lake bounding box, it reconstructs the impoundment, models the breach physics, executes high-order 2D hydrodynamic routing, dynamic road-network graph cuts, and delivers an emergency evacuation priority schedule directly to disaster responders.
+**FloodSense** replaces months of specialized hydraulic modeling with an **automated pipeline that runs in minutes on a laptop CPU**, built exclusively from open data. Given an arbitrary river coordinate or lake bounding box, it reconstructs the impoundment, models the breach physics, executes high-order 2D hydrodynamic routing, dynamic road-network graph cuts, and delivers an emergency evacuation priority schedule directly to disaster responders.
 
 ---
 
-## What Makes FloodSight Different
+## What Makes FloodSense Different
 
-| Capability | RBSD (C-DAC / NDSA) | C-FLOOD (CWC) | **FloodSight (SIH26161)** |
+| Capability | RBSD (C-DAC / NDSA) | C-FLOOD (CWC) | **FloodSense (SIH26161)** |
 |---|---|---|---|
 | **Coverage** | 6,628 specified dams | 3 designated river basins | **Any unmapped impoundment, landslide dam, or moraine lake** |
 | **Breach Ensemble** | Single deterministic curve | N/A | **Froehlich + Von Thun + MacDonald $\to$ 3-arm confidence bounds** |
 | **Cascading Failures** | ❌ | ❌ | **✅ Muskingum routing $\to$ downstream reservoir $\to$ dynamic trigger breach** |
 | **Road Isolation Over Time** | ❌ | ❌ | **✅ Dynamic graph cuts per timestep against water depth rasters** |
 | **Evacuation Window** | Static arrival time only | Static arrival time only | **✅ $\Delta T_{\text{evac}} = T_{\text{arrival}} - T_{\text{isolation}}$ per settlement** |
-| **Satellite Integration** | Limited offline GIS | Limited | **Sentinel-1 SAR + Sentinel-2 NDWI via Google Earth Engine** |
+| **Satellite Integration** | Limited offline GIS | Limited | **Sentinel-1 SAR + Sentinel-2 NDWI module for Google Earth Engine (built; pipeline hook in progress)** |
 | **Hydrodynamic Scheme** | Commercial (HEC-RAS / MIKE) | Hydrodynamic 1D/2D | **From-scratch 2D well-balanced SWE (Audusse FV + MUSCL + SSP-RK2)** |
 | **Active-Window Optimization** | Full domain grid | Full domain grid | **Bit-for-bit exact speedup on wetted bounding box + 6-cell halo** |
 | **Validation Transparency** | Not publicly available | Internal reports | **CSI / POD / FAR / Bias against Copernicus EMS & Global Flood DB** |
@@ -135,7 +147,7 @@ flowchart TD
 
 ### Physical State Continuity & Event Cascade Lifecycle
 
-FloodSight models impoundment failures as continuous physical transitions, maintaining machine-precision mass conservation ($\Delta \text{Mass} \approx 1.44 \times 10^{-16}$) across stages:
+FloodSense models impoundment failures as continuous physical transitions, maintaining machine-precision mass conservation ($\Delta \text{Mass} \approx 1.44 \times 10^{-16}$) across stages:
 
 ```mermaid
 stateDiagram-v2
@@ -157,7 +169,7 @@ stateDiagram-v2
 
 ### Time-Varying Road Network Isolation & Evacuation Window
 
-Unlike traditional inundation models that only calculate when water reaches a town center, FloodSight's Module 6 tracks the **lifeline road connectivity**:
+Unlike traditional inundation models that only calculate when water reaches a town center, FloodSense's Module 6 tracks the **lifeline road connectivity**:
 
 ```mermaid
 sequenceDiagram
@@ -179,17 +191,17 @@ sequenceDiagram
 
 ## Preconfigured Real-World Scenarios
 
-FloodSight ships with **7 calibrated real-world scenarios** spanning 4 countries and diverse failure modes:
+FloodSense ships with **7 configured real-world scenarios** spanning 4 countries and diverse failure modes:
 
 | Scenario Key | Event & Location | Dam Height | Impounded Volume | Event Type & Key Mechanics | Validation Status |
 |---|---|---|---|---|---|
-| `phutkal` | **Phutkal River Landslide Dam (2015)**<br>Zanskar, Ladakh, India 🇮🇳 | 58 m | 30.0 MCM | Massive rockslide impounding a 15 km canyon lake; narrow mountain gorge routing. | Benchmark Case |
-| `rishiganga` | **Chamoli Avalanche Cascade (2021)**<br>Uttarakhand, India 🇮🇳 | 70 m | 15.0 MCM | Hanging glacier & rock collapse $\to$ debris flood $\to$ Tapovan Vishnugad NTPC HEP cascade. | Operational Case |
-| `south_lhonak` | **South Lhonak GLOF (2023)**<br>Sikkim, India 🇮🇳 | 60 m | 50.0 MCM | Moraine-dammed lake outburst $\to$ 42 km torrent $\to$ Chungthang Dam (Teesta III) destruction. | Cascade Case |
-| `annamayya` | **Annamayya Dam Failure (2021)**<br>Andhra Pradesh, India 🇮🇳 | 26 m | 63.4 MCM | Upstream Pincha ring-bund failure $\to$ 34 km surge $\to$ jammed spillway gates $\to$ earthen bund collapse. | Hydrodynamic Case |
-| `derna` | **Derna Twin Dam Breaches (2023)**<br>Wadi Derna, Libya 🇱🇾 | 74 m | 22.5 MCM | Storm Daniel $\to$ Abu Mansour collapse $\to$ Al-Bilad overtopping $\to$ catastrophic city devastation. | **Primary Validation**<br>(Copernicus EMSR696) |
-| `malpasset` | **Malpasset Arch Dam Failure (1959)**<br>Var, France 🇫🇷 | 66.5 m | 50.0 MCM | Arch dam foundation slide; classic high-velocity wave benchmark across physical gauge stations. | **Analytical & Gauge Benchmark** |
-| `ivanovo` | **Ivanovo Dam Break (2012)**<br>Biser, Bulgaria 🇧🇬 | 16 m | 2.5 MCM | Earthen dam break with verified satellite flood footprints. | **Global Flood DB Benchmark** |
+| `phutkal` | **Phutkal River Landslide Dam (2015)**<br>Zanskar, Ladakh, India 🇮🇳 | 58 m | 30.0 MCM | Massive rockslide impounding a 15 km canyon lake; narrow mountain gorge routing. | Runs end to end; fails pool-level gate G4 |
+| `rishiganga` | **Chamoli Avalanche Cascade (2021)**<br>Uttarakhand, India 🇮🇳 | 70 m | 15.0 MCM | Hanging glacier & rock collapse $\to$ debris flood $\to$ Tapovan Vishnugad NTPC HEP cascade. | Debris flow: refused by the flow-regime gate |
+| `south_lhonak` | **South Lhonak GLOF (2023)**<br>Sikkim, India 🇮🇳 | 60 m | 50.0 MCM | Moraine-dammed lake outburst $\to$ 42 km torrent $\to$ Chungthang Dam (Teesta III) destruction. | Two structures; compound-event path pending |
+| `annamayya` | **Annamayya Dam Failure (2021)**<br>Andhra Pradesh, India 🇮🇳 | 26 m | 63.4 MCM | Upstream Pincha ring-bund failure $\to$ 34 km surge $\to$ jammed spillway gates $\to$ earthen bund collapse. | Complete 2D run, driven by reported discharges |
+| `derna` | **Derna Twin Dam Breaches (2023)**<br>Wadi Derna, Libya 🇱🇾 | 74 m | 22.5 MCM | Storm Daniel $\to$ Abu Mansour collapse $\to$ Al-Bilad overtopping $\to$ catastrophic city devastation. | Validation case (Copernicus EMSR696); currently fails the terrain gate |
+| `malpasset` | **Malpasset Arch Dam Failure (1959)**<br>Var, France 🇫🇷 | 66.5 m | 50.0 MCM | Arch dam foundation slide; classic high-velocity wave benchmark across physical gauge stations. | Numerical benchmark; currently fails the terrain gate |
+| `ivanovo` | **Ivanovo Dam Break (2012)**<br>Biser, Bulgaria 🇧🇬 | 16 m | 2.5 MCM | Earthen dam break. | Numerical test only; no verified observation on record |
 
 ---
 
@@ -353,11 +365,11 @@ Every metric rendered on the dashboard or exported carries an immutable provenan
 
 ## Benchmark Results & Solver Verification
 
-All builds are validated against 241 unit and physics tests (`pytest tests/ -v`):
+All builds are checked by 287 unit and physics tests (`pytest tests/ -v`):
 
 | Benchmark Case | Physical Test | Target Tolerance | Measured Result | Status |
 |---|---|---|---|---|
-| **Lake-at-Rest** | Spurious velocity over steep bathymetry | $= 0.0\,\text{m/s}$ | **0.0 m/s** | ✅ Passed |
+| **Lake-at-Rest** | Spurious velocity over steep bathymetry | $= 0.0\,\text{m/s}$ | **1.8 × 10⁻¹⁴ m/s** | ✅ Passed |
 | **Lake-at-Rest** | Free-surface elevation drift (10 min) | $= 0.0\,\text{m}$ | **0.0 m** | ✅ Passed |
 | **Conical Bowl** | Mass balance closure | $< 1.0\%$ | **< 0.1%** | ✅ Passed |
 | **Ritter Dam-Break** | Depth RMSE vs Analytical Solution | $< 0.10\,\text{m}$ | **0.043 m** | ✅ Passed |
@@ -523,7 +535,7 @@ floodsight/
 │   ├── charts.js                # Plotly hydrographs & benchmark plots
 │   └── styles.css               # Glassmorphic dark command-center theme
 │
-├── tests/                       # 241 regression & physical test suites
+├── tests/                       # 287 regression & physical tests
 ├── data/                        # Scenario caches, DEMs, boundaries & validation sets
 └── docs/                        # Forensic audits, architectural blueprints & logs
 ```
@@ -561,7 +573,7 @@ floodsight/
 - **No satellite observed the Annamayya flood.** Sentinel-1's only footprint over the reach acquired 16 Nov and 28 Nov — the event sits in a 12-day gap — and Sentinel-2 passed 4 h after the breach into 98.7% cloud. No CSI or POD is quoted for it, and the map's purple layer is a **reported-depth-anchored reconstruction**, never served as an observation.
 - **Annamayya's dam is not in the DEM.** GLO-30 here is a DSM captured with the reservoir full: a flat 192.50 m water plane against a 206.0 m crest, 25.1 km of valley against a 366 m dam footprint. No coordinate or footprint edit fixes this, which is why the scenario is routed rather than breached.
 - **No debris or sediment physics exists anywhere.** Debris-flow scenarios (Rishi Ganga) fail the flow-regime gate rather than being modelled with clear-water equations and presented as results.
-- **Compound Meteorological Events:** Derna 2023 was a compound disaster where extreme rainfall (150–240 mm over 476 $km^2$) accompanied the dam breach. FloodSight models the breach volume (23.7 MCM) rather than the entire 39 MCM rainfall runoff. We state this ceiling honestly rather than inflating scores with synthetic rain.
+- **Compound Meteorological Events:** Derna 2023 was a compound disaster where extreme rainfall (150–240 mm over 476 $km^2$) accompanied the dam breach. FloodSense models the breach volume (23.7 MCM) rather than the entire 39 MCM rainfall runoff. We state this ceiling honestly rather than inflating scores with synthetic rain.
 - **DEM Resolution in Extreme Gorges:** 30-meter DEMs (GLO-30) introduce $\approx 10-20\%$ volume uncertainty in steep canyons. The pipeline flags these bounds explicitly.
 - **Sparse Himalayan Road Networks:** In remote regions like Zanskar (Phutkal), mapped road networks are naturally sparse; isolation algorithms honestly report "No road egress found" rather than hallucinating roads.
 - **GPU Acceleration Hardware Bound:** The CuPy GPU solver (`swe_2d_gpu.py`) requires float64 precision to maintain well-balanced hydrostatic cancellation. On entry-level GPUs with low FP64 throughput, the windowed CPU solver remains faster.
@@ -582,7 +594,7 @@ floodsight/
 | **(ii) Customizable open-source framework** | `data/scenarios_def/` + `scripts/new_dam.py` | ✅ A new dam is registered from a JSON definition with no code change; the geometry manifest is authored and gated automatically. |
 | **(iii) Interactive dashboard + Shapefile + KML** | `frontend/` + `m8_outputs/exporters.py` | ✅ MapLibre dashboard, ESRI Shapefile (with a `_fields.json` recording 10-character truncations), KML, and a CAP-conformant alert payload, each carrying a provenance block. |
 | **(iv) GEE near-real-time integration** | `src/gee_satellite.py` | ❌ **Framework present, NOT WIRED.** The module and its tests are real, but nothing in the pipeline calls it and there is no credentialed Earth Engine account. The frontend's "SAR (GEE)" toggle was **removed** because its map source was a permanently empty FeatureCollection. |
-| **(v) Demonstration on Indian river/dam events** | Annamayya (routed), Phutkal, Rishi Ganga, South Lhonak | ⚠️ **Partial.** One complete, artifact-backed, mass-conserving Indian run — `annamayya_stage2_wide` — and it is an explicitly labelled **forced-hydrograph inundation**, not a dam break: the release is prescribed from sourced figures, `impoundment_modelled: false`. **Four of the six events named in the problem statement have no scenario** (Kosi, Kashmir 2014, Assam 2014, and "Wapriyang", which resolves to no identifiable river or dam in any source). |
+| **(v) Demonstration on Indian river/dam events** | Annamayya (routed), Phutkal, Rishi Ganga, South Lhonak | ⚠️ **Partial.** One complete, artifact-backed, mass-conserving Indian run — `annamayya_stage2_wide` — and it is an explicitly labelled **forced-hydrograph inundation**, not a dam break: the release is prescribed from sourced figures, `impoundment_modelled: false`. **Four of the six events named in the problem statement have no scenario** (Kosi, Kashmir 2014, Assam 2014, and "Wapriyang", identified on 2026-09-24 as the Warriyang / Wapra Bung in the Kameng basin, Arunachal Pradesh: a landslide debris flow, which the clear-water solver refuses by design). |
 
 ---
 
@@ -596,4 +608,4 @@ floodsight/
 
 ---
 
-*FloodSight · SIH26161 · Sponsor: NTRO · Theme: Disaster Management*
+*FloodSense · SIH26161 · Sponsor: NTRO · Theme: Disaster Management*

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>FloodSight — dam-break flood simulator</title>
-  <meta name="description" content="FloodSight: dam-break flood simulator for landslide dams and unmapped impoundments. Validated 2D shallow-water solver. SIH26161." />
+  <title>FloodSense — dam-break flood simulator</title>
+  <meta name="description" content="FloodSense: dam-break flood simulator for landslide dams and unmapped impoundments. Validated 2D shallow-water solver. SIH26161." />
 
   <link href="maplibre-gl.css" rel="stylesheet" />
   <script src="maplibre-gl.js"></script>
@@ -116,7 +116,7 @@
         </svg>
         <div class="brand-text">
           <div class="brand-title-row">
-            <h1>FloodSight</h1>
+            <h1>FloodSense</h1>
             <span class="live-pill"><span class="live-dot"></span>SIMULATOR</span>
           </div>
           <p>Dam-break flood simulator</p>
@@ -586,7 +586,7 @@
 <div id="tab-compare-panel" class="page hidden">
   <div class="page-head">
     <h2>Solvers</h2>
-    <p>FloodSight runs a 2D finite-volume shallow-water solver. It is checked against the Ritter
+    <p>FloodSense runs a 2D finite-volume shallow-water solver. It is checked against the Ritter
        analytical dam-break solution and a mass-closure ledger. Its lake-at-rest benchmark is
        currently passing on a configuration where the lake drains off the domain edge, and a
        lake bounded by dry terrain does <em>not</em> stay at rest &mdash; so treat depths near a
@@ -596,7 +596,7 @@
   <div class="page-grid">
     <article class="card page-card">
       <p class="card-kicker">Runs on every simulation</p>
-      <h3>FloodSight 2D SWE</h3>
+      <h3>FloodSense 2D SWE</h3>
       <p>Audusse hydrostatic reconstruction, MUSCL with minmod, SSP-RK2,
          Kurganov&ndash;Petrova desingularisation. Checked on lake-at-rest, mass closure,
          Ritter RMSE, wave speed and front location.</p>
@@ -659,7 +659,7 @@
   <section class="page-section" style="margin-top: 24px;">
     <p class="card-kicker" style="color: var(--water); font-family: var(--font-mono); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px;">Canonical Field Benchmark (Zero Rain)</p>
     <h3>Malpasset 1959 Dam Break Benchmark</h3>
-    <p>The textbook real-world dam break validation case (Reyran Valley, France). Catastrophic arch dam failure (66.5 m, 50 Mm³ reservoir) into a dry rocky canyon. Zero rainfall contamination. FloodSight 2D SWE simulated wave arrival times and peak elevations are compared against recorded electrical transformer destruction and police survey marks.</p>
+    <p>The textbook real-world dam break validation case (Reyran Valley, France). Catastrophic arch dam failure (66.5 m, 50 Mm³ reservoir) into a dry rocky canyon. Zero rainfall contamination. FloodSense 2D SWE simulated wave arrival times and peak elevations are compared against recorded electrical transformer destruction and police survey marks.</p>
 
     <div class="page-grid" style="margin-top: 14px;">
       <article class="card page-card">
@@ -754,7 +754,7 @@
         <!-- OUT-OF-SCOPE-NON-INDIAN: Derna is out of scope, so this caveat no longer applies to any
              selectable scenario. Restore it with the scenario.
         <li>Derna 2023 was a compound event. Rain drove part of the observed flood and
-            FloodSight routes only the dam break, so its score cannot reach 1.</li>
+            FloodSense routes only the dam break, so its score cannot reach 1.</li>
         -->
         <li>Roughness is inferred from population density, not land cover.</li>
         <li>Only the middle breach estimate is carried through to roads and people.</li>

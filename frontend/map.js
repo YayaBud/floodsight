@@ -2775,12 +2775,12 @@ function _populateAlertPanels(rankedFeatures, damName, hyd) {
   if (capEl) capEl.textContent = JSON.stringify({
     alert: {
       identifier: `FLOODSIGHT-${now}`,
-      sender: "FloodSight / SIH26161",
+      sender: "FloodSense / SIH26161",
       sent: now,
       status: "Exercise",
       msgType: "Alert",
       scope: "Restricted",
-      note: "NOT TRANSMITTED — FloodSight output for responder planning only",
+      note: "NOT TRANSMITTED — FloodSense output for responder planning only",
       info: {
         language: "en-IN",
         category: "Flood",

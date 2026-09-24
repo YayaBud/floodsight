@@ -117,7 +117,7 @@ The problem statement names six events.
 | Kosi river — 2008 | **none** | No scenario. `data/validation/gfd_dam/DFO_3382_From_20080922_to_20080929.tif` (39 MB, Global Flood Database / DFO, Tellman et al. 2021, CC BY-NC 4.0) **is already on disk** and is the shortest path to the first real Indian observation. Needs: a DEM AOI, an OSM river extract, a breach coordinate, and a geometry manifest with a sourced `crest_elev_m`. |
 | Kashmir Valley — 2014 | **none** | no scenario, no data on disk |
 | Assam — 2014 | **none** | no scenario, no data on disk |
-| "Wapriyang river" — Nov 2021 | **none** | **The event could not be identified from any source.** No river or dam of this name resolves. The closest Indian dam failure in November 2021 is Annamayya/Cheyyeru (19 Nov 2021), which is a different name and is already a separate scenario. **Nothing has been built for this entry, deliberately** — building a scenario for an unidentified place would be fabrication. This needs clarification from the problem-statement author. |
+| "Wapriyang river" — Nov 2021 | **none** | **Identified 2026-09-24** (earlier "could not be identified" was wrong): Warriyang Bung / Wapra Bung, a Kameng tributary in East Kameng, Arunachal Pradesh. A landslide on a glaciated slope caused debris flows on 29 Oct and 31 Oct–4 Nov 2021, silting the Kameng; radar showed no lake by 7 Nov (Arunachal Times, 10 Nov 2021; AGU Landslide Blog, 1 Nov 2021). It is a **debris flow**, which the clear-water solver refuses by design — out of scope for physics reasons, not for lack of identification. |
 
 **Four of six named events have no scenario. Of the two that do, neither
 currently produces a valid run.**
