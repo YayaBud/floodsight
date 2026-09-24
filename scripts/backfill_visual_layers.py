@@ -41,8 +41,7 @@ from src.run_manifest import (is_valid, load_manifest,             # noqa: E402
                               register_artifact, write_manifest)
 from src.rasterutils import sample_raster                          # noqa: E402
 from src.m6_isolation.isolation import (                            # noqa: E402
-    THRESH_CAR, compute_isolation_times, edge_midpoints,
-    emit_road_cut_timeline)
+    THRESH_CAR, compute_isolation_times, edge_cut_times, emit_road_cut_timeline)
 
 RUNS = ROOT / "data" / "scenarios"
 COMPOUND = RUNS / "annamayya_compound"
@@ -51,16 +50,6 @@ DEM_PATH = ROOT / "data" / "dem" / "annamayya_dem.tif"
 ROADS_GRAPHML = ROOT / "data" / "roads" / "annamayya_roads.graphml"
 EVIDENCE = ROOT / "data" / "evidence" / "annamayya_event_evidence.json"
 
-# Per-highway-class default speed [km/h], used only where the road graph
-# carries neither `travel_time` nor `speed_kph` -- which, measured on
-# `annamayya_roads.graphml`, is every one of its 5,299 edges. These are the
-# conventional OSRM/OSMnx car-profile defaults for Indian/generic OSM
-# `highway` tags; documented here rather than silently defaulted per-edge.
-DEFAULT_SPEED_KPH = {
-    "trunk": 60.0, "primary": 50.0, "secondary": 40.0, "tertiary": 30.0,
-    "unclassified": 25.0, "residential": 20.0, "living_street": 10.0,
-}
-FALLBACK_SPEED_KPH = 20.0  # unrecognised highway tag
 
 
 def _sha256(path: Path) -> str:
@@ -229,187 +218,39 @@ def build_isolation(run_dir: Path, raster_stack: list[tuple[float, Path]]):
 # (c) evac_routes.geojson
 # ─────────────────────────────────────────────────────────────────────────────
 
-def _edge_speed_kph(data: dict) -> float:
-    sp = data.get("speed_kph")
-    if sp:
-        try:
-            return float(sp[0] if isinstance(sp, list) else sp)
-        except (TypeError, ValueError):
-            pass
-    hw = data.get("highway")
-    hw = hw[0] if isinstance(hw, list) else hw
-    return DEFAULT_SPEED_KPH.get(hw, FALLBACK_SPEED_KPH)
-
-
 def build_evac_routes(run_dir: Path) -> Path:
+    """Time-aware evacuation routes, both modes -- see src/m6_isolation/evacuation.py."""
     import geopandas as gpd
-    import networkx as nx
     import osmnx as ox
+    from src.m6_isolation.evacuation import (never_wet_nodes, route_settlements,
+                                             shelters_from_gdf)
 
-    G = ox.load_graphml(ROADS_GRAPHML)  # WGS84, uncut -- route on the full network
-
-    # Fill missing travel_time from length + (edge travel_time, else speed_kph,
-    # else per-highway-class default). Measured: every edge in this graph is
-    # missing both travel_time and speed_kph, so the per-class default carries
-    # the whole routing -- documented above, not silently applied.
-    for u, v, k, data in G.edges(keys=True, data=True):
-        tt = data.get("travel_time")
-        if tt:
-            continue
-        length_m = float(data.get("length", 0.0))
-        speed_kph = _edge_speed_kph(data)
-        data["travel_time"] = length_m / max(speed_kph, 1e-6) / 1000.0 * 3600.0
-
-    with rasterio.open(run_dir / "max_depth.tif") as src:
-        max_depth = src.read(1).astype(float)
-        md_transform, md_crs, md_nodata = src.transform, src.crs, src.nodata
-    if md_nodata is not None:
-        max_depth = np.where(max_depth == md_nodata, 0.0, max_depth)
-
-    to_wgs84 = Transformer.from_crs(md_crs, "EPSG:4326", always_xy=True).transform
-    to_raster = Transformer.from_crs("EPSG:4326", md_crs, always_xy=True).transform
-
-    G_undirected = G.to_undirected()
-
-    # Safe nodes: dry (< THRESH_CAR) in max_depth.tif everywhere across the
-    # whole run, i.e. never wetted. max_depth.tif IS the run's own max-over-time
-    # depth, so sampling it once is exactly "outside every flooded cell for the
-    # whole run".
-    node_ids = list(G.nodes)
-    node_lons = np.array([G.nodes[n]["x"] for n in node_ids])
-    node_lats = np.array([G.nodes[n]["y"] for n in node_ids])
-    nx_r, ny_r = to_raster(node_lons, node_lats)
-    node_depths = sample_raster(max_depth, md_transform, np.asarray(nx_r), np.asarray(ny_r))
-    safe_nodes = {n for n, d in zip(node_ids, node_depths) if d < THRESH_CAR}
-    _log(f"evac_routes: {len(safe_nodes)}/{len(node_ids)} road nodes are safe "
-         f"(< {THRESH_CAR} m for the whole run)")
-
-    roads_timeline_path = run_dir / "roads_timeline.geojson"
-    roads_timeline = json.loads(roads_timeline_path.read_text(encoding="utf-8"))
-    # Per-edge earliest cut time, keyed by (highway, rounded midpoint) is fragile;
-    # instead key by osmid + endpoints is not available on the timeline feature
-    # set either. Build a per-edge-geometry index using the same edge_keys order
-    # emit_road_cut_timeline iterated, by re-deriving cut times directly rather
-    # than re-parsing the GeoJSON: cheaper and exact.
-    with rasterio.open(run_dir / "depth_rasters" / "depth_000.tif") as s0:
-        flood_crs = s0.crs
-    G_proj = ox.project_graph(G, to_crs=flood_crs)
-    edge_keys, exs, eys, is_bridge = edge_midpoints(G_proj)
+    G = ox.load_graphml(ROADS_GRAPHML)
     raster_stack = verified_raster_stack(run_dir)
-    cut_time_s = np.full(len(edge_keys), np.nan)
-    for t_s, raster_path in raster_stack:
-        with rasterio.open(raster_path) as src:
-            depth_arr = src.read(1).astype(float)
-            tr = src.transform
-        depths = sample_raster(depth_arr, tr, exs, eys)
-        eff_thresh = np.where(is_bridge, 3.0, THRESH_CAR)
-        newly = (depths >= eff_thresh) & np.isnan(cut_time_s)
-        cut_time_s[newly] = t_s
-    edge_cut_min = {ek: (None if np.isnan(cut_time_s[i]) else float(cut_time_s[i]) / 60.0)
-                    for i, ek in enumerate(edge_keys)}
+    _, edge_keys, cut_s, _ = edge_cut_times(G, raster_stack, THRESH_CAR, spacing_m=25.0)
+    cut_min = {ek: (None if np.isnan(c) else float(c) / 60.0) for ek, c in zip(edge_keys, cut_s)}
+    never_wet = never_wet_nodes(G, run_dir / "max_depth.tif", THRESH_CAR)
 
     vg = gpd.read_file(run_dir / "results.geojson")
-    vg_ranked = vg[vg["priority_rank"].notna()].sort_values("priority_rank")
+    vg = vg[vg["priority_rank"].notna()].sort_values("priority_rank")
+    settlements = [{"village_id": r["village_id"], "village_name": r["village_name"],
+                    "priority_rank": int(r["priority_rank"]), "lon": float(r["lon"]),
+                    "lat": float(r["lat"]),
+                    "water_arrival_min": None if r.get("water_arrival_min") is None
+                    or np.isnan(r["water_arrival_min"]) else float(r["water_arrival_min"])}
+                   for _, r in vg.iterrows()]
 
-    # `ox.nearest_nodes` on an unprojected (WGS84) graph needs scikit-learn,
-    # which is not installed here. `isolation.py` avoids the same dependency by
-    # projecting first and searching on the metric graph (see its
-    # `G_metric`/`vg_metric` pattern) -- reused here rather than adding a
-    # dependency for what a projected KD-tree search already avoids.
-    G_metric = ox.project_graph(G)
-    metric_crs = G_metric.graph["crs"]
-    vg_metric = vg_ranked.to_crs(metric_crs)
-    cent_metric = vg_metric.geometry.centroid
-    cent_nodes = ox.nearest_nodes(G_metric, cent_metric.x.to_numpy(), cent_metric.y.to_numpy())
+    fac = gpd.read_file(ROOT / "data" / "admin" / "annamayya_facilities.geojson")
+    shelters = shelters_from_gdf(fac, run_dir / "max_depth.tif", THRESH_CAR)
 
-    features = []
-    unreachable = []
-    for (_, row), origin in zip(vg_ranked.iterrows(), cent_nodes):
-        vid, vname = row["village_id"], row["village_name"]
-        rank = int(row["priority_rank"])
-        water_arrival = row.get("water_arrival_min")
-        water_arrival = None if water_arrival is None or (isinstance(water_arrival, float)
-                                                            and np.isnan(water_arrival)) else float(water_arrival)
-
-        # Shortest path (by travel_time) from origin to the nearest reachable
-        # safe node, on the UNCUT graph.
-        try:
-            lengths = nx.single_source_dijkstra_path_length(G_undirected, origin, weight="travel_time")
-        except nx.NodeNotFound:
-            unreachable.append({"village_id": vid, "village_name": vname,
-                                "reason": "origin node not found in road graph"})
-            continue
-        reachable_safe = [n for n in safe_nodes if n in lengths]
-        if not reachable_safe:
-            unreachable.append({"village_id": vid, "village_name": vname,
-                                "reason": "no safe node reachable on the road graph"})
-            continue
-        dest = min(reachable_safe, key=lambda n: lengths[n])
-        path_nodes = nx.dijkstra_path(G_undirected, origin, dest, weight="travel_time")
-
-        # For each hop, use the parallel edge Dijkstra would have used: the one
-        # with minimum travel_time (a MultiGraph shortest path resolves
-        # parallel edges this way internally without exposing the key).
-        def _best_parallel(a, b):
-            parallel = G_undirected.get_edge_data(a, b)  # {key: data, ...}
-            return min(parallel.values(), key=lambda d: d.get("travel_time", float("inf")))
-
-        travel_min = lengths[dest] / 60.0
-        length_km = sum(_best_parallel(a, b).get("length", 0.0)
-                        for a, b in zip(path_nodes[:-1], path_nodes[1:])) / 1000.0
-
-        # route_cut_min = earliest cut time among the route's own edges.
-        cuts = []
-        for a, b in zip(path_nodes[:-1], path_nodes[1:]):
-            found = None
-            for u2, v2, k2 in edge_cut_min:
-                if {u2, v2} == {a, b}:
-                    val = edge_cut_min[(u2, v2, k2)]
-                    if val is not None and (found is None or val < found):
-                        found = val
-            if found is not None:
-                cuts.append(found)
-        route_cut_min = min(cuts) if cuts else None
-
-        status_note = ""
-        if len(path_nodes) < 2:
-            status_note = "village's nearest road node is itself never wetted in this run"
-        elif route_cut_min is not None and water_arrival is not None and route_cut_min < water_arrival:
-            status_note = "route cut before water arrives at the village"
-
-        coords = [[round(G.nodes[n]["x"], 6), round(G.nodes[n]["y"], 6)] for n in path_nodes]
-        if len(coords) < 2:
-            # origin IS the nearest safe node (distance 0 is always the
-            # Dijkstra minimum when the origin qualifies) -- a real, computed
-            # zero-length route, not a routing failure. Duplicate the single
-            # point so the LineString stays valid GeoJSON (>=2 positions);
-            # length_km/travel_min are correctly 0.0.
-            coords = coords * 2
-        features.append({
-            "type": "Feature",
-            "geometry": {"type": "LineString", "coordinates": coords},
-            "properties": {
-                "village_id": vid, "village_name": vname, "priority_rank": rank,
-                "dest_node": str(dest), "dest_lon": round(G.nodes[dest]["x"], 6),
-                "dest_lat": round(G.nodes[dest]["y"], 6),
-                "length_km": round(length_km, 3), "travel_min": round(travel_min, 1),
-                "route_cut_min": None if route_cut_min is None else round(route_cut_min, 1),
-                "water_arrival_min": water_arrival, "status_note": status_note,
-                "provenance": ("Shortest path by travel_time on the uncut OSM road graph "
-                              "(annamayya_roads.graphml) from the village centroid's nearest "
-                              "road node to the nearest node never wetted above "
-                              f"{THRESH_CAR} m in this run's own max_depth.tif. Edge travel "
-                              "time uses the graph's own travel_time/speed_kph where present, "
-                              "else a per-highway-class default speed (documented in "
-                              "backfill_visual_layers.py::DEFAULT_SPEED_KPH) -- this graph "
-                              "carries neither on any of its edges."),
-            },
-        })
-
-    out = {"type": "FeatureCollection", "features": features, "unreachable": unreachable}
+    t_lo, t_hi = raster_stack[0][0] / 60.0, raster_stack[-1][0] / 60.0
+    out = route_settlements(G, cut_min, never_wet, settlements, shelters, t_lo, t_hi)
     out_path = run_dir / "evac_routes.geojson"
-    out_path.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
-    _log(f"evac_routes: {len(features)} routes, {len(unreachable)} unreachable")
+    out_path.write_text(json.dumps(out, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+    n0 = sum(1 for r in out["settlements"] if r["origin_on_mainland"])
+    _log(f"evac_routes: {len(out['features'])} route variants for {len(settlements)} settlements; "
+         f"mainland {out['mainland_nodes']} nodes, {out['shelters_on_mainland']} shelters on it; "
+         f"{n0} settlements already on the dry mainland")
     return out_path
 
 

@@ -3572,7 +3572,13 @@ function renderPriorityList(features) {
         <div class="p-score-col">
           <span class="p-score">${fmtFixed(p.priority_score)}</span>
           <div class="p-score-bar"><div class="p-score-fill" style="width:${scoreW}%"></div></div>
-          <span class="p-window">win: ${fmtWin(p.evacuation_window_min)}</span>
+          <span class="p-window" title="Latest departure that still reaches dry ground on foot (typical speeds)">${(() => {
+            const sm = _evacSummary(p.village_id);
+            if (!sm) return "win: " + fmtWin(p.evacuation_window_min);
+            const m = sm.modes.foot;
+            return m.status === "open" ? "road stays dry" : m.status === "none" ? "no way out"
+              : "leave by T+" + Math.round(+m.leave_by_min);
+          })()}</span>
         </div>
       </div>
     `;
@@ -4931,6 +4937,15 @@ let evacRouteMarkers = [];
 // the same pattern `roads-bridge-cut` already uses for the same reason.
 function _addEvacRoutesLayer() {
   map.addSource("evac-routes", { type: "geojson", data: { type: "FeatureCollection", features: [] } });
+  // Dark casing so a route reads as its own layer, not as another road colour
+  // (amber would otherwise match the "cut soon" road ramp).
+  map.addLayer({
+    id: "evac-routes-casing",
+    type: "line",
+    source: "evac-routes",
+    layout: { "line-join": "round", "line-cap": "round" },
+    paint: { "line-color": "#0b1220", "line-width": 8, "line-opacity": 0.85 },
+  });
   map.addLayer({
     id: "evac-routes-line",
     type: "line",
@@ -4938,8 +4953,8 @@ function _addEvacRoutesLayer() {
     filter: ["!=", ["get", "route_status"], "lost"],
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
-      "line-color": ["match", ["get", "route_status"], "amber", "#f59e0b", "#10b981"],
-      "line-width": 3,
+      "line-color": ["match", ["get", "route_status"], "amber", "#f59e0b", "#22c55e"],
+      "line-width": 4.5,
       "line-opacity": 0.9,
     },
   });
@@ -4950,8 +4965,8 @@ function _addEvacRoutesLayer() {
     filter: ["==", ["get", "route_status"], "lost"],
     layout: { "line-join": "round", "line-cap": "round" },
     paint: {
-      "line-color": "#64748b",
-      "line-width": 3,
+      "line-color": "#94a3b8",
+      "line-width": 4,
       "line-dasharray": [2, 1.5],
       "line-opacity": 0.85,
     },
@@ -4971,20 +4986,36 @@ function _addEvacRoutesLayer() {
   }
 }
 
+// Settlement summary from evac_routes.geojson (leave-by per mode, access distance).
+function _evacSummary(villageId) {
+  const rows = (evacRoutesGeoJSON && evacRoutesGeoJSON.settlements) || [];
+  return rows.find((r) => r.village_id === villageId) || null;
+}
+function _leaveByTxt(m) {
+  if (!m) return "—";
+  if (m.status === "open") return "open all run";
+  if (m.status === "none") return "no way out";
+  return "T+" + Math.round(+m.leave_by_min) + " min";
+}
+
 function _evacRoutePopupHtml(p) {
-  if (p.length_km !== undefined && +p.length_km === 0) {
-    return `<div class="village-popup"><div class="pop-name" dir="auto">${escapeHtml(p.village_name || "Village")}</div>
-      <p style="margin:4px 0 0;font-size:11px;color:var(--text-secondary);">
-      ${escapeHtml(p.status_note || "Nearest road stays dry — move to high ground nearby.")}</p></div>`;
-  }
-  const cutTxt = isMissing(p.route_cut_min) ? "not cut in this run" : `cut at T+${Math.round(+p.route_cut_min)} min`;
+  const s = _evacSummary(p.village_id);
+  const foot = s && s.modes ? s.modes.foot : null;
+  const veh = s && s.modes ? s.modes.vehicle : null;
+  const dest = p.shelter_name
+    ? `Dry mainland → ${escapeHtml(p.shelter_name)}${isMissing(p.shelter_extra_min) ? "" : ` (+${Math.round(+p.shelter_extra_min)} min)`}`
+    : "Dry mainland (road that never floods)";
+  const lost = p.route_status === "lost";
   return `<div class="village-popup"><div class="pop-name" dir="auto">${escapeHtml(p.village_name || "Village")}</div>
+    ${lost ? `<p style="margin:4px 0 0;font-size:11px;color:#f87171;font-weight:600;">No way out on foot after ${_leaveByTxt(foot)}</p>` : ""}
     <dl class="pop-grid" style="margin-top:6px;">
-      <dt>Length</dt><dd>${isMissing(p.length_km) ? "—" : (+p.length_km).toFixed(2) + " km"}</dd>
-      <dt>Travel</dt><dd>${isMissing(p.travel_min) ? "—" : Math.round(+p.travel_min) + " min"}</dd>
-      <dt>Route</dt><dd>${escapeHtml(cutTxt)}</dd>
-      <dt>Water there</dt><dd>${isMissing(p.water_arrival_min) ? "—" : "T+" + Math.round(+p.water_arrival_min) + " min"}</dd>
-    </dl></div>`;
+      <dt>Leave by, on foot</dt><dd>${_leaveByTxt(foot)}</dd>
+      <dt>Leave by, vehicle</dt><dd>${_leaveByTxt(veh)}</dd>
+      <dt>Walk</dt><dd>${(+p.length_km).toFixed(1)} km · ${Math.round(+p.travel_min)} min</dd>
+      <dt>To</dt><dd>${dest}</dd>
+      <dt>Water there</dt><dd>${isMissing(s && s.water_arrival_min) ? "—" : "T+" + Math.round(+s.water_arrival_min) + " min"}</dd>
+    </dl>
+    <p style="margin:6px 0 0;font-size:10px;color:var(--text-muted);">Typical speeds (4.5 km/h on foot); roads close at 0.3 m. Debris and blockages not modelled.</p></div>`;
 }
 
 async function _loadEvacRoutes(jobId) {
@@ -4993,6 +5024,7 @@ async function _loadEvacRoutes(jobId) {
     const r = await fetch(`/api/run_layer/${jobId}/evac_routes`);
     if (!r.ok) return;
     evacRoutesGeoJSON = await r.json();
+    if (_priorityRows.length) renderPriorityList(_priorityRows);   // show leave-by
   } catch (e) {
     console.warn("evac_routes not available:", e);
   }
@@ -5015,23 +5047,31 @@ function _updateEvacRoutesAtTime(tMin) {
   if (t === _lastEvacT) return;
   _lastEvacT = t;
 
-  const ranked = [...evacRoutesGeoJSON.features]
-    .filter((f) => f.properties && +f.properties.length_km > 0)
-    .sort((a, b) => (a.properties.priority_rank || 999) - (b.properties.priority_rank || 999));
-
-  const wanted = selectedEvacVillageId
-    ? ranked.filter((f) => f.properties.village_id === selectedEvacVillageId)
-    : ranked.slice(0, 5);
-
-  const out = wanted.map((f) => {
+  // The on-foot route each settlement would take if it left NOW. Routes are
+  // precomputed per departure window [dep_from_min, dep_to_min]; after the last
+  // window closes (leave-by) the last route is drawn as lost.
+  const byVillage = new Map();
+  for (const f of evacRoutesGeoJSON.features) {
     const p = f.properties;
-    const cut = isMissing(p.route_cut_min) ? null : +p.route_cut_min;
+    if (!p || p.mode !== "foot" || !(+p.length_km > 0)) continue;
+    if (!byVillage.has(p.village_id)) byVillage.set(p.village_id, []);
+    byVillage.get(p.village_id).push(f);
+  }
+  let vids = [...byVillage.keys()].sort((a, b) =>
+    (byVillage.get(a)[0].properties.priority_rank || 999) - (byVillage.get(b)[0].properties.priority_rank || 999));
+  vids = selectedEvacVillageId ? vids.filter((v) => v === selectedEvacVillageId) : vids.slice(0, 5);
+
+  const out = vids.map((vid) => {
+    const fs = byVillage.get(vid).sort((a, b) => a.properties.dep_from_min - b.properties.dep_from_min);
+    let f = fs.find((x) => tMin >= x.properties.dep_from_min && tMin <= x.properties.dep_to_min);
     let status = "safe";
-    if (cut !== null) {
-      if (tMin >= cut) status = "lost";
-      else if (cut - tMin <= 60) status = "amber";
+    if (!f) {
+      if (tMin < fs[0].properties.dep_from_min) f = fs[0];
+      else { f = fs[fs.length - 1]; status = f.properties.status === "open" ? "safe" : "lost"; }
     }
-    return { ...f, properties: { ...p, route_status: status } };
+    const lb = f.properties.leave_by_min;
+    if (status !== "lost" && !isMissing(lb) && +lb - tMin <= 60) status = "amber";
+    return { ...f, properties: { ...f.properties, route_status: status } };
   });
   map.getSource("evac-routes").setData({ type: "FeatureCollection", features: out });
 
@@ -5052,7 +5092,7 @@ function _updateEvacRoutesAtTime(tMin) {
       m.getElement().className = cls;
       m.setLngLat([p.dest_lon, p.dest_lat]);
     }
-    m.getElement().title = `Safe ground for ${p.village_name || "village"}`;
+    m.getElement().title = `Dry mainland for ${p.village_name || "village"}`;
     m.getElement().style.display = "";
   }
   for (let i = out.length; i < evacRouteMarkers.length; i++) {

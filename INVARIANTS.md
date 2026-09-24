@@ -21,6 +21,8 @@ then moves no output.
 
 | To change… | Edit | Near-miss — do NOT edit |
 |---|---|---|
+| evacuation routes (who can still get out, and how) | `src/m6_isolation/evacuation.py::route_settlements`, called by `run_pipeline.py` (M6b, after ranking) and `scripts/backfill_visual_layers.py::build_evac_routes` | the backfill's old inline router (deleted 2026-09-24); `frontend/map.js::_updateEvacRoutesAtTime` only SELECTS a precomputed route by departure time, it computes nothing |
+| when a road link floods | `src/m6_isolation/isolation.py::edge_cut_times` — one implementation for timeline, backfill and routing | a copy of the sampling loop anywhere else |
 | how the breach grows (width, invert, discharge) | `src/m3_breach/breach_kernel.py` — the single shared kernel | `cascade.py` / `ensemble.py` growth code: they **call** the kernel, they don't define it |
 | the 0-D reservoir routing | `src/m3_breach/cascade.py::simulate_reservoir_cascade` | `breach_kernel.py` — it is one instant's discharge, not the routing |
 | where the opening is cut, and how it evolves | `src/m4_solvers/swe_2d.py::BreachOpening` + the P3 block in `run_pipeline.py` | `snap_to_thalweg` — it no longer positions the release and must not again (it lands on the pool floor: that was defect C2) |
@@ -44,6 +46,18 @@ then moves no output.
 | whether a cached OSM layer matches the scenario AOI | the `<name>.bbox.json` sidecar written by `_bbox_stamp_ok` | the layer's mtime — it says when it was fetched, never which bbox for |
 
 ## 2. Invariants — properties other code depends on
+
+**An evacuation route never puts anyone on a road link after it floods.** A link is
+usable only if the evacuee is off it before its cut time (`arrival + tau < cut`), and
+routing cut times are sampled every 25 m along the link, ends included
+(`edge_cut_times(spacing_m=25)`), never at the midpoint only. Destinations are the dry
+MAINLAND (largest cluster of never-wet nodes joined by never-cut links), never the
+nearest dry node. Each route is usable for every departure in `[dep_from_min, dep_to_min]`
+(exact, from the path's own cut times), and a settlement's `leave_by_min` is its last
+route's `dep_to_min`. Checked independently 2026-09-24: 20,390 points walked at 4.5 km/h
+against the raw depth frames, 0 wet on ordinary road. All 875 wet points were on
+bridge links, which keep the 3.0 m deck-clearance assumption.
+*Pinned by:* `tests/test_evacuation.py`, `tests/test_backfill_visual_layers.py::test_evac_routes_*`.
 
 **The scheme is well-balanced over ARBITRARY topography, and that is load-bearing.**
 `_rhs` uses Audusse et al. (2004) hydrostatic reconstruction: interface bed
@@ -503,6 +517,15 @@ applied to the moraine it derives a crest (5254.29 m) above the moraine's own
 highest barrier cell (5222.18 m), so the crest script correctly refuses.
 
 ## 4. Shortcuts with a known ceiling
+
+- Road-timeline and isolation cut times still use the edge MIDPOINT (`spacing_m=None`);
+  only routing samples along the link. On annamayya_compound a dry midpoint hid up to
+  3.6 m of water on a long link, so the "roads cut" count under-reads. Left as is on
+  2026-09-24 so on-screen counts did not change under the demo video; the upgrade is
+  `spacing_m=25` in `emit_road_cut_timeline` and `compute_isolation_times`.
+- Evacuation speeds are defaults (4.5 km/h on foot, per-class for vehicles). The OSM
+  graphs carry no speed tags, the network is drive-only (no footpaths), and debris is
+  not modelled.
 
 - `escape_head_4connected` is a minimax search, O(n log n) per call; fine at these
   grid sizes, would need a proper priority-flood if domains grow.

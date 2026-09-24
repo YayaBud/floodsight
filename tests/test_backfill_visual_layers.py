@@ -86,15 +86,19 @@ def test_evac_routes_destinations_are_safe_and_fields_sane():
         assert depth < THRESH_CAR, (
             f"{p['village_id']} destination depth {depth} >= threshold {THRESH_CAR}")
 
-        assert p["route_cut_min"] is None or p["route_cut_min"] >= 0
-        # A route whose destination IS the origin (village's nearest road node
-        # already never wetted) is a real, computed zero-length route — see
-        # backfill_visual_layers.py::build_evac_routes. travel_min is then
-        # legitimately 0, not > 0; distinguished by status_note.
-        if p["status_note"] == "village's nearest road node is itself never wetted in this run":
-            assert p["travel_min"] == 0.0
-        else:
-            assert p["travel_min"] > 0
+        # New contract (src/m6_isolation/evacuation.py): one feature per distinct
+        # route per mode, valid for departures in [dep_from_min, dep_to_min].
+        assert p["mode"] in ("foot", "vehicle")
+        assert p["dep_from_min"] <= p["dep_to_min"]
+        if p["status"] == "leave_by":
+            assert p["dep_to_min"] <= p["leave_by_min"] + 1e-6
+        assert p["travel_min"] >= 0
+        assert (p["length_km"] > 0) == (p["travel_min"] > 0)
+
+    # Every settlement is summarised for both modes.
+    for row in data["settlements"]:
+        assert set(row["modes"]) == {"foot", "vehicle"}
+        assert row["modes"]["foot"]["status"] in ("open", "leave_by", "none")
 
 
 # ── lake frames ──────────────────────────────────────────────────────────────

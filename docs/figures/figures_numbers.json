@@ -1,0 +1,36 @@
+{
+ "ritter": {
+  "rmse_fv": 0.04256274359856122,
+  "rmse_sph": 1.10950266056301,
+  "front_rel_err": 0.10426540284360189,
+  "t": 30.0
+ },
+ "release": {
+  "q_peak": 9355.856443727389,
+  "t_peak_h": 0.75
+ },
+ "arrivals": {
+  "late_min": [
+   100.0,
+   85.0,
+   115.0,
+   75.0,
+   495.0
+  ],
+  "summary": "0 of 5 historical arrival windows matched within tolerance",
+  "depth_matches": 3
+ },
+ "leave_by": {
+  "n": 18,
+  "open": 5,
+  "variants": 73,
+  "mainland": 1407,
+  "shelters": 18
+ },
+ "roads": {
+  "cut": 355,
+  "total": 5299,
+  "first": 60.0,
+  "last": 600.0
+ }
+}

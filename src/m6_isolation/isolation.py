@@ -394,6 +394,68 @@ def compute_isolation_times(
 # Road-cut timeline export  ★ THE DIFFERENTIATOR MADE VISIBLE ★
 # ──────────────────────────────────────────────────────────────────────────────
 
+def edge_cut_times(
+    G: nx.MultiDiGraph,
+    raster_stack: Sequence[tuple[float, str | Path]],
+    threshold_m: float = THRESH_CAR,
+    bridge_threshold_m: float = 3.0,
+    spacing_m: Optional[float] = None,
+) -> tuple[nx.MultiDiGraph, list[tuple], np.ndarray, np.ndarray]:
+    """
+    First timestep [s] at which each edge floods.
+
+    The one implementation behind the road timeline, the backfill and evacuation
+    routing. Returns ``(G_proj, edge_keys, cut_time_s, is_bridge)``; ``cut_time_s``
+    is NaN where the edge is never cut. ``edge_keys`` are ``(u, v, k)`` and match
+    ``G``'s own keys (projection keeps node ids and keys).
+
+    ``spacing_m=None`` samples the edge MIDPOINT only (the road timeline's
+    convention). With a spacing, the edge is sampled every ``spacing_m`` along its
+    geometry, both ends included, and floods when its DEEPEST sample does. Routing
+    must use a spacing: a long link with a dry midpoint can still run through
+    3.6 m of water (measured on annamayya_compound, 2026-09-24).
+    """
+    if not _OSMNX:
+        raise RuntimeError("OSMnx not installed. Run: pip install osmnx")
+    if not raster_stack:
+        raise ValueError("raster_stack is empty")
+    with rasterio.open(raster_stack[0][1]) as src0:
+        flood_crs = src0.crs
+    G_proj = ox.project_graph(G, to_crs=flood_crs)
+    edge_keys, exs, eys, is_bridge = edge_midpoints(G_proj)
+    logger.info("Road cut times: %d edges over %d timesteps", len(edge_keys), len(raster_stack))
+
+    owner = np.arange(len(edge_keys))            # sample -> edge index
+    if spacing_m:
+        sx, sy, so = [], [], []
+        for i, (u, v, k) in enumerate(edge_keys):
+            geom = G_proj.edges[u, v, k].get("geometry")
+            if geom is None:
+                a, b = G_proj.nodes[u], G_proj.nodes[v]
+                pts = np.linspace(0.0, 1.0, max(2, int(np.hypot(b["x"] - a["x"], b["y"] - a["y"]) // spacing_m) + 2))
+                sx.extend(a["x"] + (b["x"] - a["x"]) * pts); sy.extend(a["y"] + (b["y"] - a["y"]) * pts)
+            else:
+                n = max(2, int(geom.length // spacing_m) + 2)
+                for d in np.linspace(0.0, geom.length, n):
+                    p = geom.interpolate(d)
+                    sx.append(p.x); sy.append(p.y)
+            so.extend([i] * (len(sx) - len(so)))
+        exs, eys, owner = np.asarray(sx), np.asarray(sy), np.asarray(so)
+
+    cut_time_s = np.full(len(edge_keys), np.nan)
+    eff_thresh = np.where(is_bridge, bridge_threshold_m, threshold_m)
+    for t_s, raster_path in raster_stack:
+        with rasterio.open(raster_path) as src:
+            depth_arr = src.read(1).astype(float)
+            tr = src.transform
+        depths = np.nan_to_num(sample_raster(depth_arr, tr, exs, eys), nan=0.0)
+        edge_max = np.zeros(len(edge_keys))
+        np.maximum.at(edge_max, owner, depths)
+        newly_cut = (edge_max >= eff_thresh) & np.isnan(cut_time_s)
+        cut_time_s[newly_cut] = t_s
+    return G_proj, edge_keys, cut_time_s, is_bridge
+
+
 def emit_road_cut_timeline(
     G: nx.MultiDiGraph,
     raster_stack: Sequence[tuple[float, str | Path]],
@@ -436,30 +498,10 @@ def emit_road_cut_timeline(
         raise ValueError("raster_stack is empty")
 
     out_path = Path(out_path)
-
-    with rasterio.open(raster_stack[0][1]) as src0:
-        flood_crs = src0.crs
-        transform0 = src0.transform
-
-    # Project graph once
-    G_proj = ox.project_graph(G, to_crs=flood_crs)
-    edge_keys, exs, eys, is_bridge = edge_midpoints(G_proj)
+    G_proj, edge_keys, cut_time_s, is_bridge = edge_cut_times(
+        G, raster_stack, threshold_m, bridge_threshold_m)
+    flood_crs = G_proj.graph["crs"]
     n_edges = len(edge_keys)
-    logger.info("Road timeline: %d edges to track over %d timesteps",
-                n_edges, len(raster_stack))
-
-    # cut_time_s[i] = first t_s where edge i depth >= threshold_m
-    cut_time_s = np.full(n_edges, np.nan)
-
-    for t_s, raster_path in raster_stack:
-        with rasterio.open(raster_path) as src:
-            depth_arr = src.read(1).astype(float)
-            tr = src.transform
-
-        depths = sample_raster(depth_arr, tr, exs, eys)
-        eff_thresh = np.where(is_bridge, bridge_threshold_m, threshold_m)
-        newly_cut = (depths >= eff_thresh) & np.isnan(cut_time_s)
-        cut_time_s[newly_cut] = t_s
 
     n_cut = int((~np.isnan(cut_time_s)).sum())
     logger.info("Road timeline: %d / %d edges cut within the window", n_cut, n_edges)
