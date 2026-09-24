@@ -58,7 +58,9 @@ from src.m3_breach.ensemble import get_hydrographs
 from src.m4_solvers.swe_2d import run_2d_swe_simulation
 from src.m4_solvers.validation import run_ritter_benchmark
 from src.m5_exposure.exposure import compute_village_exposure
-from src.m6_isolation.isolation import (compute_isolation_times,
+from src.m6_isolation.evacuation import (never_wet_nodes, route_settlements,
+                                         shelters_from_gdf)
+from src.m6_isolation.isolation import (compute_isolation_times, edge_cut_times,
                                         emit_road_cut_timeline,
                                         THRESH_CAR)
 from src.m7_ranking.ranker import rank_villages, RankWeights
@@ -1994,6 +1996,31 @@ def execute_full_simulation(
     if ranked.crs is not None and str(ranked.crs) != "EPSG:4326":
         ranked = ranked.to_crs("EPSG:4326")
 
+    # ── M6b: evacuation routes (time-aware, on foot and by vehicle) ──────────
+    # Needs the ranking for labels, so it runs after M7. Links are sampled every
+    # 25 m, not at the midpoint: a dry midpoint can hide 3.6 m of water.
+    evac_routes_path = None
+    try:
+        _, _ek, _cut_s, _ = edge_cut_times(G, raster_stack, THRESH_CAR, spacing_m=25.0)
+        _cut_min = {k: (None if np.isnan(c) else float(c) / 60.0) for k, c in zip(_ek, _cut_s)}
+        _pts = ranked.geometry.representative_point()
+        _num = lambda v: None if v is None or (isinstance(v, float) and np.isnan(v)) else float(v)
+        _settlements = [{"village_id": r.get("village_id"), "village_name": r.get("village_name"),
+                         "priority_rank": None if _num(r.get("priority_rank")) is None
+                         else int(r.get("priority_rank")),
+                         "lon": p.x, "lat": p.y, "water_arrival_min": _num(r.get("water_arrival_min"))}
+                        for (_, r), p in zip(ranked.iterrows(), _pts)]
+        _evac = route_settlements(
+            G, _cut_min, never_wet_nodes(G, flood_depth_tif, THRESH_CAR), _settlements,
+            shelters_from_gdf(facilities_gdf, flood_depth_tif, THRESH_CAR),
+            raster_stack[0][0] / 60.0, raster_stack[-1][0] / 60.0)
+        evac_routes_path = out_dir / "evac_routes.geojson"
+        evac_routes_path.write_text(json.dumps(_evac, ensure_ascii=False, allow_nan=False), encoding="utf-8")
+        logger.info("M6b: %d evacuation route variants → %s", len(_evac["features"]), evac_routes_path)
+    except Exception as exc:
+        logger.warning("M6b: evacuation routing failed (%s) — continuing without it", exc)
+        evac_routes_path = None
+
     # ── Provenance stamping ───────────────────────────────────────────────────
     # A live solver on synthetic terrain is still synthetic; `worst` enforces it.
     def _row_provenance(row) -> str:
@@ -2416,6 +2443,8 @@ def execute_full_simulation(
         artifact_manifest.append({"name": "snapshots_index", "path": str(snapshots_index_path), "media_type": "application/json", "required": True})
     if roads_timeline_path and Path(roads_timeline_path).is_file():
         artifact_manifest.append({"name": "roads_timeline", "path": str(roads_timeline_path), "media_type": "application/geo+json", "required": False})
+    if evac_routes_path and Path(evac_routes_path).is_file():
+        artifact_manifest.append({"name": "evac_routes", "path": str(evac_routes_path), "media_type": "application/geo+json", "required": False})
     if 'envelope_tif' in locals() and envelope_tif and Path(envelope_tif).is_file():
         artifact_manifest.append({"name": "envelope", "path": str(envelope_tif), "media_type": "image/tiff", "required": False})
     if 'envelope_geojson_path' in locals() and envelope_geojson_path and Path(envelope_geojson_path).is_file():
@@ -2443,6 +2472,7 @@ def execute_full_simulation(
         "arms_contributing": arms_contributing if 'arms_contributing' in locals() else None,
         "snapshots_index": str(snapshots_index_path),
         "roads_timeline": str(roads_timeline_path) if roads_timeline_path else None,
+        "evac_routes": str(evac_routes_path) if evac_routes_path else None,
         "validation_agreement": str(agreement_path) if agreement_path else None,
         "observed_extent": str(observed_extent_path) if observed_extent_path else None,
         "validation_roads": str(roads_val_path) if roads_val_path else None,
