@@ -168,13 +168,13 @@ async function renderRitterPlot() {
       x: x_analytical, y: h_swe_real,
       mode: "lines",
       line: { color: T().accent, width: 1.8 },
-      name: "FloodSight 2D SWE (COMPUTED LIVE)",
+      name: "FloodSense 2D SWE (COMPUTED LIVE)",
     });
     const rmse_swe = Math.sqrt(
       h_swe_real.reduce((acc, v, i) => acc + Math.pow(v - h_analytical[i], 2), 0) / h_swe_real.length
     ).toFixed(3);
     annotations.push({
-      text: `FloodSight SWE RMSE = ${rmse_swe} m (COMPUTED LIVE)`,
+      text: `FloodSense SWE RMSE = ${rmse_swe} m (COMPUTED LIVE)`,
       x: 0.01, y: 0.88, xref: "paper", yref: "paper",
       xanchor: "left", showarrow: false,
       font: { size: 11, color: T().accent, family: T().mono },
@@ -188,14 +188,14 @@ async function renderRitterPlot() {
       x: x_analytical, y: h_sph_real,
       mode: "lines",
       line: { color: T().cool, width: 1.8, dash: "dash" },
-      name: "FloodSight SWE-SPH (COMPUTED LIVE)",
+      name: "FloodSense SWE-SPH (COMPUTED LIVE)",
     });
     let rmse_sph = "?";
     if (ritterData && ritterData.sph_ritter && ritterData.sph_ritter.rmse_sph) {
       rmse_sph = ritterData.sph_ritter.rmse_sph.toFixed(3);
     }
     annotations.push({
-      text: `FloodSight SPH RMSE = ${rmse_sph} m (COMPUTED LIVE)`,
+      text: `FloodSense SPH RMSE = ${rmse_sph} m (COMPUTED LIVE)`,
       x: 0.01, y: 0.79, xref: "paper", yref: "paper",
       xanchor: "left", showarrow: false,
       font: { size: 11, color: T().cool, family: T().mono },
