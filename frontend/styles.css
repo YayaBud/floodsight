@@ -1724,12 +1724,17 @@ body:has(#spine.is-compact) .map-tools {
   flex-direction: column;
   align-items: center;
   gap: 1px;
+  width: 132px;
   max-width: 132px;
   text-align: center;
   pointer-events: none;
 }
 .pin-label.pin-in { animation: pin-label-in 320ms var(--ease) backwards; }
 .pin-label b {
+  display: block;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 600;
@@ -1833,7 +1838,9 @@ body:has(#spine.is-compact) .map-tools {
   background: linear-gradient(135deg, #34D399, #10B981);
 }
 
-.readout { display: flex; align-items: baseline; gap: 6px; }
+/* min-width: 0 lets the phase title shrink and ellipsize inside the flex row;
+   without it a long title pushed .spine-ends into three wrapped lines. */
+.readout { display: flex; align-items: baseline; gap: 6px; flex: 1 1 auto; min-width: 0; }
 .readout-t {
   font-family: var(--font-mono);
   font-size: 11px;
@@ -1848,10 +1855,20 @@ body:has(#spine.is-compact) .map-tools {
   letter-spacing: -.02em;
   line-height: 1;
   color: var(--text-primary);
+  /* The phase title (e.g. "T-90 min · Reservoir Rising (63.4 MCM)") must stay
+     one line -- overflow ellipses and the full text is still available via
+     the element's own `title`, set alongside textContent in map.js. */
+  max-width: 100%;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .spine-ends {
   margin-left: auto;
+  flex: none;
+  white-space: nowrap;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2402,6 +2419,7 @@ body.hide-markings .village-mark.is-rank1 .village-dot {
 }
 
 .village-dot {
+  position: relative;
   width: 9px;
   height: 9px;
   border-radius: 50%;
@@ -2647,6 +2665,11 @@ body.hide-markings .village-mark.is-rank1 .village-dot {
 .roadcut-mark.is-bridge .roadcut-badge {
   border-color: rgba(168, 85, 247, 0.45);
 }
+/* Icon only on the map; the "ROAD CUT T+N" text shows on hover. With 15 cuts
+   on screen the text pills overlapped each other and the village labels. */
+.roadcut-mark .roadcut-badge { display: none; }
+.roadcut-mark:hover .roadcut-badge { display: inline-flex; }
+.roadcut-mark .roadcut-pin { width: 16px; height: 16px; border-width: 1.5px; }
 
 /* ── Markings Toggle Button in .map-tools ─────────────────────────────── */
 #btn-toggle-markings {
@@ -2943,4 +2966,103 @@ body.show-all-shelter-labels .shelter-badge {
   font-weight: 600;
   white-space: nowrap;
   vertical-align: middle;
+}
+
+/* ══════════════════════════════════════════════════════ FLOW-FIELD CANVAS
+   Sits between #map and #workspace in z-order (paint order in the DOM). Never
+   intercepts pointer events -- it is a pure visual overlay, redrawn every
+   frame by map.js from front_field data. */
+#flow-canvas {
+  position: fixed;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+}
+
+/* ══════════════════════════════════════════════════════ LAKE / RESERVOIR LAYER
+   Deliberately distinct from both the chrome accent and the flood-depth ramp
+   (ui.md: accent is chrome-only, depth ramp tops out at --depth-6) so a
+   reservoir never reads as either. */
+#lake-fill    { }
+.dam-mark.is-overtop .dam-beacon-core {
+  animation: dam-overtop-pulse 1.1s ease-in-out infinite;
+}
+@keyframes dam-overtop-pulse {
+  0%, 100% { box-shadow: 0 2px 12px rgba(217, 119, 6, 0.6), 0 0 0 2px rgba(245, 158, 11, 0.35); }
+  50%      { box-shadow: 0 2px 20px rgba(239, 68, 68, 0.85), 0 0 0 5px rgba(239, 68, 68, 0.45); }
+}
+.dam-mark.is-breach-flash .dam-beacon-core {
+  animation: dam-breach-flash 900ms ease-out 1;
+}
+@keyframes dam-breach-flash {
+  0%   { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.9); }
+  100% { box-shadow: 0 0 40px 18px rgba(239, 68, 68, 0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .dam-mark.is-overtop .dam-beacon-core,
+  .dam-mark.is-breach-flash .dam-beacon-core { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════ EVACUATION ROUTES */
+.evac-route-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #10b981;
+  border: 2px solid #fff;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.7);
+  pointer-events: none;
+}
+.evac-route-arrow.is-amber { background: #f59e0b; box-shadow: 0 0 8px rgba(245, 158, 11, 0.7); }
+.evac-route-arrow.is-lost  { background: #64748b; box-shadow: none; }
+
+/* ══════════════════════════════════════════════════════ MARCHING DASH (Story/route)
+   Opt-in only -- the entrance-animation trap in ui.md applies here too: a
+   frozen dash-offset still leaves the line itself visible. */
+.evac-route-line-anim {
+  animation: evac-dash-march 900ms linear infinite;
+}
+@keyframes evac-dash-march {
+  to { stroke-dashoffset: -16; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .evac-route-line-anim { animation: none; }
+}
+
+/* ══════════════════════════════════════════════════════ ROADCUT MARKER (existing
+   .roadcut-mark styling covers icon+badge already; no change needed here). */
+
+/* ══════════════════════════════════════════════════════ STORY BUTTON */
+#btn-story:disabled { opacity: .4; }
+
+/* ══════════════════════════════════════════════════════ VILLAGE MARKER — DOT-ONLY
+   FALLBACK when hidden by label-collision (item 7). Keeps the place marked
+   without a colliding badge. */
+.village-mark.is-collision-hidden .village-badge { display: none; }
+.village-mark.is-collision-hidden .village-dot { opacity: .85; }
+
+/* One-shot "water just arrived" ring, distinct from the rank-1 continuous
+   pulse above -- this one plays once and stops, so a frozen tab still shows
+   the dot underneath rather than a half-finished ring. */
+.village-mark .arrival-ring {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #38bdf8;
+  opacity: 0;
+  pointer-events: none;
+}
+.village-mark .arrival-ring.is-playing {
+  animation: fs-arrival-ring 900ms ease-out 1;
+}
+@keyframes fs-arrival-ring {
+  0%   { transform: scale(.4); opacity: .9; }
+  100% { transform: scale(2.2); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .village-mark .arrival-ring.is-playing { animation: none; }
 }
